@@ -1,0 +1,7 @@
+🎨 BOF Videos Machine — Product Video Generation
+============================================================
+📦 Product: Tarte Big Stick Energy Duo
+⏱️ Duration: ~8 seconds
+🔄 Pipeline: Image → Upload → Image-to-Video → Download
+============================================================
+📤 Step 1: Uploading product image to KIE.ai...
