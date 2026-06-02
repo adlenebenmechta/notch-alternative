@@ -897,6 +897,27 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     if (!char) return;
     setSelectedCharacterId(charId);
     try {
+      // If imageUrl is already a data URL, use it directly (uploaded characters)
+      if (char.imageUrl.startsWith("data:")) {
+        const img = new Image();
+        img.onload = () => {
+          const canvas = document.createElement("canvas");
+          const maxDim = 1024;
+          const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
+          canvas.width = Math.round(img.width * ratio);
+          canvas.height = Math.round(img.height * ratio);
+          const ctx = canvas.getContext("2d");
+          if (ctx) {
+            ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+            const compressedUrl = canvas.toDataURL("image/jpeg", 0.90);
+            setAvatarImage(compressedUrl);
+            setAvatarUrl("");
+          }
+        };
+        img.src = char.imageUrl;
+        return;
+      }
+      // Server-hosted image (default characters): fetch then compress
       const res = await fetch(char.imageUrl);
       const blob = await res.blob();
       const reader = new FileReader();
@@ -923,7 +944,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     } catch (err) {
       console.error("Failed to load character:", err);
     }
-  }, []);
+  }, [characterLibrary]);
 
   // ─── Add Character to Library ──────────────────────────────────────
   const handleNewCharImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
