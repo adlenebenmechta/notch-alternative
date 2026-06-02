@@ -607,11 +607,33 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [useFreeAi, setUseFreeAi] = useState(true);
   const [aiProvider, setAiProvider] = useState<"deepseek" | "groq" | "gemini" | "openrouter" | "custom">("deepseek");
 
-  // ── Character Library ──
-  const CHARACTER_LIBRARY = [
-    { id: "char1", name: "Sarah", imageUrl: "/characters/character-1.jpg" },
+  // ── Character Library (persisted in localStorage) ──
+  const DEFAULT_CHARACTERS = [
+    { id: "char1", name: "Sarah", imageUrl: "/characters/character-1.jpg", isDefault: true },
   ];
+  const CHARACTERS_STORAGE_KEY = "ai_avatar_character_library";
+  const [characterLibrary, setCharacterLibrary] = useState<Array<{ id: string; name: string; imageUrl: string; isDefault?: boolean }>>(() => {
+    try {
+      const stored = localStorage.getItem(CHARACTERS_STORAGE_KEY);
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch {}
+    return DEFAULT_CHARACTERS;
+  });
   const [selectedCharacterId, setSelectedCharacterId] = useState<string | null>(null);
+  const [showAddCharacter, setShowAddCharacter] = useState(false);
+  const [newCharName, setNewCharName] = useState("");
+  const [newCharImage, setNewCharImage] = useState<string | null>(null);
+  const [isAddingCharacter, setIsAddingCharacter] = useState(false);
+
+  // Persist character library to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(CHARACTERS_STORAGE_KEY, JSON.stringify(characterLibrary));
+    } catch {}
+  }, [characterLibrary]);
 
   // ── Product URL & Image ──
   const [productUrl, setProductUrl] = useState("");
@@ -871,7 +893,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
   // ─── Character Library Selection ───────────────────────────────────────
   const handleSelectCharacter = useCallback(async (charId: string) => {
-    const char = CHARACTER_LIBRARY.find(c => c.id === charId);
+    const char = characterLibrary.find(c => c.id === charId);
     if (!char) return;
     setSelectedCharacterId(charId);
     try {
@@ -902,6 +924,56 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       console.error("Failed to load character:", err);
     }
   }, []);
+
+  // ─── Add Character to Library ──────────────────────────────────────
+  const handleNewCharImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    const reader = new FileReader();
+    reader.onload = (ev) => {
+      const dataUrl = ev.target?.result as string;
+      const img = new Image();
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const maxDim = 1024;
+        const ratio = Math.min(maxDim / img.width, maxDim / img.height, 1);
+        canvas.width = Math.round(img.width * ratio);
+        canvas.height = Math.round(img.height * ratio);
+        const ctx = canvas.getContext("2d");
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+          const compressedUrl = canvas.toDataURL("image/jpeg", 0.90);
+          setNewCharImage(compressedUrl);
+        }
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const addCharacterToLibrary = useCallback(() => {
+    if (!newCharImage) { alert("Please upload an image for the character."); return; }
+    const name = newCharName.trim() || `Character ${characterLibrary.length + 1}`;
+    const newChar = {
+      id: `char_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`,
+      name,
+      imageUrl: newCharImage, // data URL stored directly
+    };
+    setCharacterLibrary((prev) => [...prev, newChar]);
+    setNewCharName("");
+    setNewCharImage(null);
+    setShowAddCharacter(false);
+    setIsAddingCharacter(false);
+  }, [newCharImage, newCharName, characterLibrary.length]);
+
+  const removeCharacterFromLibrary = useCallback((charId: string) => {
+    setCharacterLibrary((prev) => prev.filter((c) => c.id !== charId));
+    if (selectedCharacterId === charId) {
+      setSelectedCharacterId(null);
+      setAvatarImage(null);
+      setAvatarUrl("");
+    }
+  }, [selectedCharacterId]);
 
   // ─── Product Image Upload ───────────────────────────────────────────
   const handleProductImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -2835,39 +2907,159 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   <>
                   {/* ── Character Library ── */}
                   <div className="mb-4">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
-                      🎭 Character Library
-                    </label>
+                    <div className="flex items-center justify-between mb-2">
+                      <label className="text-xs font-bold uppercase tracking-wider" style={{ color: T.textMuted }}>
+                        🎭 Character Library
+                      </label>
+                      <button
+                        onClick={() => { setShowAddCharacter(!showAddCharacter); setNewCharImage(null); setNewCharName(""); setIsAddingCharacter(false); }}
+                        disabled={isRunning || isAutoChainRunning}
+                        className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-50 border-2"
+                        style={{
+                          backgroundColor: showAddCharacter ? `${T.pink}15` : T.inputBg,
+                          borderColor: showAddCharacter ? T.pink : T.cardBorder,
+                          color: showAddCharacter ? T.pink : T.textMuted,
+                        }}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                          <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+                        </svg>
+                        Add Character
+                      </button>
+                    </div>
+
+                    {/* Character Grid */}
                     <div className="flex gap-3 flex-wrap">
-                      {CHARACTER_LIBRARY.map((char) => (
-                        <button
-                          key={char.id}
-                          onClick={() => handleSelectCharacter(char.id)}
-                          disabled={isRunning}
-                          className="flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 group disabled:opacity-50"
-                        >
-                          <div
-                            className="w-[60px] h-[60px] rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105"
-                            style={{
-                              borderColor: selectedCharacterId === char.id ? T.pink : T.cardBorder,
-                              boxShadow: selectedCharacterId === char.id ? `0 0 0 2px ${T.pink}40` : "none",
-                            }}
+                      {characterLibrary.map((char) => (
+                        <div key={char.id} className="relative flex flex-col items-center gap-1 group/char">
+                          <button
+                            onClick={() => handleSelectCharacter(char.id)}
+                            disabled={isRunning || isAutoChainRunning}
+                            className="flex flex-col items-center gap-1 cursor-pointer transition-all duration-200 group disabled:opacity-50"
                           >
-                            <img
-                              src={char.imageUrl}
-                              alt={char.name}
-                              className="w-full h-full object-cover"
-                            />
-                          </div>
-                          <span
-                            className="text-[10px] font-semibold"
-                            style={{ color: selectedCharacterId === char.id ? T.pink : T.textMuted }}
-                          >
-                            {char.name}
-                          </span>
-                        </button>
+                            <div
+                              className="w-[60px] h-[60px] rounded-xl overflow-hidden border-2 transition-all duration-200 group-hover:scale-105"
+                              style={{
+                                borderColor: selectedCharacterId === char.id ? T.pink : T.cardBorder,
+                                boxShadow: selectedCharacterId === char.id ? `0 0 0 2px ${T.pink}40` : "none",
+                              }}
+                            >
+                              <img
+                                src={char.imageUrl}
+                                alt={char.name}
+                                className="w-full h-full object-cover"
+                              />
+                            </div>
+                            <span
+                              className="text-[10px] font-semibold max-w-[60px] truncate"
+                              style={{ color: selectedCharacterId === char.id ? T.pink : T.textMuted }}
+                            >
+                              {char.name}
+                            </span>
+                          </button>
+                          {/* Delete button (only for non-default characters) */}
+                          {!char.isDefault && (
+                            <button
+                              onClick={() => { if (confirm(`Remove "${char.name}" from library?`)) removeCharacterFromLibrary(char.id); }}
+                              disabled={isRunning || isAutoChainRunning}
+                              className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full flex items-center justify-center opacity-0 group-hover/char:opacity-100 transition-all cursor-pointer disabled:opacity-0 z-10"
+                              style={{ backgroundColor: "#EF4444", color: "#fff", boxShadow: "0 2px 6px rgba(239,68,68,0.4)" }}
+                              title="Remove character"
+                            >
+                              <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                              </svg>
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
+
+                    {/* Add Character Panel */}
+                    {showAddCharacter && (
+                      <div className="mt-3 p-4 rounded-2xl border-2" style={{ borderColor: `${T.pink}40`, backgroundColor: isDark ? `${T.pink}08` : `${T.pink}05` }}>
+                        <div className="flex items-center gap-2 mb-3">
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={T.pink} strokeWidth={2}>
+                            <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0" />
+                          </svg>
+                          <span className="text-xs font-bold uppercase tracking-wider" style={{ color: T.text }}>Add New Character</span>
+                        </div>
+
+                        {/* Character Name */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: T.textMuted }}>
+                            Character Name
+                          </label>
+                          <input
+                            type="text"
+                            value={newCharName}
+                            onChange={(e) => setNewCharName(e.target.value)}
+                            placeholder="e.g. Alex, John, Maria..."
+                            maxLength={20}
+                            className="w-full px-3 py-2 rounded-xl text-sm outline-none transition-all border-2"
+                            style={{ backgroundColor: T.inputBg, borderColor: newCharName ? T.cyan : T.inputBorder, color: T.text, caretColor: T.pink }}
+                            onFocus={(e) => { e.currentTarget.style.borderColor = T.cyan; }}
+                            onBlur={(e) => { e.currentTarget.style.borderColor = newCharName ? T.cyan : T.inputBorder; }}
+                          />
+                        </div>
+
+                        {/* Character Image Upload */}
+                        <div className="mb-3">
+                          <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: T.textMuted }}>
+                            Character Image
+                          </label>
+                          {!newCharImage ? (
+                            <label
+                              className="flex items-center justify-center gap-2 px-4 py-3 rounded-xl border-2 border-dashed cursor-pointer transition-all hover:border-current"
+                              style={{ borderColor: T.cardBorder, backgroundColor: T.inputBg, color: T.textMuted }}
+                            >
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M6.827 6.175A2.31 2.31 0 0 1 5.186 7.23c-.38.054-.757.112-1.134.175C2.999 7.58 2.25 8.507 2.25 9.574V18a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9.574c0-1.067-.75-1.994-1.802-2.169a47.865 47.865 0 0 0-1.134-.175 2.31 2.31 0 0 1-1.64-1.055l-.822-1.316a2.192 2.192 0 0 0-1.736-1.039 48.774 48.774 0 0 0-5.232 0 2.192 2.192 0 0 0-1.736 1.039l-.821 1.316z" />
+                                <path strokeLinecap="round" strokeLinejoin="round" d="M16.5 12.75a4.5 4.5 0 1 1-9 0 4.5 4.5 0 0 1 9 0z" />
+                              </svg>
+                              <span className="text-xs font-medium">Upload Character Photo</span>
+                              <input type="file" accept="image/*" onChange={handleNewCharImageUpload} className="hidden" />
+                            </label>
+                          ) : (
+                            <div className="flex items-center gap-3">
+                              <div className="w-16 h-16 rounded-xl overflow-hidden border-2" style={{ borderColor: T.cyan }}>
+                                <img src={newCharImage} alt="New character" className="w-full h-full object-cover" />
+                              </div>
+                              <div className="flex-1">
+                                <p className="text-xs font-bold" style={{ color: T.text }}>Photo uploaded</p>
+                                <p className="text-[9px] mt-0.5" style={{ color: T.textMuted }}>Front-facing, clear face works best</p>
+                                <button
+                                  onClick={() => setNewCharImage(null)}
+                                  className="mt-1 text-[10px] font-bold uppercase tracking-wider cursor-pointer"
+                                  style={{ color: "#EF4444" }}
+                                >
+                                  Change photo
+                                </button>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Save Button */}
+                        <div className="flex gap-2">
+                          <button
+                            onClick={addCharacterToLibrary}
+                            disabled={!newCharImage}
+                            className="flex-1 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40"
+                            style={{ backgroundColor: T.pink, color: "#fff", boxShadow: newCharImage ? `0 4px 16px ${T.pink}30` : "none" }}
+                          >
+                            Save to Library
+                          </button>
+                          <button
+                            onClick={() => { setShowAddCharacter(false); setNewCharImage(null); setNewCharName(""); }}
+                            className="px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all cursor-pointer"
+                            style={{ backgroundColor: T.inputBg, border: `2px solid ${T.cardBorder}`, color: T.textMuted }}
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                   </div>
 
                   {/* Divider */}
