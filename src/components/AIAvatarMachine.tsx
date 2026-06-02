@@ -736,6 +736,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [autoChainError, setAutoChainError] = useState("");
   const [isAutoChainRunning, setIsAutoChainRunning] = useState(false);
   const [pendingAutoChain, setPendingAutoChain] = useState(false); // Trigger: auto-start chain after script gen
+  const [regeneratingFrameIndex, setRegeneratingFrameIndex] = useState<number | null>(null);
 
   // ── Pipeline Checkpoint (survives page refresh) ──
   const PIPELINE_CHECKPOINT_KEY = "ai_avatar_pipeline_checkpoint";
@@ -808,6 +809,8 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const abortRef = useRef<AbortController | null>(null);
   const scenesRef = useRef(scenes); // Keep a ref to latest scenes for resume data
   scenesRef.current = scenes; // Update ref whenever scenes changes
+  const autoChainFrameUrlsRef = useRef<string[]>([]);
+  const autoChainVideoUrlsRef = useRef<string[]>([]);
   const pollIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const currentJobIdRef = useRef<string | null>(null);
   const lastEventTimeRef = useRef<number>(0);
@@ -1225,6 +1228,118 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     return url;
   }, [addLog]);
 
+  // ─── Regenerate Single Scene Frame ──────────────────────────────────
+  const regenerateSceneFrame = useCallback(async (sceneIndex: number) => {
+    const scene = scenes[sceneIndex];
+    if (!scene) return;
+    if (!avatarImage && !scene.referenceImage) { alert("Please select a character or add a reference image first."); return; }
+    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
+    setRegeneratingFrameIndex(sceneIndex);
+    addLog(`Regenerating frame for Scene ${sceneIndex + 1}...`);
+
+    try {
+      // Upload character/avatar image (use reference image if available, otherwise avatar)
+      let refImageUrl = "";
+      if (scene.referenceImage) {
+        addLog(`Scene ${sceneIndex + 1}: Using scene reference image...`);
+        const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
+        const refFormData = new FormData();
+        refFormData.append("avatar", refBlob, "reference.jpg");
+        refFormData.append("kieApiKey", kieApiKey);
+        const refUploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: refFormData });
+        if (refUploadRes.ok) {
+          const refData = await refUploadRes.json();
+          if (refData.avatarUrl) refImageUrl = refData.avatarUrl;
+        }
+      }
+
+      if (!refImageUrl && avatarImage) {
+        addLog(`Scene ${sceneIndex + 1}: Uploading character image...`);
+        refImageUrl = await uploadAvatarToServer(avatarImage, kieApiKey);
+      }
+
+      if (!refImageUrl) throw new Error("No reference image available");
+
+      // Build frame prompt from edited scene data
+      const prompt = scene.framePrompt || scene.description || `Person looking at camera, scene ${sceneIndex + 1}. Photorealistic.`;
+
+      // Call auto-chain API with just this one scene
+      addLog(`Scene ${sceneIndex + 1}: Generating frame with prompt: "${prompt.slice(0, 80)}..."`);
+      const pipelineRes = await authFetch("/api/auto-chain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          characterImageUrl: refImageUrl,
+          scenes: [{ script: scene.script, framePrompt: prompt, description: scene.description, label: scene.label }],
+          kieApiKey,
+          falApiKey,
+          videoModel,
+        }),
+      });
+
+      if (!pipelineRes.ok) {
+        const errData = await pipelineRes.json().catch(() => ({ error: "Frame regeneration failed" }));
+        throw new Error(errData.error || "Frame regeneration failed");
+      }
+
+      // Read SSE stream to get the frame URL
+      const reader = pipelineRes.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+
+      const decoder = new TextDecoder();
+      let buffer = "";
+      let frameUrl = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "frame_done" && event.frameUrl) {
+              frameUrl = event.frameUrl;
+            }
+            if (event.type === "error") {
+              throw new Error(event.message || "Frame regeneration failed");
+            }
+          } catch (e) {
+            if (e instanceof Error && !e.message.includes("Frame regeneration failed")) throw e;
+          }
+        }
+      }
+
+      if (frameUrl) {
+        // Update the specific scene with the new frame URL
+        setScenes((prev) =>
+          prev.map((s, i) => i === sceneIndex ? { ...s, frameUrl, frameDone: true, frameProgress: 100 } : s)
+        );
+        // Also update autoChainFrameUrls
+        setAutoChainFrameUrls((prev) => {
+          const next = [...prev];
+          next[sceneIndex] = frameUrl;
+          return next;
+        });
+        addLog(`Scene ${sceneIndex + 1}: Frame regenerated successfully!`);
+      } else {
+        throw new Error("No frame URL received from server");
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog(`Scene ${sceneIndex + 1}: Frame regeneration failed: ${msg}`);
+      alert("Frame regeneration failed: " + msg);
+    } finally {
+      setRegeneratingFrameIndex(null);
+    }
+  }, [scenes, avatarImage, kieApiKey, falApiKey, videoModel, addLog, uploadAvatarToServer, authFetch]);
+
   // ─── Auto Chain Pipeline ──────────────────────────────────────────
   const startAutoChain = useCallback(async () => {
     if (!avatarImage) { alert("Please select a character from the Character Library first."); return; }
@@ -1345,6 +1460,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               setAutoChainFrameUrls((prev) => {
                 const next = [...prev];
                 next[event.sceneIndex] = event.frameUrl;
+                autoChainFrameUrlsRef.current = next;
                 return next;
               });
             }
@@ -1373,6 +1489,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               setAutoChainVideoUrls((prev) => {
                 const next = [...prev];
                 next[event.sceneIndex] = event.videoUrl;
+                autoChainVideoUrlsRef.current = next;
                 return next;
               });
             }
@@ -1417,9 +1534,34 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       if (!pipelineDone && !controller.signal.aborted) {
-        addLog("Pipeline stream ended unexpectedly");
-        setAutoChainStep("error");
-        setAutoChainError("Pipeline stream ended unexpectedly");
+        // Stream ended without "done" event — check if we have partial results
+        const frameResults = autoChainFrameUrlsRef.current;
+        const videoResults = autoChainVideoUrlsRef.current;
+        const hasFrameResults = frameResults.length > 0 && frameResults.some(Boolean);
+        const hasVideoResults = videoResults.length > 0 && videoResults.some(Boolean);
+
+        if (hasVideoResults) {
+          // We have some videos! Treat as partial success
+          addLog("Pipeline stream ended early, but some videos were generated.");
+          setAutoChainStep("done");
+          setAutoChainProgress(100);
+          setPipelineStep(4);
+          const validVideos = videoResults.filter(Boolean);
+          setFinalVideoUrls(validVideos);
+          if (validVideos.length === 1) {
+            setAutoChainMergedUrl(validVideos[0]);
+            setFinalVideoUrl(validVideos[0]);
+          }
+        } else if (hasFrameResults) {
+          // Frames were generated but no videos yet
+          addLog("Pipeline ended during video generation. Frames are available for review.");
+          setAutoChainStep("error");
+          setAutoChainError("Pipeline ended during video generation. Your frames were generated — you can regenerate individual frames if needed, then try again.");
+        } else {
+          addLog("Pipeline stream ended unexpectedly — no results were generated.");
+          setAutoChainStep("error");
+          setAutoChainError("Pipeline stream ended unexpectedly. This may be a timeout issue — try again with fewer scenes.");
+        }
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -3894,19 +4036,61 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                             />
                           </div>
 
-                          {/* Frame Prompt (collapsible, only shown if present) */}
-                          {scene.framePrompt && (
-                            <details className="group">
-                              <summary className="text-[10px] font-bold uppercase tracking-widest cursor-pointer select-none flex items-center gap-1 mb-1" style={{ color: T.textMuted }}>
-                                🎨 Image Prompt
-                                <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                                  <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
-                                </svg>
-                              </summary>
-                              <p className="text-[11px] leading-relaxed mt-1 px-2 py-1.5 rounded-lg" style={{ backgroundColor: T.lightPink + "50", color: T.text }}>
-                                {scene.framePrompt}
-                              </p>
-                            </details>
+                          {/* Frame Prompt - Editable in Custom Frames, read-only in other modes */}
+                          {frameMode === "custom" ? (
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: T.textMuted }}>
+                                🎨 Image Prompt <span className="font-normal lowercase tracking-normal opacity-60">(editable)</span>
+                              </label>
+                              <textarea
+                                value={scene.framePrompt}
+                                onChange={(e) => updateScene(scene.id, "framePrompt", e.target.value)}
+                                placeholder="Describe the visual setting, person's appearance, pose, background... (leave empty to use default)"
+                                disabled={isAutoChainRunning || regeneratingFrameIndex !== null}
+                                rows={3}
+                                className="w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 resize-none outline-none border-2 focus:border-current"
+                                style={{ backgroundColor: T.inputBg, borderColor: scene.framePrompt ? T.cyan : T.cardBorder, color: T.text, caretColor: T.pink }}
+                              />
+                            </div>
+                          ) : (
+                            /* Other modes: collapsible read-only frame prompt */
+                            scene.framePrompt && (
+                              <details className="group">
+                                <summary className="text-[10px] font-bold uppercase tracking-widest cursor-pointer select-none flex items-center gap-1 mb-1" style={{ color: T.textMuted }}>
+                                  🎨 Image Prompt
+                                  <svg className="w-3 h-3 transition-transform group-open:rotate-90" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5" />
+                                  </svg>
+                                </summary>
+                                <p className="text-[11px] leading-relaxed mt-1 px-2 py-1.5 rounded-lg" style={{ backgroundColor: T.lightPink + "50", color: T.text }}>
+                                  {scene.framePrompt}
+                                </p>
+                              </details>
+                            )
+                          )}
+
+                          {/* Regenerate Frame Button - only in Custom Frames when a frame exists */}
+                          {frameMode === "custom" && (autoChainFrameUrls[i] || scene.frameUrl) && !isAutoChainRunning && (
+                            <button
+                              onClick={() => regenerateSceneFrame(i)}
+                              disabled={regeneratingFrameIndex !== null}
+                              className="w-full flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 border-2"
+                              style={{ backgroundColor: "transparent", borderColor: T.lime, color: T.lime }}
+                            >
+                              {regeneratingFrameIndex === i ? (
+                                <>
+                                  <div className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${T.lime}50`, borderTopColor: T.lime }} />
+                                  Regenerating Frame...
+                                </>
+                              ) : (
+                                <>
+                                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2.5}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182" />
+                                  </svg>
+                                  Regenerate Frame
+                                </>
+                              )}
+                            </button>
                           )}
 
                           {/* Expression / Gesture — only in Custom Frames + Expressive (v2) */}
