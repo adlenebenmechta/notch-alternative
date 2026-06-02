@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-server";
 
-export const maxDuration = 300;
+export const maxDuration = 600; // 10 minutes for long pipelines
 export const dynamic = "force-dynamic";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
@@ -350,6 +350,11 @@ export async function POST(req: NextRequest) {
     // Full pipeline
     characterImageUrl, scenes: requestScenes,
     kieApiKey, falApiKey, videoModel,
+    // Manual frames mode: skip frame generation, use pre-uploaded frame URLs
+    skipFrames,
+    preUploadedFrameUrls,
+    // Merge-only action
+    videoUrls: mergeVideoUrls,
   } = body as {
     action?: string;
     topic?: string;
@@ -361,6 +366,9 @@ export async function POST(req: NextRequest) {
     kieApiKey?: string;
     falApiKey?: string;
     videoModel?: string;
+    skipFrames?: boolean;
+    preUploadedFrameUrls?: string[];
+    videoUrls?: string[];
   };
 
   // ── Action: Generate Script Only ──
@@ -377,10 +385,28 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // ── Action: Merge Videos Only ──
+  if (action === "merge_only") {
+    if (!mergeVideoUrls || mergeVideoUrls.length < 2) return NextResponse.json({ error: "At least 2 video URLs are required" }, { status: 400 });
+    if (!falApiKey) return NextResponse.json({ error: "Fal.ai API key is required for merging" }, { status: 400 });
+
+    try {
+      const mergedUrl = await mergeVideos(mergeVideoUrls, falApiKey);
+      return NextResponse.json({ videoUrl: mergedUrl });
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      return NextResponse.json({ error: msg }, { status: 500 });
+    }
+  }
+
   // ── Action: Full Auto Chain Pipeline ──
-  if (!characterImageUrl) return NextResponse.json({ error: "Character image URL is required" }, { status: 400 });
+  // In skipFrames mode, characterImageUrl is optional (user uploaded their own frames)
+  if (!skipFrames && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required" }, { status: 400 });
   if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
   if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+  if (skipFrames && (!preUploadedFrameUrls || preUploadedFrameUrls.length === 0)) {
+    return NextResponse.json({ error: "Pre-uploaded frame URLs are required when skipFrames is true" }, { status: 400 });
+  }
 
   const model = videoModel || "veo3_lite";
   const totalScenes = requestScenes.length;
@@ -395,54 +421,73 @@ export async function POST(req: NextRequest) {
   // Run pipeline in background
   (async () => {
     try {
-      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes` });
+      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (manual frames)" : ""}` });
 
-      // ── STEP 1: Chained Frame Generation ──
-      sseSend(sw, { type: "step_change", step: "frames", message: "Generating frames (chained reference)..." });
-
+      // ── STEP 1: Frame Generation (skip if user uploaded their own frames) ──
       const frameUrls: string[] = [];
-      let currentRefUrl = characterImageUrl; // Start with character image as reference
 
-      for (let i = 0; i < totalScenes; i++) {
-        const scene = requestScenes[i];
-        const pct = Math.round(((i) / totalScenes) * 50);
+      if (skipFrames && preUploadedFrameUrls) {
+        // User already has frames — skip generation, use pre-uploaded URLs directly
+        sseSend(sw, { type: "step_change", step: "frames", message: "Using your uploaded frames (skipping generation)..." });
+        for (let i = 0; i < totalScenes; i++) {
+          const frameUrl = preUploadedFrameUrls[i] || "";
+          frameUrls.push(frameUrl);
+          if (frameUrl) {
+            sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl, message: `Frame ${i + 1}/${totalScenes}: Using uploaded frame` });
+          } else {
+            sseSend(sw, { type: "frame_error", sceneIndex: i, error: "No frame uploaded", message: `Frame ${i + 1}: No uploaded frame` });
+          }
+        }
+        const successfulFrames = frameUrls.filter(Boolean);
+        sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready (uploaded)` });
 
-        sseSend(sw, {
-          type: "frame_progress",
-          sceneIndex: i,
-          pct,
-          message: `Frame ${i + 1}/${totalScenes}: Generating with ${i === 0 ? "character" : "previous frame"} as reference...`,
-        });
+        if (successfulFrames.length === 0) {
+          sseSend(sw, { type: "error", message: "No uploaded frames were provided" });
+          return;
+        }
+      } else {
+        // Generate frames using AI (chained reference)
+        sseSend(sw, { type: "step_change", step: "frames", message: "Generating frames (chained reference)..." });
+        let currentRefUrl = characterImageUrl!; // Start with character image as reference
 
-        try {
-          // Generate frame using current reference (character for scene 1, previous frame for rest)
-          const rawFrameUrl = await generateFrameWithRef(scene.framePrompt, currentRefUrl, kieApiKey);
-          const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
-
-          frameUrls.push(kieFrameUrl);
-          // Next scene will use this frame as reference (the chain!)
-          currentRefUrl = kieFrameUrl;
+        for (let i = 0; i < totalScenes; i++) {
+          const scene = requestScenes[i];
+          const pct = Math.round(((i) / totalScenes) * 50);
 
           sseSend(sw, {
-            type: "frame_done",
+            type: "frame_progress",
             sceneIndex: i,
-            frameUrl: kieFrameUrl,
-            message: `Frame ${i + 1}/${totalScenes} complete!`,
+            pct,
+            message: `Frame ${i + 1}/${totalScenes}: Generating with ${i === 0 ? "character" : "previous frame"} as reference...`,
           });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
-          sseSend(sw, { type: "frame_error", sceneIndex: i, error: msg, message: `Frame ${i + 1} failed: ${msg}` });
-          // On frame failure, try to continue with the current reference (don't break the chain completely)
-          frameUrls.push("");
+
+          try {
+            const rawFrameUrl = await generateFrameWithRef(scene.framePrompt, currentRefUrl, kieApiKey);
+            const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
+
+            frameUrls.push(kieFrameUrl);
+            currentRefUrl = kieFrameUrl;
+
+            sseSend(sw, {
+              type: "frame_done",
+              sceneIndex: i,
+              frameUrl: kieFrameUrl,
+              message: `Frame ${i + 1}/${totalScenes} complete!`,
+            });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            sseSend(sw, { type: "frame_error", sceneIndex: i, error: msg, message: `Frame ${i + 1} failed: ${msg}` });
+            frameUrls.push("");
+          }
         }
-      }
 
-      const successfulFrames = frameUrls.filter(Boolean);
-      sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames generated` });
+        const successfulFrames = frameUrls.filter(Boolean);
+        sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames generated` });
 
-      if (successfulFrames.length === 0) {
-        sseSend(sw, { type: "error", message: "No frames were generated successfully" });
-        return;
+        if (successfulFrames.length === 0) {
+          sseSend(sw, { type: "error", message: "No frames were generated successfully" });
+          return;
+        }
       }
 
       // ── STEP 2: Video Generation ──
