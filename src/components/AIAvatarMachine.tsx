@@ -1617,26 +1617,42 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       if (!pipelineDone && !controller.signal.aborted) {
-        // Stream ended without "done" event — check if we have partial results
-        const frameResults = autoChainFrameUrlsRef.current;
+        // Stream ended without "done" event — this means the server connection dropped
+        // NEVER give up! Auto-retry to continue from where we left off
         const videoResults = autoChainVideoUrlsRef.current;
-        const hasFrameResults = frameResults.length > 0 && frameResults.some(Boolean);
-        const hasVideoResults = videoResults.length > 0 && videoResults.some(Boolean);
+        const completedVideos = videoResults.filter(Boolean).length;
+        const totalNeeded = scenesWithContent.length;
 
-        if (hasVideoResults) {
-          // We have some videos! Treat as partial success
-          addLog("Pipeline stream ended early, but some videos were generated.");
-          setAutoChainStep("done");
-          setAutoChainProgress(100);
-          setPipelineStep(4);
+        if (completedVideos < totalNeeded) {
+          // Still have videos to generate — auto-retry (resume mode will skip completed ones)
+          autoRetryCountRef.current += 1;
+          if (autoRetryCountRef.current <= 5) {
+            addLog(`Pipeline connection lost. ${completedVideos}/${totalNeeded} videos done. Auto-reconnecting (attempt ${autoRetryCountRef.current}/5) in 10s...`);
+            await new Promise(r => setTimeout(r, 10000));
+            // Retry — startAutoChain will detect existing URLs and resume
+            setIsAutoChainRunning(false);
+            setIsRunning(false);
+            startAutoChain();
+            return;
+          } else {
+            addLog(`Pipeline connection lost after 5 retries. ${completedVideos}/${totalNeeded} videos done. Click Generate Video to retry.`);
+            setAutoChainStep("error");
+            setAutoChainError(`Connection lost after 5 retries. ${completedVideos}/${totalNeeded} videos completed. Click Generate Video to continue from where you left off.`);
+          }
+        } else {
+          // All videos are actually done! Just merge them
+          addLog("All videos completed! Merging results...");
           const validVideos = videoResults.filter(Boolean);
           setFinalVideoUrls(validVideos);
           if (validVideos.length === 1) {
             setAutoChainMergedUrl(validVideos[0]);
             setFinalVideoUrl(validVideos[0]);
+            setAutoChainStep("done");
+            setAutoChainProgress(100);
+            setPipelineStep(4);
+            setShowConfetti(true);
+            setTimeout(() => setShowConfetti(false), 4000);
           } else if (validVideos.length > 1 && falApiKey) {
-            // Try to merge the partial videos ourselves
-            addLog("Attempting to merge partial video results...");
             try {
               const mergeRes = await authFetch("/api/auto-chain", {
                 method: "POST",
@@ -1652,24 +1668,18 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 if (mergeData.videoUrl) {
                   setAutoChainMergedUrl(mergeData.videoUrl);
                   setFinalVideoUrl(mergeData.videoUrl);
-                  addLog("Partial videos merged successfully!");
+                  addLog("All videos merged successfully!");
                 }
               }
             } catch {
-              addLog("Could not merge partial videos — you can download them individually.");
+              addLog("Merge failed — you can download videos individually.");
             }
+            setAutoChainStep("done");
+            setAutoChainProgress(100);
+            setPipelineStep(4);
+            setShowConfetti(true);
+            setTimeout(() => setShowConfetti(false), 4000);
           }
-          setShowConfetti(true);
-          setTimeout(() => setShowConfetti(false), 4000);
-        } else if (hasFrameResults) {
-          // Frames were generated but no videos yet
-          addLog("Pipeline ended during video generation. Frames are available for review.");
-          setAutoChainStep("error");
-          setAutoChainError("Pipeline ended during video generation. Your frames were generated — you can regenerate individual frames if needed, then try again with fewer scenes.");
-        } else {
-          addLog("Pipeline stream ended unexpectedly — no results were generated.");
-          setAutoChainStep("error");
-          setAutoChainError("Pipeline stream ended unexpectedly. This is usually caused by a server timeout. Try: 1) Fewer scenes, 2) Refresh the page and try again, 3) Upload your own frames to skip AI generation.");
         }
       }
     } catch (err) {
