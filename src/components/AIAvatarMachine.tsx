@@ -1356,23 +1356,44 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     if (!kieApiKey) { alert("KIE API key is required."); return; }
     if (scenesWithContent.length === 0) { alert("Please add scenes with scripts or uploaded frames."); return; }
 
+    // Check if we have existing progress to resume from
+    const existingFrameUrls = autoChainFrameUrlsRef.current;
+    const existingVideoUrls = autoChainVideoUrlsRef.current;
+    const hasExistingFrames = existingFrameUrls.length > 0 && existingFrameUrls.some(Boolean);
+    const hasExistingVideos = existingVideoUrls.length > 0 && existingVideoUrls.some(Boolean);
+    const isResume = hasExistingFrames || hasExistingVideos;
+
     setIsAutoChainRunning(true);
     setIsRunning(true);
-    setAutoChainStep("frames");
+    if (isResume) {
+      setAutoChainStep("videos"); // Resume goes straight to video step
+    } else {
+      setAutoChainStep("frames");
+      autoRetryCountRef.current = 0; // Reset retry counter on fresh start
+    }
     setAutoChainProgress(0);
     setAutoChainCurrentScene(0);
     setAutoChainError("");
     setAutoChainMergedUrl("");
-    setAutoChainFrameUrls([]);
-    setAutoChainVideoUrls([]);
-    setLogs([]);
-    setPipelineStep(1);
+    // DON'T clear frame/video URLs on resume — keep them!
+    if (!isResume) {
+      setAutoChainFrameUrls([]);
+      setAutoChainVideoUrls([]);
+    }
+    if (!isResume) {
+      setLogs([]);
+    }
+    setPipelineStep(isResume ? 2 : 1);
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     try {
-      if (hasManualFrames) {
+      if (isResume) {
+        const doneFrames = existingFrameUrls.filter(Boolean).length;
+        const doneVideos = existingVideoUrls.filter(Boolean).length;
+        addLog(`Resuming pipeline... (${doneFrames} frames, ${doneVideos} videos already done)`);
+      } else if (hasManualFrames) {
         addLog("Manual Frames mode: Using your uploaded frames, skipping image generation...");
       } else {
         addLog("Auto Chain: Starting pipeline...");
@@ -1439,7 +1460,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (controller.signal.aborted) throw new Error("aborted");
 
       // Step 2: Run the auto-chain pipeline
-      if (hasManualFrames) {
+      if (isResume) {
+        addLog("Resuming from where we left off...");
+      } else if (hasManualFrames) {
         addLog("Starting video-only pipeline (using your uploaded frames)...");
       } else if (someManualFrames) {
         addLog("Starting mixed pipeline (some uploaded frames, some AI-generated)...");
@@ -1461,6 +1484,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           // Manual frames mode: skip frame generation for scenes with uploaded frames
           skipFrames: hasManualFrames,
           preUploadedFrameUrls: hasManualFrames ? preUploadedFrameUrls : undefined,
+          // Resume mode: pass already-completed URLs so the server skips them
+          existingFrameUrls: isResume ? existingFrameUrls : undefined,
+          existingVideoUrls: isResume ? existingVideoUrls : undefined,
         }),
       });
 
@@ -1650,8 +1676,24 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const msg = err instanceof Error ? err.message : String(err);
       if (msg !== "aborted") {
         addLog(`Auto Chain ERROR: ${msg}`);
+        // On network error, auto-retry up to 3 times (preserving progress)
+        const isNetworkError = msg.includes("network") || msg.includes("Network") || msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("connection") || msg.includes("timeout");
+        if (isNetworkError) {
+          autoRetryCountRef.current += 1;
+          if (autoRetryCountRef.current <= 3) {
+            addLog(`Network error — auto-retrying (attempt ${autoRetryCountRef.current}/3) in 15s... Progress will be preserved.`);
+            await new Promise(r => setTimeout(r, 15000));
+            setIsAutoChainRunning(false);
+            setIsRunning(false);
+            startAutoChain();
+            return;
+          }
+        } else {
+          // Non-network error: reset retry counter
+          autoRetryCountRef.current = 0;
+        }
         setAutoChainStep("error");
-        setAutoChainError(msg);
+        setAutoChainError(msg + (isNetworkError ? " — Click Generate Video to retry from where you left off." : ""));
       }
     } finally {
       setIsAutoChainRunning(false);

@@ -362,6 +362,9 @@ export async function POST(req: NextRequest) {
     // Manual frames mode: skip frame generation, use pre-uploaded frame URLs
     skipFrames,
     preUploadedFrameUrls,
+    // Resume mode: pass already-completed URLs to skip them
+    existingFrameUrls,
+    existingVideoUrls,
     // Merge-only action
     videoUrls: mergeVideoUrls,
   } = body as {
@@ -377,6 +380,8 @@ export async function POST(req: NextRequest) {
     videoModel?: string;
     skipFrames?: boolean;
     preUploadedFrameUrls?: string[];
+    existingFrameUrls?: string[];
+    existingVideoUrls?: string[];
     videoUrls?: string[];
   };
 
@@ -430,10 +435,17 @@ export async function POST(req: NextRequest) {
   // Run pipeline in background
   (async () => {
     try {
-      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (manual frames)" : ""}` });
+      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (manual frames)" : ""}${existingVideoUrls?.some(Boolean) ? " (resuming)" : ""}` });
 
-      // ── STEP 1: Frame Generation (skip if user uploaded their own frames) ──
+      // ── STEP 1: Frame Generation (skip if user uploaded their own frames OR resuming with existing frames) ──
       const frameUrls: string[] = [];
+
+      // Pre-fill with existing frame URLs from resume
+      if (existingFrameUrls) {
+        for (let i = 0; i < totalScenes; i++) {
+          frameUrls[i] = existingFrameUrls[i] || "";
+        }
+      }
 
       if (skipFrames && preUploadedFrameUrls) {
         // User already has frames — skip generation, use pre-uploaded URLs directly
@@ -456,11 +468,32 @@ export async function POST(req: NextRequest) {
         }
       } else {
         // Generate frames using AI (chained reference) — with per-frame retry
+        // Skip frames that already exist from resume
+        const existingFrameCount = frameUrls.filter(Boolean).length;
         const MAX_FRAME_RETRIES = 3;
-        sseSend(sw, { type: "step_change", step: "frames", message: "Generating frames (chained reference)..." });
+        sseSend(sw, { type: "step_change", step: "frames", message: existingFrameCount > 0 ? `Resuming: ${existingFrameCount} frames already done, generating remaining...` : "Generating frames (chained reference)..." });
         let currentRefUrl = characterImageUrl!; // Start with character image as reference
 
+        // Find the last existing frame to use as chain reference
+        if (existingFrameCount > 0) {
+          for (let i = totalScenes - 1; i >= 0; i--) {
+            if (frameUrls[i]) {
+              currentRefUrl = frameUrls[i];
+              // Log skipped frames
+              for (let j = 0; j < totalScenes; j++) {
+                if (frameUrls[j]) {
+                  sseSend(sw, { type: "frame_done", sceneIndex: j, frameUrl: frameUrls[j], message: `Frame ${j + 1}/${totalScenes}: Already done (resuming)` });
+                }
+              }
+              break;
+            }
+          }
+        }
+
         for (let i = 0; i < totalScenes; i++) {
+          // Skip if frame already exists from resume
+          if (frameUrls[i]) continue;
+
           const scene = requestScenes[i];
           const pct = Math.round(((i) / totalScenes) * 50);
 
@@ -542,13 +575,31 @@ export async function POST(req: NextRequest) {
 
       // ── STEP 2: Video Generation (with per-video retry) ──
       const MAX_VIDEO_RETRIES = 5;
-      sseSend(sw, { type: "step_change", step: "videos", message: "Generating videos..." });
-
       const videoUrls: string[] = [];
+
+      // Pre-fill with existing video URLs from resume
+      if (existingVideoUrls) {
+        for (let i = 0; i < totalScenes; i++) {
+          videoUrls[i] = existingVideoUrls[i] || "";
+        }
+      }
+
+      const existingVideoCount = videoUrls.filter(Boolean).length;
+      sseSend(sw, { type: "step_change", step: "videos", message: existingVideoCount > 0 ? `Resuming: ${existingVideoCount} videos already done, generating remaining...` : "Generating videos..." });
+
+      // Log skipped (already done) videos
       for (let i = 0; i < totalScenes; i++) {
+        if (videoUrls[i]) {
+          sseSend(sw, { type: "video_done", sceneIndex: i, videoUrl: videoUrls[i], message: `Video ${i + 1}/${totalScenes}: Already done (resuming)` });
+        }
+      }
+
+      for (let i = 0; i < totalScenes; i++) {
+        // Skip if video already exists from resume
+        if (videoUrls[i]) continue;
         if (!frameUrls[i]) {
           // Skip scenes where frame failed
-          videoUrls.push("");
+          videoUrls[i] = "";
           continue;
         }
 
@@ -600,7 +651,7 @@ export async function POST(req: NextRequest) {
         }
 
         if (videoUrl) {
-          videoUrls.push(videoUrl);
+          videoUrls[i] = videoUrl;
           sseSend(sw, {
             type: "video_done",
             sceneIndex: i,
@@ -608,7 +659,7 @@ export async function POST(req: NextRequest) {
             message: `Video ${i + 1}/${totalScenes} complete!`,
           });
         } else {
-          videoUrls.push("");
+          videoUrls[i] = "";
           sseSend(sw, {
             type: "video_error",
             sceneIndex: i,
