@@ -446,7 +446,8 @@ export async function POST(req: NextRequest) {
           return;
         }
       } else {
-        // Generate frames using AI (chained reference)
+        // Generate frames using AI (chained reference) — with per-frame retry
+        const MAX_FRAME_RETRIES = 3;
         sseSend(sw, { type: "step_change", step: "frames", message: "Generating frames (chained reference)..." });
         let currentRefUrl = characterImageUrl!; // Start with character image as reference
 
@@ -454,30 +455,59 @@ export async function POST(req: NextRequest) {
           const scene = requestScenes[i];
           const pct = Math.round(((i) / totalScenes) * 50);
 
-          sseSend(sw, {
-            type: "frame_progress",
-            sceneIndex: i,
-            pct,
-            message: `Frame ${i + 1}/${totalScenes}: Generating with ${i === 0 ? "character" : "previous frame"} as reference...`,
-          });
+          // Retry loop for frame generation
+          let frameUrl = "";
+          let lastFrameError = "";
+          for (let attempt = 1; attempt <= MAX_FRAME_RETRIES; attempt++) {
+            sseSend(sw, {
+              type: "frame_progress",
+              sceneIndex: i,
+              pct,
+              message: attempt === 1
+                ? `Frame ${i + 1}/${totalScenes}: Generating with ${i === 0 ? "character" : "previous frame"} as reference...`
+                : `Frame ${i + 1}/${totalScenes}: Retry ${attempt}/${MAX_FRAME_RETRIES} after error: ${lastFrameError.slice(0, 80)}`,
+            });
 
-          try {
-            const rawFrameUrl = await generateFrameWithRef(scene.framePrompt, currentRefUrl, kieApiKey);
-            const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
+            try {
+              const rawFrameUrl = await generateFrameWithRef(scene.framePrompt, currentRefUrl, kieApiKey);
+              const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
+              frameUrl = kieFrameUrl;
+              lastFrameError = "";
+              break; // Success
+            } catch (err) {
+              lastFrameError = err instanceof Error ? err.message : String(err);
+              if (attempt < MAX_FRAME_RETRIES) {
+                sseSend(sw, {
+                  type: "frame_error",
+                  sceneIndex: i,
+                  error: lastFrameError,
+                  retryAttempt: attempt,
+                  maxRetries: MAX_FRAME_RETRIES,
+                  message: `Frame ${i + 1} ERROR (attempt ${attempt}/${MAX_FRAME_RETRIES}): ${lastFrameError} — retrying in 10s...`,
+                });
+                await sleep(10000);
+              }
+            }
+          }
 
-            frameUrls.push(kieFrameUrl);
-            currentRefUrl = kieFrameUrl;
-
+          if (frameUrl) {
+            frameUrls.push(frameUrl);
+            currentRefUrl = frameUrl; // Chain: use this frame as reference for next
             sseSend(sw, {
               type: "frame_done",
               sceneIndex: i,
-              frameUrl: kieFrameUrl,
+              frameUrl,
               message: `Frame ${i + 1}/${totalScenes} complete!`,
             });
-          } catch (err) {
-            const msg = err instanceof Error ? err.message : String(err);
-            sseSend(sw, { type: "frame_error", sceneIndex: i, error: msg, message: `Frame ${i + 1} failed: ${msg}` });
+          } else {
             frameUrls.push("");
+            sseSend(sw, {
+              type: "frame_error",
+              sceneIndex: i,
+              error: lastFrameError,
+              message: `Frame ${i + 1}/${totalScenes} FAILED after ${MAX_FRAME_RETRIES} attempts: ${lastFrameError}`,
+            });
+            // Keep currentRefUrl as-is so next frame still has a reference
           }
         }
 
@@ -490,7 +520,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // ── STEP 2: Video Generation ──
+      // ── STEP 2: Video Generation (with per-video retry) ──
+      const MAX_VIDEO_RETRIES = 5;
       sseSend(sw, { type: "step_change", step: "videos", message: "Generating videos..." });
 
       const videoUrls: string[] = [];
@@ -504,27 +535,55 @@ export async function POST(req: NextRequest) {
         const scene = requestScenes[i];
         const pct = 50 + Math.round((i / totalScenes) * 40);
 
-        sseSend(sw, {
-          type: "video_progress",
-          sceneIndex: i,
-          pct,
-          message: `Video ${i + 1}/${totalScenes}: Generating...`,
-        });
+        // Retry loop: keep trying until success or max retries exhausted
+        let videoUrl = "";
+        let lastError = "";
+        for (let attempt = 1; attempt <= MAX_VIDEO_RETRIES; attempt++) {
+          sseSend(sw, {
+            type: "video_progress",
+            sceneIndex: i,
+            pct,
+            message: attempt === 1
+              ? `Video ${i + 1}/${totalScenes}: Generating...`
+              : `Video ${i + 1}/${totalScenes}: Retry ${attempt}/${MAX_VIDEO_RETRIES} after error: ${lastError.slice(0, 80)}`,
+          });
 
-        try {
-          const videoUrl = await generateVideo(frameUrls[i], scene.script, kieApiKey, model);
+          try {
+            videoUrl = await generateVideo(frameUrls[i], scene.script, kieApiKey, model);
+            lastError = "";
+            break; // Success — exit retry loop
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            if (attempt < MAX_VIDEO_RETRIES) {
+              sseSend(sw, {
+                type: "video_error",
+                sceneIndex: i,
+                error: lastError,
+                retryAttempt: attempt,
+                maxRetries: MAX_VIDEO_RETRIES,
+                message: `Video ${i + 1}/${totalScenes} ERROR (attempt ${attempt}/${MAX_VIDEO_RETRIES}): ${lastError} — retrying in 10s...`,
+              });
+              await sleep(10000); // Wait 10 seconds before retrying
+            }
+          }
+        }
+
+        if (videoUrl) {
           videoUrls.push(videoUrl);
-
           sseSend(sw, {
             type: "video_done",
             sceneIndex: i,
             videoUrl,
             message: `Video ${i + 1}/${totalScenes} complete!`,
           });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+        } else {
           videoUrls.push("");
-          sseSend(sw, { type: "video_error", sceneIndex: i, error: msg, message: `Video ${i + 1} failed: ${msg}` });
+          sseSend(sw, {
+            type: "video_error",
+            sceneIndex: i,
+            error: lastError,
+            message: `Video ${i + 1}/${totalScenes} FAILED after ${MAX_VIDEO_RETRIES} attempts: ${lastError}`,
+          });
         }
       }
 
