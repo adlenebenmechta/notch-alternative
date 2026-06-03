@@ -145,7 +145,8 @@ async function generateScript(
 async function generateFrameWithRef(
   prompt: string,
   referenceImageUrl: string,
-  apiKey: string
+  apiKey: string,
+  onProgress?: (elapsed: number, pollCount: number) => void
 ): Promise<string> {
   const imgPrompt =
     prompt.trim() +
@@ -168,6 +169,10 @@ async function generateFrameWithRef(
 
   // Poll for result
   for (let i = 0; i < 120; i++) {
+    // Send progress update every 2 poll cycles (~6s)
+    if (onProgress && i % 2 === 0) {
+      onProgress(i * 3, i);
+    }
     try {
       const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -214,7 +219,8 @@ async function generateVideo(
   frameUrl: string,
   script: string,
   apiKey: string,
-  videoModel: string = "veo3_lite"
+  videoModel: string = "veo3_lite",
+  onProgress?: (elapsed: number, pollCount: number) => void
 ): Promise<string> {
   const videoPrompt =
     `IMPORTANT: This is a RAW UNCUT CONTINUOUS SHOT — NOT an edited video. You must NOT apply ANY post-production effects, transitions, or editing. Output must look like raw footage from a single locked camera — like a webcam recording. No editing, no effects, no transitions at all. ` +
@@ -246,6 +252,10 @@ async function generateVideo(
 
   // Poll for result
   for (let i = 0; i < 180; i++) {
+    // Send progress update every 2 poll cycles (~10s)
+    if (onProgress && i % 2 === 0) {
+      onProgress(i * 5, i);
+    }
     try {
       const pollRes = await fetch(`https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`, {
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -468,7 +478,18 @@ export async function POST(req: NextRequest) {
             });
 
             try {
-              const rawFrameUrl = await generateFrameWithRef(scene.framePrompt, currentRefUrl, kieApiKey);
+              const rawFrameUrl = await generateFrameWithRef(
+                scene.framePrompt, currentRefUrl, kieApiKey,
+                (elapsed, pollCount) => {
+                  // Send SSE progress update every ~6s during frame polling
+                  sseSend(sw, {
+                    type: "frame_progress",
+                    sceneIndex: i,
+                    pct,
+                    message: `Frame ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed, poll #${pollCount})`,
+                  });
+                }
+              );
               const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
               frameUrl = kieFrameUrl;
               lastFrameError = "";
@@ -548,7 +569,18 @@ export async function POST(req: NextRequest) {
           });
 
           try {
-            videoUrl = await generateVideo(frameUrls[i], scene.script, kieApiKey, model);
+            videoUrl = await generateVideo(
+              frameUrls[i], scene.script, kieApiKey, model,
+              (elapsed, pollCount) => {
+                // Send SSE progress update every ~10s during video polling
+                sseSend(sw, {
+                  type: "video_progress",
+                  sceneIndex: i,
+                  pct,
+                  message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed, poll #${pollCount})`,
+                });
+              }
+            );
             lastError = "";
             break; // Success — exit retry loop
           } catch (err) {
