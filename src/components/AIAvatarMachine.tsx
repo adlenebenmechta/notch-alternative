@@ -1598,8 +1598,17 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 setAutoChainMergedUrl(event.videoUrl);
                 setFinalVideoUrl(event.videoUrl);
                 addLog("Auto Chain complete! Merged video ready.");
+                // Auto-save to library
+                doSaveToLibrary(event.videoUrl, autoChainFrameUrlsRef.current);
+                clearPipelineCheckpoint();
               } else if (event.videoUrls) {
                 addLog(`Auto Chain complete! ${event.videoUrls.length} videos ready.`);
+                // If there's a single video URL, save it; if multiple, the merge path below will handle it
+                if (event.videoUrls.length === 1) {
+                  setFinalVideoUrl(event.videoUrls[0]);
+                  doSaveToLibrary(event.videoUrls[0], autoChainFrameUrlsRef.current);
+                  clearPipelineCheckpoint();
+                }
               }
               setShowConfetti(true);
               setTimeout(() => setShowConfetti(false), 4000);
@@ -1624,25 +1633,21 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         const totalNeeded = scenesWithContent.length;
 
         if (completedVideos < totalNeeded) {
-          // Still have videos to generate — auto-retry (resume mode will skip completed ones)
+          // Still have videos to generate — NEVER give up! Auto-retry until all videos are done
           autoRetryCountRef.current += 1;
-          if (autoRetryCountRef.current <= 5) {
-            addLog(`Pipeline connection lost. ${completedVideos}/${totalNeeded} videos done. Auto-reconnecting (attempt ${autoRetryCountRef.current}/5) in 10s...`);
-            await new Promise(r => setTimeout(r, 10000));
-            // Retry — startAutoChain will detect existing URLs and resume
-            setIsAutoChainRunning(false);
-            setIsRunning(false);
-            startAutoChain();
-            return;
-          } else {
-            addLog(`Pipeline connection lost after 5 retries. ${completedVideos}/${totalNeeded} videos done. Click Generate Video to retry.`);
-            setAutoChainStep("error");
-            setAutoChainError(`Connection lost after 5 retries. ${completedVideos}/${totalNeeded} videos completed. Click Generate Video to continue from where you left off.`);
-          }
+          const delay = Math.min(10000 + (autoRetryCountRef.current * 2000), 30000); // 10s base, +2s per retry, max 30s
+          addLog(`Pipeline connection lost. ${completedVideos}/${totalNeeded} videos done. Auto-reconnecting (attempt ${autoRetryCountRef.current}) in ${delay/1000}s... Will keep retrying until ALL videos are complete.`);
+          await new Promise(r => setTimeout(r, delay));
+          // Retry — startAutoChain will detect existing URLs and resume
+          setIsAutoChainRunning(false);
+          setIsRunning(false);
+          startAutoChain();
+          return;
         } else {
           // All videos are actually done! Just merge them
           addLog("All videos completed! Merging results...");
           const validVideos = videoResults.filter(Boolean);
+          const validFrames = autoChainFrameUrlsRef.current.filter(Boolean);
           setFinalVideoUrls(validVideos);
           if (validVideos.length === 1) {
             setAutoChainMergedUrl(validVideos[0]);
@@ -1652,6 +1657,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             setPipelineStep(4);
             setShowConfetti(true);
             setTimeout(() => setShowConfetti(false), 4000);
+            // Auto-save to library
+            doSaveToLibrary(validVideos[0], validFrames);
+            clearPipelineCheckpoint();
           } else if (validVideos.length > 1 && falApiKey) {
             try {
               const mergeRes = await authFetch("/api/auto-chain", {
@@ -1669,10 +1677,18 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   setAutoChainMergedUrl(mergeData.videoUrl);
                   setFinalVideoUrl(mergeData.videoUrl);
                   addLog("All videos merged successfully!");
+                  // Auto-save merged video to library
+                  doSaveToLibrary(mergeData.videoUrl, validFrames);
+                  clearPipelineCheckpoint();
                 }
               }
             } catch {
               addLog("Merge failed — you can download videos individually.");
+              // Still save the first video to library so user has something
+              if (validVideos[0]) {
+                doSaveToLibrary(validVideos[0], validFrames);
+                clearPipelineCheckpoint();
+              }
             }
             setAutoChainStep("done");
             setAutoChainProgress(100);
@@ -1686,31 +1702,30 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const msg = err instanceof Error ? err.message : String(err);
       if (msg !== "aborted") {
         addLog(`Auto Chain ERROR: ${msg}`);
-        // On network error, auto-retry up to 3 times (preserving progress)
+        // On network error, NEVER give up — keep retrying until all videos are complete
         const isNetworkError = msg.includes("network") || msg.includes("Network") || msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("connection") || msg.includes("timeout");
         if (isNetworkError) {
           autoRetryCountRef.current += 1;
-          if (autoRetryCountRef.current <= 3) {
-            addLog(`Network error — auto-retrying (attempt ${autoRetryCountRef.current}/3) in 15s... Progress will be preserved.`);
-            await new Promise(r => setTimeout(r, 15000));
-            setIsAutoChainRunning(false);
-            setIsRunning(false);
-            startAutoChain();
-            return;
-          }
+          const delay = Math.min(15000 + (autoRetryCountRef.current * 2000), 45000); // 15s base, +2s per retry, max 45s
+          addLog(`Network error — auto-retrying (attempt ${autoRetryCountRef.current}) in ${delay/1000}s... Progress will be preserved. Will keep retrying until ALL videos are complete.`);
+          await new Promise(r => setTimeout(r, delay));
+          setIsAutoChainRunning(false);
+          setIsRunning(false);
+          startAutoChain();
+          return;
         } else {
           // Non-network error: reset retry counter
           autoRetryCountRef.current = 0;
         }
         setAutoChainStep("error");
-        setAutoChainError(msg + (isNetworkError ? " — Click Generate Video to retry from where you left off." : ""));
+        setAutoChainError(msg);
       }
     } finally {
       setIsAutoChainRunning(false);
       setIsRunning(false);
       abortRef.current = null;
     }
-  }, [avatarImage, scenes, kieApiKey, falApiKey, videoModel, addLog, authFetch, uploadAvatarToServer]);
+  }, [avatarImage, scenes, kieApiKey, falApiKey, videoModel, addLog, authFetch, uploadAvatarToServer, doSaveToLibrary, clearPipelineCheckpoint]);
 
   // ─── Auto Chain: Auto-trigger after script generation when character selected ──
   useEffect(() => {
