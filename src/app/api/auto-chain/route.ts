@@ -365,6 +365,8 @@ export async function POST(req: NextRequest) {
     // Resume mode: pass already-completed URLs to skip them
     existingFrameUrls,
     existingVideoUrls,
+    // Per-scene custom reference images (optional — used alongside Scene 1 frame as reference)
+    customReferenceImages,
     // Merge-only action
     videoUrls: mergeVideoUrls,
   } = body as {
@@ -382,6 +384,7 @@ export async function POST(req: NextRequest) {
     preUploadedFrameUrls?: string[];
     existingFrameUrls?: string[];
     existingVideoUrls?: string[];
+    customReferenceImages?: string[];
     videoUrls?: string[];
   };
 
@@ -467,25 +470,27 @@ export async function POST(req: NextRequest) {
           return;
         }
       } else {
-        // Generate frames using AI (chained reference) — with per-frame retry
+        // Generate frames using AI (Scene 1 uses character ref, Scenes 2+ use Scene 1 frame as ref) — with per-frame retry
         // Skip frames that already exist from resume
         const existingFrameCount = frameUrls.filter(Boolean).length;
         const MAX_FRAME_RETRIES = 3;
-        sseSend(sw, { type: "step_change", step: "frames", message: existingFrameCount > 0 ? `Resuming: ${existingFrameCount} frames already done, generating remaining...` : "Generating frames (chained reference)..." });
-        let currentRefUrl = characterImageUrl!; // Start with character image as reference
+        sseSend(sw, { type: "step_change", step: "frames", message: existingFrameCount > 0 ? `Resuming: ${existingFrameCount} frames already done, generating remaining...` : "Generating frames..." });
 
-        // Find the last existing frame to use as chain reference
+        // NEW LOGIC: Scene 1 uses character image as reference.
+        // Scenes 2+ use Scene 1's generated frame as reference (NOT the previous scene's frame).
+        // If a scene has a customReferenceImage, it's used alongside Scene 1's frame.
+        let scene1FrameUrl = ""; // Will be set after Scene 1 is generated
+
+        // For resume: find Scene 1's frame URL if it already exists
+        if (existingFrameCount > 0 && frameUrls[0]) {
+          scene1FrameUrl = frameUrls[0];
+        }
+
+        // Log skipped frames from resume
         if (existingFrameCount > 0) {
-          for (let i = totalScenes - 1; i >= 0; i--) {
-            if (frameUrls[i]) {
-              currentRefUrl = frameUrls[i];
-              // Log skipped frames
-              for (let j = 0; j < totalScenes; j++) {
-                if (frameUrls[j]) {
-                  sseSend(sw, { type: "frame_done", sceneIndex: j, frameUrl: frameUrls[j], message: `Frame ${j + 1}/${totalScenes}: Already done (resuming)` });
-                }
-              }
-              break;
+          for (let j = 0; j < totalScenes; j++) {
+            if (frameUrls[j]) {
+              sseSend(sw, { type: "frame_done", sceneIndex: j, frameUrl: frameUrls[j], message: `Frame ${j + 1}/${totalScenes}: Already done (resuming)` });
             }
           }
         }
@@ -497,32 +502,107 @@ export async function POST(req: NextRequest) {
           const scene = requestScenes[i];
           const pct = Math.round(((i) / totalScenes) * 50);
 
+          // Determine reference image for this scene:
+          // - Scene 1: use character image
+          // - Scenes 2+: use Scene 1 frame (if available), fallback to character image
+          // - If scene has a customReferenceImage, use it as additional reference
+          let refUrl: string;
+          if (i === 0) {
+            refUrl = characterImageUrl!;
+          } else {
+            refUrl = scene1FrameUrl || characterImageUrl!;
+          }
+
+          // If this scene has a custom reference image, use it as the primary reference
+          // The custom ref image is used alongside Scene 1 frame — pass both as image_urls
+          const customRefImage = customReferenceImages?.[i];
+          const imageUrls: string[] = [];
+          if (customRefImage && i > 0) {
+            // Use custom reference image + Scene 1 frame for best consistency
+            imageUrls.push(customRefImage);
+            if (scene1FrameUrl) imageUrls.push(scene1FrameUrl);
+          } else if (customRefImage && i === 0) {
+            // Scene 1 with custom reference: use custom ref + character image
+            imageUrls.push(customRefImage);
+            imageUrls.push(characterImageUrl!);
+          } else {
+            // No custom reference: use the determined refUrl
+            imageUrls.push(refUrl);
+          }
+
           // Retry loop for frame generation
           let frameUrl = "";
           let lastFrameError = "";
           for (let attempt = 1; attempt <= MAX_FRAME_RETRIES; attempt++) {
+            const refDesc = i === 0
+              ? "character image"
+              : (customRefImage ? "custom reference + Scene 1" : "Scene 1 frame");
             sseSend(sw, {
               type: "frame_progress",
               sceneIndex: i,
               pct,
               message: attempt === 1
-                ? `Frame ${i + 1}/${totalScenes}: Generating with ${i === 0 ? "character" : "previous frame"} as reference...`
+                ? `Frame ${i + 1}/${totalScenes}: Generating with ${refDesc} as reference...`
                 : `Frame ${i + 1}/${totalScenes}: Retry ${attempt}/${MAX_FRAME_RETRIES} after error: ${lastFrameError.slice(0, 80)}`,
             });
 
             try {
-              const rawFrameUrl = await generateFrameWithRef(
-                scene.framePrompt, currentRefUrl, kieApiKey,
-                (elapsed, pollCount) => {
-                  // Send SSE progress update every ~6s during frame polling
+              // Build prompt with appropriate reference images
+              const imgPrompt =
+                scene.framePrompt.trim() +
+                ". Keep the EXACT SAME person from the reference image — same face, same facial features, same hair, same skin tone, same body. " +
+                "Photorealistic, high quality, 9:16 vertical format. Fixed tripod shot, looking at camera.";
+
+              const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  model: "nano-banana-pro",
+                  input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.5 },
+                }),
+              });
+
+              const submitJson = await submitRes.json();
+              if (submitJson.code !== 200) throw new Error("Frame submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
+              const taskId = submitJson.data?.taskId;
+              if (!taskId) throw new Error("No taskId for frame generation");
+
+              // Poll for result
+              let rawFrameUrl = "";
+              for (let p = 0; p < 120; p++) {
+                if (p % 2 === 0) {
                   sseSend(sw, {
                     type: "frame_progress",
                     sceneIndex: i,
                     pct,
-                    message: `Frame ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed, poll #${pollCount})`,
+                    message: `Frame ${i + 1}/${totalScenes}: Generating... (${p * 3}s elapsed)`,
                   });
                 }
-              );
+                try {
+                  const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
+                    headers: { Authorization: `Bearer ${kieApiKey}` },
+                  });
+                  const pollJson = await pollRes.json();
+                  if (pollJson.code === 200) {
+                    const d = pollJson.data;
+                    if (d?.state === "success") {
+                      let result;
+                      if (typeof d.resultJson === "string") { try { result = JSON.parse(d.resultJson); } catch { result = d.resultJson; } }
+                      else { result = d.resultJson; }
+                      const imageUrl = result?.resultUrls?.[0] || result?.result_url || result?.url;
+                      if (imageUrl) { rawFrameUrl = imageUrl; break; }
+                      throw new Error("Frame ready but no URL");
+                    }
+                    if (d?.state === "fail") throw new Error("Frame generation failed: " + (d?.failMsg || "unknown"));
+                  }
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : String(err);
+                  if (msg.includes("generation failed") || msg.includes("no URL")) throw err;
+                }
+                await sleep(3000);
+              }
+              if (!rawFrameUrl) throw new Error("Frame generation timed out after 6 minutes");
+
               const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
               frameUrl = kieFrameUrl;
               lastFrameError = "";
@@ -545,7 +625,10 @@ export async function POST(req: NextRequest) {
 
           if (frameUrl) {
             frameUrls.push(frameUrl);
-            currentRefUrl = frameUrl; // Chain: use this frame as reference for next
+            // Save Scene 1's frame as the permanent reference for all subsequent scenes
+            if (i === 0) {
+              scene1FrameUrl = frameUrl;
+            }
             sseSend(sw, {
               type: "frame_done",
               sceneIndex: i,
@@ -560,7 +643,6 @@ export async function POST(req: NextRequest) {
               error: lastFrameError,
               message: `Frame ${i + 1}/${totalScenes} FAILED after ${MAX_FRAME_RETRIES} attempts: ${lastFrameError}`,
             });
-            // Keep currentRefUrl as-is so next frame still has a reference
           }
         }
 

@@ -26,6 +26,7 @@ interface Scene {
   frameUrl: string;
   videoUrl: string;
   customFrameImage: string | null;
+  referenceImage: string | null; // Optional per-scene reference image for AI generation
   label?: string; // NEW: scene label (HOOK, PAIN+DISCOVERY, PROOF, CTA)
 }
 
@@ -585,6 +586,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       frameUrl: "",
       videoUrl: "",
       customFrameImage: null,
+      referenceImage: null,
       label: "",
     },
   ]);
@@ -1056,7 +1058,27 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
   const removeSceneFrame = useCallback((sceneId: string) => {
     setScenes((prev) =>
-      prev.map((s) => (s.id === sceneId ? { ...s, customFrameImage: null } : s))
+      prev.map((s) => (s.id === sceneId ? { ...s, customFrameImage: null, referenceImage: null } : s))
+    );
+  }, []);
+
+  // Upload a reference image for a specific scene (optional — used alongside Scene 1 frame)
+  const uploadSceneReference = useCallback(async (sceneId: string, file: File) => {
+    const MAX = 2 * 1024 * 1024;
+    if (file.size > MAX) { alert("Reference image must be under 2MB"); return; }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setScenes((prev) =>
+        prev.map((s) => (s.id === sceneId ? { ...s, referenceImage: dataUrl } : s))
+      );
+    };
+    reader.readAsDataURL(file);
+  }, []);
+
+  const removeSceneReference = useCallback((sceneId: string) => {
+    setScenes((prev) =>
+      prev.map((s) => (s.id === sceneId ? { ...s, referenceImage: null } : s))
     );
   }, []);
 
@@ -1076,6 +1098,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       frameUrl: "",
       videoUrl: "",
       customFrameImage: null,
+      referenceImage: null,
       label: "",
     };
     setScenes((prev) => [...prev, newScene]);
@@ -1158,6 +1181,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           frameUrl: "",
           videoUrl: "",
           customFrameImage: null,
+          referenceImage: null,
           label: s.label || "",
         }))
       );
@@ -1442,6 +1466,41 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         addLog("Custom frame upload complete!");
       }
 
+      // Upload per-scene reference images (optional — used alongside Scene 1 frame for consistency)
+      let customReferenceImageUrls: string[] = [];
+      const scenesWithRefImages = scenesWithContent.filter((s) => s.referenceImage);
+      if (scenesWithRefImages.length > 0) {
+        addLog(`Uploading ${scenesWithRefImages.length} reference image(s)...`);
+        for (let i = 0; i < scenes.length; i++) {
+          const scene = scenes[i];
+          if (scene.referenceImage) {
+            try {
+              addLog(`  Scene ${i + 1}: Uploading reference image...`);
+              const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
+              const formData = new FormData();
+              formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
+              formData.append("kieApiKey", kieApiKey);
+              const uploadRes = await authFetch("/api/upload-avatar", {
+                method: "POST",
+                body: formData,
+                signal: controller.signal,
+              });
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                if (uploadData.avatarUrl) {
+                  customReferenceImageUrls[i] = uploadData.avatarUrl;
+                  addLog(`  Scene ${i + 1}: Reference image uploaded!`);
+                }
+              }
+            } catch (err) {
+              const msg = err instanceof Error ? err.message : String(err);
+              addLog(`  Scene ${i + 1}: Reference upload failed: ${msg}`);
+            }
+          }
+        }
+        addLog("Reference image upload complete!");
+      }
+
       // Build scene data from existing scenes
       const chainScenes = scenesWithContent.map((s, i) => ({
         script: s.script.trim(),
@@ -1487,6 +1546,8 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           // Resume mode: pass already-completed URLs so the server skips them
           existingFrameUrls: isResume ? existingFrameUrls : undefined,
           existingVideoUrls: isResume ? existingVideoUrls : undefined,
+          // Per-scene custom reference images (optional — used alongside Scene 1 frame)
+          customReferenceImages: customReferenceImageUrls.length > 0 ? customReferenceImageUrls : undefined,
         }),
       });
 
@@ -2555,6 +2616,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         frameUrl: "",
         videoUrl: "",
         customFrameImage: null,
+        referenceImage: null,
       },
     ]);
     // Also reset AI script fields
@@ -2581,6 +2643,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         frameUrl: "",
         videoUrl: "",
         customFrameImage: null,
+        referenceImage: null,
         label: "",
       });
     }
@@ -4156,6 +4219,57 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                                   type="file"
                                   accept="image/*"
                                   onChange={(e) => handleSceneFrameUpload(scene.id, e)}
+                                  disabled={isRunning}
+                                  className="hidden"
+                                />
+                              </label>
+                            )}
+                            </div>
+                          )}
+
+                          {/* Per-Scene Reference Image - Optional, only for scenes 2+ in Custom Frames mode */}
+                          {frameMode === "custom" && i > 0 && !scene.customFrameImage && (
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: scene.referenceImage ? T.cyan : T.textMuted }}>
+                                🎯 Reference Image <span className="font-normal lowercase tracking-normal opacity-60">(optional)</span>
+                              </label>
+                              {scene.referenceImage ? (
+                              <div className="relative rounded-xl overflow-hidden border-2 w-24 mx-auto" style={{ borderColor: T.cyan }}>
+                                <img
+                                  src={scene.referenceImage}
+                                  alt={`Scene ${i + 1} reference`}
+                                  className="w-full aspect-[9/16] object-contain"
+                                  style={{ backgroundColor: isDark ? "#111" : "#F9FAFB" }}
+                                />
+                                <button
+                                  onClick={() => removeSceneReference(scene.id)}
+                                  disabled={isRunning}
+                                  className="absolute top-1 right-1 w-5 h-5 rounded-md flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
+                                  style={{ backgroundColor: "rgba(239,68,68,0.9)", color: "#fff" }}
+                                  title="Remove reference"
+                                >
+                                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                                    <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                  </svg>
+                                </button>
+                              </div>
+                            ) : (
+                              <label
+                                className="flex flex-col items-center justify-center gap-1 rounded-xl border-2 border-dashed aspect-[9/16] w-24 mx-auto cursor-pointer transition-all hover:border-current"
+                                style={{ borderColor: T.cardBorder, backgroundColor: T.cardBg, color: T.textMuted }}
+                              >
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                                  <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m9.86-2.03a4.5 4.5 0 00-1.242-7.244l4.5-4.5a4.5 4.5 0 016.364 6.364l-1.757 1.757" />
+                                </svg>
+                                <span className="text-[9px] font-semibold">Add ref</span>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  onChange={(e) => {
+                                    const file = e.target.files?.[0];
+                                    if (file) uploadSceneReference(scene.id, file);
+                                    e.target.value = "";
+                                  }}
                                   disabled={isRunning}
                                   className="hidden"
                                 />
