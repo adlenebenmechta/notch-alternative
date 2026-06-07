@@ -2317,42 +2317,39 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
       </div>
 
       {activeTab === "generate" ? (
-        <div className="flex flex-col lg:flex-row gap-3">
-          {/* LEFT: Prompt + Toolbar */}
-          <div className="flex-1 min-w-0">
-            <div className="rounded-[22px] sm:rounded-[28px] border p-3 sm:p-3.5" style={{ backgroundColor: "rgba(120,120,120,0.08)", borderColor: "rgba(120,120,120,0.2)" }}>
-              <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe what happens in the ad..." rows={4}
-                className="w-full px-4 py-3 text-[15px] leading-6 font-medium placeholder-gray-400 resize-none focus:outline-none" style={{ backgroundColor: "transparent", border: "none", color: D.textPrimary, minHeight: "132px" }} />
-              <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                <ToolbarBtn label="Format" icon={<PlusIconSmall />} onClick={() => setShowFormatDialog(true)} />
-                <div className="relative">
-                  <ToolbarBtn label={AD_MODELS.find((m) => m.value === model)?.label || "Model"} icon={<span className="text-sm">{AD_MODELS.find((m) => m.value === model)?.icon}</span>} onClick={() => setShowModelPicker(!showModelPicker)} chevron />
-                  {showModelPicker && <ModelPickerPopup model={model} setModel={(v) => { setModel(v); setShowModelPicker(false); }} onClose={() => setShowModelPicker(false)} />}
-                </div>
-                <div className="relative">
-                  <ToolbarBtn label={`${duration}s`} icon={<ClockIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} />
-                  {showDurationPicker && <DurationPopup duration={duration} setDuration={(v) => { setDuration(v); }} aspectRatio={aspectRatio} setAspectRatio={setAspectRatio} resolution={resolution} setResolution={setResolution} onClose={() => setShowDurationPicker(false)} />}
-                </div>
-                <ToolbarBtn label="Add references" icon={<PlusIconSmall />} onClick={() => {}} />
-                <ToolbarBtn label="" icon={<SettingsIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} iconOnly />
+        <div className="max-w-[760px]">
+          {/* Prompt + Toolbar + References + Generate all in one card */}
+          <div className="rounded-[22px] sm:rounded-[28px] border p-3 sm:p-3.5" style={{ backgroundColor: "rgba(120,120,120,0.08)", borderColor: "rgba(120,120,120,0.2)" }}>
+            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe what happens in the ad..." rows={4}
+              className="w-full px-4 py-3 text-[15px] leading-6 font-medium placeholder-gray-400 resize-none focus:outline-none" style={{ backgroundColor: "transparent", border: "none", color: D.textPrimary, minHeight: "132px" }} />
+            {/* Toolbar row */}
+            <div className="flex flex-wrap items-center gap-1.5 mt-2">
+              <ToolbarBtn label="Format" icon={<PlusIconSmall />} onClick={() => setShowFormatDialog(true)} />
+              <div className="relative">
+                <ToolbarBtn label={AD_MODELS.find((m) => m.value === model)?.label || "Model"} icon={<span className="text-sm">{AD_MODELS.find((m) => m.value === model)?.icon}</span>} onClick={() => setShowModelPicker(!showModelPicker)} chevron />
+                {showModelPicker && <ModelPickerPopup model={model} setModel={(v) => { setModel(v); setShowModelPicker(false); }} onClose={() => setShowModelPicker(false)} />}
               </div>
+              <div className="relative">
+                <ToolbarBtn label={`${duration}s`} icon={<ClockIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} />
+                {showDurationPicker && <DurationPopup duration={duration} setDuration={(v) => { setDuration(v); }} aspectRatio={aspectRatio} setAspectRatio={setAspectRatio} resolution={resolution} setResolution={setResolution} onClose={() => setShowDurationPicker(false)} />}
+              </div>
+              <RefCard label="Product" preview={productPreview || selectedProduct} uploading={productUploading} icon={<PackageIcon />} onClick={() => setShowProductDialog(true)} />
+              <RefCard label="Avatar" preview={customAvatarPreview || selectedAvatar} uploading={customAvatarUploading} icon={<UserRoundIcon />} onClick={() => setShowAvatarDialog(true)} />
+              <RefCard label="Voice" preview={selectedVoice ? AD_VOICES.find((v) => v.value === selectedVoice)?.label || "" : voicePreview ? "Custom" : ""} uploading={voiceUploading} icon={<VoiceIconSmall />} onClick={() => isVoiceAvailable && setShowVoiceDialog(true)} disabled={!isVoiceAvailable} disabledLabel="Seedance only" />
+              <ToolbarBtn label="" icon={<SettingsIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} iconOnly />
             </div>
-            {result.error && <ErrorDisplay error={result.error} />}
-            {result.loading && (<div className="mt-4 rounded-xl p-6 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin mx-auto mb-3" /><p className="text-sm font-medium" style={{ color: D.textPrimary }}>Generating your ad...</p><p className="text-xs mt-1" style={{ color: D.textMuted }}>This may take 1-3 minutes</p></div>)}
-            {result.url && !result.loading && <VideoResult url={result.url} />}
           </div>
 
-          {/* RIGHT: Product / Avatar / Voice / Generate */}
-          <div className="grid grid-cols-3 lg:grid-cols-1 gap-2 lg:w-[260px] shrink-0">
-            <RefCard label="Product" preview={productPreview || selectedProduct} uploading={productUploading} icon={<PackageIcon />} onClick={() => setShowProductDialog(true)} />
-            <RefCard label="Avatar" preview={customAvatarPreview || selectedAvatar} uploading={customAvatarUploading} icon={<UserRoundIcon />} onClick={() => setShowAvatarDialog(true)} />
-            <RefCard label="Voice" preview={selectedVoice ? AD_VOICES.find((v) => v.value === selectedVoice)?.label || "" : voicePreview ? "Custom" : ""} uploading={voiceUploading} icon={<VoiceIconSmall />} onClick={() => isVoiceAvailable && setShowVoiceDialog(true)} disabled={!isVoiceAvailable} disabledLabel="Seedance only" />
-            <div className="col-span-3 lg:col-span-1">
-              <button onClick={handleGenerate} disabled={!canGenerate || result.loading} className="w-full py-3 rounded-[10px] text-sm font-semibold transition-all flex items-center justify-center gap-1.5 disabled:cursor-not-allowed" style={{ backgroundColor: canGenerate && !result.loading ? D.black : "rgba(120,120,120,0.16)", color: canGenerate && !result.loading ? D.white : "rgba(0,0,0,0.4)" }}>
-                {result.loading ? <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Generating...</> : <><span>Generate</span><SparklesIcon /><span className="opacity-70">20</span></>}
-              </button>
-            </div>
+          {/* Generate button */}
+          <div className="mt-3">
+            <button onClick={handleGenerate} disabled={!canGenerate || result.loading} className="w-full py-3 rounded-[14px] text-sm font-semibold transition-all flex items-center justify-center gap-1.5 disabled:cursor-not-allowed" style={{ backgroundColor: canGenerate && !result.loading ? D.black : "rgba(120,120,120,0.16)", color: canGenerate && !result.loading ? D.white : "rgba(0,0,0,0.4)" }}>
+              {result.loading ? <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Generating...</> : <><span>Generate</span><SparklesIcon /><span className="opacity-70">20</span></>}
+            </button>
           </div>
+
+          {result.error && <ErrorDisplay error={result.error} />}
+          {result.loading && (<div className="mt-4 rounded-xl p-6 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin mx-auto mb-3" /><p className="text-sm font-medium" style={{ color: D.textPrimary }}>Generating your ad...</p><p className="text-xs mt-1" style={{ color: D.textMuted }}>This may take 1-3 minutes</p></div>)}
+          {result.url && !result.loading && <VideoResult url={result.url} />}
         </div>
       ) : (
         <div>{feed.length === 0 ? (<div className="rounded-xl p-8 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><p className="text-sm" style={{ color: D.textMuted }}>Your generated ads will appear here</p></div>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{feed.map((item) => (<div key={item.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}><video src={item.url} controls className="w-full" style={{ maxHeight: "250px" }} /><div className="p-2.5 flex items-center justify-between" style={{ backgroundColor: D.inputBg }}><div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: D.textPrimary }}>{item.format} · {item.model}</p><p className="text-[10px] truncate" style={{ color: D.textMuted }}>{item.prompt}</p></div><button onClick={() => { setPrompt(item.prompt); setActiveTab("generate"); }} className="ml-2 px-2 py-1 rounded-md text-[10px] font-semibold shrink-0" style={{ backgroundColor: D.purpleLight, color: D.purple }}>Reuse</button></div></div>))}</div>)}</div>
@@ -2396,16 +2393,16 @@ function DurationPopup({ duration, setDuration, aspectRatio, setAspectRatio, res
 }
 
 function RefCard({ label, preview, uploading, icon, onClick, disabled, disabledLabel }: { label: string; preview: string; uploading: boolean; icon: React.ReactNode; onClick: () => void; disabled?: boolean; disabledLabel?: string }) {
-  return (<button onClick={disabled ? undefined : onClick} className="group relative flex flex-col items-center justify-center gap-2 rounded-[10px] border p-2.5 text-center transition sm:rounded-[14px] aspect-[2/3] w-full" style={{ borderColor: preview ? "rgba(0,117,253,0.4)" : "rgba(120,120,120,0.2)", backgroundColor: preview ? "rgba(0,117,253,0.06)" : "rgba(116,116,128,0.08)", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer" }}>{preview ? (<div className="flex flex-col items-center gap-1"><span className="text-[10px] font-semibold" style={{ color: "#0075FD" }}>{label}</span><span className="text-[11px] font-medium truncate max-w-full" style={{ color: D.textPrimary }}>{preview}</span></div>) : (<><span className="relative inline-flex size-6 items-center justify-center" style={{ color: "rgba(0,0,0,0.8)" }}>{icon}</span><span className="text-xs font-semibold tracking-tight" style={{ color: "rgba(0,0,0,0.8)" }}>{label}</span>{disabledLabel && <span className="text-[9px]" style={{ color: D.textDim }}>{disabledLabel}</span>}</>)}{uploading && <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-[10px]"><div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" /></div>}</button>);
+  return (<button onClick={disabled ? undefined : onClick} className="group relative inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-left transition" style={{ borderColor: preview ? "rgba(0,117,253,0.4)" : "rgba(120,120,120,0.2)", backgroundColor: preview ? "rgba(0,117,253,0.06)" : "rgba(116,116,128,0.08)", opacity: disabled ? 0.4 : 1, cursor: disabled ? "not-allowed" : "pointer" }}><span className="relative inline-flex size-4 items-center justify-center shrink-0" style={{ color: preview ? "#0075FD" : "rgba(0,0,0,0.8)" }}>{icon}</span>{preview ? (<span className="text-xs font-semibold truncate max-w-[80px]" style={{ color: "#0075FD" }}>{preview}</span>) : (<span className="text-xs font-semibold tracking-tight" style={{ color: "rgba(0,0,0,0.8)" }}>{label}</span>)}{disabledLabel && <span className="text-[9px]" style={{ color: D.textDim }}>{disabledLabel}</span>}{uploading && <div className="absolute inset-0 bg-white/60 flex items-center justify-center rounded-[10px]"><div className="w-4 h-4 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" /></div>}</button>);
 }
 
 function CheckIcon({ color }: { color: string }) { return <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={color} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 6L9 17l-5-5" /></svg>; }
 function PlusIconSmall() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14" /><path d="M12 5v14" /></svg>; }
 function ClockIcon() { return <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16.5 12" /></svg>; }
 function SettingsIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" /><line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" /><line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" /><line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" /><line x1="16" x2="16" y1="18" y2="22" /></svg>; }
-function PackageIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M11 21.73a2 2 0 002 0l7-4A2 2 0 0021 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" /></svg>; }
-function UserRoundIcon() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 00-16 0" /></svg>; }
-function VoiceIconSmall() { return <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4.702a.705.705 0 00-1.203-.498L6.413 7.587A1.4 1.4 0 015.416 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2.416a1.4 1.4 0 01.997.413l3.383 3.384A.705.705 0 0011 19.298z" /><path d="M16 9a5 5 0 010 6" /><path d="M19.364 18.364a9 9 0 010-12.728" /></svg>; }
+function PackageIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 21.73a2 2 0 002 0l7-4A2 2 0 0021 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73z" /><path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" /></svg>; }
+function UserRoundIcon() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 00-16 0" /></svg>; }
+function VoiceIconSmall() { return <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4.702a.705.705 0 00-1.203-.498L6.413 7.587A1.4 1.4 0 015.416 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2.416a1.4 1.4 0 01.997.413l3.383 3.384A.705.705 0 0011 19.298z" /><path d="M16 9a5 5 0 010 6" /><path d="M19.364 18.364a9 9 0 010-12.728" /></svg>; }
 // ─── Main Component ───────────────────────────────────────────────────────
 
 export default function AllInOneMachine({ onBack, onNavigate: _onNavigate }: AllInOneMachineProps) {
