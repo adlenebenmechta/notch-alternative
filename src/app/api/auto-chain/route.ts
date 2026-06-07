@@ -369,6 +369,10 @@ export async function POST(req: NextRequest) {
     customReferenceImages,
     // Merge-only action
     videoUrls: mergeVideoUrls,
+    // Frames-only mode: stop after generating frames, don't generate videos
+    framesOnly,
+    // Single-scene frame regeneration: regenerate just one scene's frame
+    regenerateSceneIndex,
   } = body as {
     action?: string;
     topic?: string;
@@ -386,6 +390,8 @@ export async function POST(req: NextRequest) {
     existingVideoUrls?: string[];
     customReferenceImages?: string[];
     videoUrls?: string[];
+    framesOnly?: boolean;
+    regenerateSceneIndex?: number;
   };
 
   // ── Action: Generate Script Only ──
@@ -414,6 +420,256 @@ export async function POST(req: NextRequest) {
       const msg = err instanceof Error ? err.message : String(err);
       return NextResponse.json({ error: msg }, { status: 500 });
     }
+  }
+
+  // ── Action: Regenerate a Single Frame ──
+  if (action === "regenerate_frame") {
+    if (regenerateSceneIndex === undefined || regenerateSceneIndex === null) return NextResponse.json({ error: "regenerateSceneIndex is required" }, { status: 400 });
+    if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
+    if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+    if (!characterImageUrl && !existingFrameUrls?.[0]) return NextResponse.json({ error: "Character image URL or Scene 1 frame URL is required" }, { status: 400 });
+
+    const sceneIdx = regenerateSceneIndex;
+    const scene = requestScenes[sceneIdx];
+    if (!scene) return NextResponse.json({ error: `Scene ${sceneIdx + 1} not found` }, { status: 400 });
+
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const sw: SafeWriter = { writer, closed: false };
+    const heartbeatStop = { stopped: false };
+    startHeartbeat(sw, heartbeatStop);
+
+    (async () => {
+      try {
+        sseSend(sw, { type: "pipeline_started", totalScenes: 1, message: `Regenerating frame for Scene ${sceneIdx + 1}...` });
+
+        // Determine reference: Scene 1 frame if available, otherwise character image
+        let refUrl = characterImageUrl || "";
+        if (sceneIdx > 0 && existingFrameUrls?.[0]) {
+          refUrl = existingFrameUrls[0]; // Use Scene 1's frame as reference for other scenes
+        }
+
+        const customRefImage = customReferenceImages?.[sceneIdx];
+        const imageUrls: string[] = [];
+        if (customRefImage && sceneIdx > 0) {
+          imageUrls.push(customRefImage);
+          if (existingFrameUrls?.[0]) imageUrls.push(existingFrameUrls[0]);
+          else if (characterImageUrl) imageUrls.push(characterImageUrl);
+        } else if (customRefImage && sceneIdx === 0) {
+          imageUrls.push(customRefImage);
+          if (characterImageUrl) imageUrls.push(characterImageUrl);
+        } else {
+          imageUrls.push(refUrl);
+        }
+
+        sseSend(sw, { type: "step_change", step: "frames", message: `Regenerating frame ${sceneIdx + 1}...` });
+
+        const MAX_RETRIES = 3;
+        let frameUrl = "";
+        let lastError = "";
+
+        for (let attempt = 1; attempt <= MAX_RETRIES; attempt++) {
+          sseSend(sw, { type: "frame_progress", sceneIndex: sceneIdx, pct: 0, message: attempt === 1 ? `Regenerating frame ${sceneIdx + 1}...` : `Retry ${attempt}/${MAX_RETRIES}: ${lastError.slice(0, 80)}` });
+
+          try {
+            const imgPrompt = scene.framePrompt.trim() + ". Keep the EXACT SAME person from the reference image — same face, same facial features, same hair, same skin tone, same body. Photorealistic, high quality, 9:16 vertical format. Fixed tripod shot, looking at camera.";
+
+            const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+              method: "POST",
+              headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
+              body: JSON.stringify({ model: "nano-banana-pro", input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.5 } }),
+            });
+
+            const submitJson = await submitRes.json();
+            if (submitJson.code !== 200) throw new Error("Frame submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
+            const taskId = submitJson.data?.taskId;
+            if (!taskId) throw new Error("No taskId for frame generation");
+
+            let rawFrameUrl = "";
+            for (let p = 0; p < 120; p++) {
+              if (p % 2 === 0) sseSend(sw, { type: "frame_progress", sceneIndex: sceneIdx, pct: 0, message: `Regenerating frame ${sceneIdx + 1}... (${p * 3}s)` });
+              try {
+                const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${kieApiKey}` } });
+                const pollJson = await pollRes.json();
+                if (pollJson.code === 200) {
+                  const d = pollJson.data;
+                  if (d?.state === "success") {
+                    let result;
+                    if (typeof d.resultJson === "string") { try { result = JSON.parse(d.resultJson); } catch { result = d.resultJson; } } else { result = d.resultJson; }
+                    const imageUrl = result?.resultUrls?.[0] || result?.result_url || result?.url;
+                    if (imageUrl) { rawFrameUrl = imageUrl; break; }
+                    throw new Error("Frame ready but no URL");
+                  }
+                  if (d?.state === "fail") throw new Error("Frame generation failed: " + (d?.failMsg || "unknown"));
+                }
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                if (msg.includes("generation failed") || msg.includes("no URL")) throw err;
+              }
+              await sleep(3000);
+            }
+            if (!rawFrameUrl) throw new Error("Frame generation timed out");
+
+            frameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `regen_frame_${sceneIdx}`);
+            lastError = "";
+            break;
+          } catch (err) {
+            lastError = err instanceof Error ? err.message : String(err);
+            if (attempt < MAX_RETRIES) {
+              sseSend(sw, { type: "frame_error", sceneIndex: sceneIdx, error: lastError, retryAttempt: attempt, maxRetries: MAX_RETRIES, message: `Frame ${sceneIdx + 1} ERROR (attempt ${attempt}/${MAX_RETRIES}): ${lastError} — retrying...` });
+              await sleep(10000);
+            }
+          }
+        }
+
+        if (frameUrl) {
+          sseSend(sw, { type: "frame_done", sceneIndex: sceneIdx, frameUrl, message: `Frame ${sceneIdx + 1} regenerated!` });
+        } else {
+          sseSend(sw, { type: "frame_error", sceneIndex: sceneIdx, error: lastError, message: `Frame ${sceneIdx + 1} FAILED: ${lastError}` });
+        }
+
+        sseSend(sw, { type: "frames_complete", frameUrls: [frameUrl], successCount: frameUrl ? 1 : 0, regeneratedSceneIndex: sceneIdx, message: `Frame regeneration ${frameUrl ? "complete" : "failed"}` });
+        sseSend(sw, { type: "done", frameUrls: [frameUrl], regeneratedSceneIndex: sceneIdx });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sseSend(sw, { type: "error", message: msg });
+      } finally {
+        heartbeatStop.stopped = true;
+        try { writer.close(); } catch {}
+      }
+    })();
+
+    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+  }
+
+  // ── Action: Videos Only (frames already generated, just generate videos + merge) ──
+  if (action === "videos_only") {
+    if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
+    if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+    if (!existingFrameUrls || existingFrameUrls.filter(Boolean).length === 0) return NextResponse.json({ error: "Frame URLs are required for video generation" }, { status: 400 });
+
+    const totalScenes = requestScenes.length;
+    const model = videoModel || "veo3_lite";
+
+    const stream = new TransformStream();
+    const writer = stream.writable.getWriter();
+    const sw: SafeWriter = { writer, closed: false };
+    const heartbeatStop = { stopped: false };
+    startHeartbeat(sw, heartbeatStop);
+
+    (async () => {
+      try {
+        sseSend(sw, { type: "pipeline_started", totalScenes, message: `Generating videos for ${totalScenes} scenes...` });
+
+        const frameUrls = [...existingFrameUrls];
+        const MAX_VIDEO_RETRIES = 5;
+        const videoUrls: string[] = [];
+        if (existingVideoUrls) { for (let i = 0; i < totalScenes; i++) videoUrls[i] = existingVideoUrls[i] || ""; }
+
+        sseSend(sw, { type: "step_change", step: "videos", message: "Generating videos from approved frames..." });
+
+        for (let i = 0; i < totalScenes; i++) {
+          if (videoUrls[i]) continue;
+          if (!frameUrls[i]) { videoUrls[i] = ""; continue; }
+
+          const scene = requestScenes[i];
+          let videoUrl = "";
+          let lastVideoError = "";
+
+          for (let attempt = 1; attempt <= MAX_VIDEO_RETRIES; attempt++) {
+            const pct = Math.round(((i) / totalScenes) * 80);
+            sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: attempt === 1 ? `Video ${i + 1}/${totalScenes}: Generating...` : `Video ${i + 1} retry ${attempt}/${MAX_VIDEO_RETRIES}: ${lastVideoError.slice(0, 60)}` });
+
+            try {
+              const videoPrompt = scene.script.trim() + ". Subtle natural movement, person speaking gently to camera. Cinematic.";
+              const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+                method: "POST",
+                headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
+                body: JSON.stringify({ model, input: { prompt: videoPrompt, image_urls: [frameUrls[i]], image_size: "768x1344", duration: 5 } }),
+              });
+              const submitJson = await submitRes.json();
+              if (submitJson.code !== 200) throw new Error("Video submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
+              const taskId = submitJson.data?.taskId;
+              if (!taskId) throw new Error("No taskId for video");
+
+              let rawVideoUrl = "";
+              for (let p = 0; p < 200; p++) {
+                if (p % 3 === 0) sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${p * 5}s)` });
+                try {
+                  const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${kieApiKey}` } });
+                  const pollJson = await pollRes.json();
+                  if (pollJson.code === 200) {
+                    const d = pollJson.data;
+                    if (d?.state === "success") {
+                      let result;
+                      if (typeof d.resultJson === "string") { try { result = JSON.parse(d.resultJson); } catch { result = d.resultJson; } } else { result = d.resultJson; }
+                      const url = result?.resultUrls?.[0] || result?.result_url || result?.url;
+                      if (url) { rawVideoUrl = url; break; }
+                      throw new Error("Video ready but no URL");
+                    }
+                    if (d?.state === "fail") throw new Error("Video generation failed: " + (d?.failMsg || "unknown"));
+                  }
+                } catch (err) {
+                  const msg = err instanceof Error ? err.message : String(err);
+                  if (msg.includes("generation failed") || msg.includes("no URL")) throw err;
+                }
+                await sleep(5000);
+              }
+              if (!rawVideoUrl) throw new Error("Video generation timed out");
+
+              videoUrl = await downloadAndReupload(rawVideoUrl, kieApiKey, `chain_video_${i}`);
+              lastVideoError = "";
+              break;
+            } catch (err) {
+              lastVideoError = err instanceof Error ? err.message : String(err);
+              if (attempt < MAX_VIDEO_RETRIES) {
+                sseSend(sw, { type: "video_error", sceneIndex: i, error: lastVideoError, message: `Video ${i + 1} ERROR (attempt ${attempt}/${MAX_VIDEO_RETRIES}) — retrying in 10s...` });
+                await sleep(10000);
+              }
+            }
+          }
+
+          if (videoUrl) {
+            videoUrls[i] = videoUrl;
+            sseSend(sw, { type: "video_done", sceneIndex: i, videoUrl, message: `Video ${i + 1}/${totalScenes} complete!` });
+          } else {
+            videoUrls[i] = "";
+            sseSend(sw, { type: "video_error", sceneIndex: i, error: lastVideoError, message: `Video ${i + 1} FAILED: ${lastVideoError}` });
+          }
+        }
+
+        const successfulVideos = videoUrls.filter(Boolean);
+        sseSend(sw, { type: "videos_complete", videoUrls, successCount: successfulVideos.length });
+
+        if (successfulVideos.length === 0) {
+          sseSend(sw, { type: "error", message: "No videos were generated successfully" });
+          return;
+        }
+
+        // Merge if multiple videos
+        if (successfulVideos.length > 1 && falApiKey) {
+          sseSend(sw, { type: "step_change", step: "merge", message: "Merging videos..." });
+          try {
+            const mergedUrl = await mergeVideos(successfulVideos, falApiKey);
+            sseSend(sw, { type: "done", videoUrl: mergedUrl, videoUrls: successfulVideos });
+          } catch (err) {
+            const msg = err instanceof Error ? err.message : String(err);
+            sseSend(sw, { type: "merge_error", error: msg, message: `Merge failed: ${msg}` });
+            sseSend(sw, { type: "done", videoUrls: successfulVideos });
+          }
+        } else {
+          sseSend(sw, { type: "done", videoUrl: successfulVideos[0], videoUrls: successfulVideos });
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        sseSend(sw, { type: "error", message: msg });
+      } finally {
+        heartbeatStop.stopped = true;
+        try { writer.close(); } catch {}
+      }
+    })();
+
+    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
   }
 
   // ── Action: Full Auto Chain Pipeline ──
@@ -651,6 +907,12 @@ export async function POST(req: NextRequest) {
 
         if (successfulFrames.length === 0) {
           sseSend(sw, { type: "error", message: "No frames were generated successfully" });
+          return;
+        }
+
+        // ── Frames-only mode: stop here, let user review before generating videos ──
+        if (framesOnly) {
+          sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames generated! Review and then generate videos." });
           return;
         }
       }

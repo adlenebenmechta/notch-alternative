@@ -740,6 +740,10 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [pendingAutoChain, setPendingAutoChain] = useState(false); // Trigger: auto-start chain after script gen
   const [regeneratingFrameIndex, setRegeneratingFrameIndex] = useState<number | null>(null);
 
+  // ── Two-Phase Pipeline: Frames → Review → Videos ──
+  const [pipelinePhase, setPipelinePhase] = useState<"idle" | "generating_frames" | "reviewing_frames" | "generating_videos" | "done">("idle");
+  const [framesReviewReady, setFramesReviewReady] = useState(false); // True when frames are done and awaiting review
+
   // ── Pipeline Checkpoint (survives page refresh) ──
   const PIPELINE_CHECKPOINT_KEY = "ai_avatar_pipeline_checkpoint";
   const [hasActiveCheckpoint, setHasActiveCheckpoint] = useState(false);
@@ -1252,118 +1256,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     return url;
   }, [addLog]);
 
-  // ─── Regenerate Single Scene Frame ──────────────────────────────────
-  const regenerateSceneFrame = useCallback(async (sceneIndex: number) => {
-    const scene = scenes[sceneIndex];
-    if (!scene) return;
-    if (!avatarImage && !scene.customFrameImage) { alert("Please select a character or upload a frame first."); return; }
-    if (!kieApiKey) { alert("KIE API key is required."); return; }
-
-    setRegeneratingFrameIndex(sceneIndex);
-    addLog(`Regenerating frame for Scene ${sceneIndex + 1}...`);
-
-    try {
-      // Upload character/avatar image (use custom frame if available, otherwise avatar)
-      let refImageUrl = "";
-      if (scene.customFrameImage) {
-        addLog(`Scene ${sceneIndex + 1}: Using uploaded scene frame as reference...`);
-        const refBlob = await fetch(scene.customFrameImage).then(r => r.blob());
-        const refFormData = new FormData();
-        refFormData.append("avatar", refBlob, "reference.jpg");
-        refFormData.append("kieApiKey", kieApiKey);
-        const refUploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: refFormData });
-        if (refUploadRes.ok) {
-          const refData = await refUploadRes.json();
-          if (refData.avatarUrl) refImageUrl = refData.avatarUrl;
-        }
-      }
-
-      if (!refImageUrl && avatarImage) {
-        addLog(`Scene ${sceneIndex + 1}: Uploading character image...`);
-        refImageUrl = await uploadAvatarToServer(avatarImage, kieApiKey);
-      }
-
-      if (!refImageUrl) throw new Error("No reference image available");
-
-      // Build frame prompt from edited scene data
-      const prompt = scene.framePrompt || scene.description || `Person looking at camera, scene ${sceneIndex + 1}. Photorealistic.`;
-
-      // Call auto-chain API with just this one scene
-      addLog(`Scene ${sceneIndex + 1}: Generating frame with prompt: "${prompt.slice(0, 80)}..."`);
-      const pipelineRes = await authFetch("/api/auto-chain", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          characterImageUrl: refImageUrl,
-          scenes: [{ script: scene.script, framePrompt: prompt, description: scene.description, label: scene.label }],
-          kieApiKey,
-          falApiKey,
-          videoModel,
-        }),
-      });
-
-      if (!pipelineRes.ok) {
-        const errData = await pipelineRes.json().catch(() => ({ error: "Frame regeneration failed" }));
-        throw new Error(errData.error || "Frame regeneration failed");
-      }
-
-      // Read SSE stream to get the frame URL
-      const reader = pipelineRes.body?.getReader();
-      if (!reader) throw new Error("No response stream");
-
-      const decoder = new TextDecoder();
-      let buffer = "";
-      let frameUrl = "";
-
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        buffer += decoder.decode(value, { stream: true });
-        const lines = buffer.split("\n");
-        buffer = lines.pop() || "";
-
-        for (const line of lines) {
-          if (!line.startsWith("data: ")) continue;
-          const jsonStr = line.slice(6).trim();
-          if (!jsonStr) continue;
-          try {
-            const event = JSON.parse(jsonStr);
-            if (event.type === "frame_done" && event.frameUrl) {
-              frameUrl = event.frameUrl;
-            }
-            if (event.type === "error") {
-              throw new Error(event.message || "Frame regeneration failed");
-            }
-          } catch (e) {
-            if (e instanceof Error && !e.message.includes("Frame regeneration failed")) throw e;
-          }
-        }
-      }
-
-      if (frameUrl) {
-        // Update the specific scene with the new frame URL
-        setScenes((prev) =>
-          prev.map((s, i) => i === sceneIndex ? { ...s, frameUrl, frameDone: true, frameProgress: 100 } : s)
-        );
-        // Also update autoChainFrameUrls
-        setAutoChainFrameUrls((prev) => {
-          const next = [...prev];
-          next[sceneIndex] = frameUrl;
-          return next;
-        });
-        addLog(`Scene ${sceneIndex + 1}: Frame regenerated successfully!`);
-      } else {
-        throw new Error("No frame URL received from server");
-      }
-    } catch (err) {
-      const msg = err instanceof Error ? err.message : String(err);
-      addLog(`Scene ${sceneIndex + 1}: Frame regeneration failed: ${msg}`);
-      alert("Frame regeneration failed: " + msg);
-    } finally {
-      setRegeneratingFrameIndex(null);
-    }
-  }, [scenes, avatarImage, kieApiKey, falApiKey, videoModel, addLog, uploadAvatarToServer, authFetch]);
-
   // ─── Auto-save to library on completion ──────────────────────────
   // NOTE: Must be defined BEFORE startAutoChain since it's used there.
   const doSaveToLibrary = useCallback(async (videoUrl: string, frameUrls: string[]) => {
@@ -1846,6 +1738,396 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       startAutoChain();
     }
   }, [pendingAutoChain, isAutoChainRunning, isGeneratingScript, isRunning, startAutoChain]);
+
+  // ─── Two-Phase: Generate Frames Only (Custom Frames mode) ──
+  const startFramesOnly = useCallback(async () => {
+    if (!avatarImage && !scenes.some(s => s.customFrameImage)) {
+      alert("Please select a character from the Character Library or upload frames for all scenes.");
+      return;
+    }
+    if (!kieApiKey) { alert("KIE API key is required."); return; }
+    const scenesWithContent = scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage);
+    if (scenesWithContent.length === 0) { alert("Please add scenes with scripts."); return; }
+
+    // Reset pipeline state
+    setPipelinePhase("generating_frames");
+    setIsAutoChainRunning(true);
+    setIsRunning(true);
+    setAutoChainStep("frames");
+    setAutoChainProgress(0);
+    setAutoChainCurrentScene(0);
+    setAutoChainError("");
+    setAutoChainMergedUrl("");
+    setAutoChainFrameUrls([]);
+    setAutoChainVideoUrls([]);
+    setFramesReviewReady(false);
+    autoChainFrameUrlsRef.current = [];
+    autoChainVideoUrlsRef.current = [];
+    autoRetryCountRef.current = 0;
+    setLogs([]);
+    setPipelineStep(1);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      addLog("🖼️ Generating scene frames (frames-only mode)...");
+
+      // Upload character image
+      let uploadedCharUrl = "";
+      if (avatarImage) {
+        addLog("Uploading character image...");
+        uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey, controller.signal);
+        setAvatarUrl(uploadedCharUrl);
+        addLog("Character image uploaded!");
+      }
+
+      // Upload custom frame images
+      const scenesWithCustomFrames = scenes.filter(s => s.customFrameImage);
+      let preUploadedFrameUrls: string[] = [];
+      if (scenesWithCustomFrames.length > 0) {
+        addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s)...`);
+        for (let i = 0; i < scenes.length; i++) {
+          const scene = scenes[i];
+          if (scene.customFrameImage) {
+            try {
+              const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
+              const formData = new FormData();
+              formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
+              formData.append("kieApiKey", kieApiKey);
+              const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                if (uploadData.avatarUrl) preUploadedFrameUrls[i] = uploadData.avatarUrl;
+              }
+            } catch (err) { addLog(`  Scene ${i + 1}: Frame upload failed`); }
+          }
+        }
+      }
+
+      // Upload per-scene reference images
+      let customReferenceImageUrls: string[] = [];
+      const scenesWithRefImages = scenesWithContent.filter(s => s.referenceImage);
+      if (scenesWithRefImages.length > 0) {
+        addLog(`Uploading ${scenesWithRefImages.length} reference image(s)...`);
+        for (let i = 0; i < scenes.length; i++) {
+          const scene = scenes[i];
+          if (scene.referenceImage) {
+            try {
+              const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
+              const formData = new FormData();
+              formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
+              formData.append("kieApiKey", kieApiKey);
+              const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
+              if (uploadRes.ok) {
+                const uploadData = await uploadRes.json();
+                if (uploadData.avatarUrl) customReferenceImageUrls[i] = uploadData.avatarUrl;
+              }
+            } catch (err) { addLog(`  Scene ${i + 1}: Reference upload failed`); }
+          }
+        }
+      }
+
+      // Build scene data
+      const chainScenes = scenesWithContent.map((s, i) => ({
+        script: s.script.trim(),
+        framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}. Photorealistic.`,
+        description: s.description.trim() || `Scene ${i + 1}`,
+        label: s.label || `Scene ${i + 1}`,
+      }));
+      setAutoChainScenes(chainScenes);
+      setAutoChainProgress(5);
+
+      if (controller.signal.aborted) throw new Error("aborted");
+
+      // Call auto-chain with framesOnly: true
+      const pipelineRes = await authFetch("/api/auto-chain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          characterImageUrl: uploadedCharUrl || undefined,
+          scenes: chainScenes,
+          kieApiKey,
+          falApiKey,
+          videoModel,
+          framesOnly: true,
+          preUploadedFrameUrls: scenesWithCustomFrames.length > 0 ? preUploadedFrameUrls : undefined,
+          customReferenceImages: customReferenceImageUrls.length > 0 ? customReferenceImageUrls : undefined,
+        }),
+      });
+
+      if (!pipelineRes.ok) {
+        const errData = await pipelineRes.json().catch(() => ({ error: "Pipeline failed" }));
+        throw new Error(errData.error || "Pipeline failed");
+      }
+
+      // Read SSE stream
+      const reader = pipelineRes.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (controller.signal.aborted) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "ping") continue;
+            if (event.type === "frame_progress") { setAutoChainCurrentScene(event.sceneIndex + 1); setAutoChainProgress(event.pct || 0); addLog(event.message); }
+            if (event.type === "frame_done") {
+              addLog(`Frame ${event.sceneIndex + 1} complete!`);
+              setAutoChainFrameUrls((prev) => { const next = [...prev]; next[event.sceneIndex] = event.frameUrl; autoChainFrameUrlsRef.current = next; return next; });
+            }
+            if (event.type === "frame_error") {
+              addLog(`Frame ${event.sceneIndex + 1} ERROR: ${event.error}`);
+              setAutoChainFrameUrls((prev) => { const next = [...prev]; next[event.sceneIndex] = ""; return next; });
+            }
+            if (event.type === "frames_complete") { addLog(`Frames done: ${event.successCount}/${event.totalScenes || chainScenes.length} successful`); }
+            if (event.type === "done" && event.framesOnly) {
+              // Frames-only mode complete! Enter review phase
+              addLog("✅ All frames generated! Review them below, then click 'Generate Video' when ready.");
+              setPipelinePhase("reviewing_frames");
+              setFramesReviewReady(true);
+              setAutoChainStep("done");
+              setAutoChainProgress(100);
+              setPipelineStep(1); // Still on frame step
+            }
+            if (event.type === "error") {
+              addLog(`PIPELINE ERROR: ${event.message}`);
+              setAutoChainStep("error");
+              setAutoChainError(event.message);
+              setPipelinePhase("idle");
+            }
+          } catch { /* ignore parse errors */ }
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg !== "aborted") { addLog(`Frame generation ERROR: ${msg}`); setAutoChainError(msg); setPipelinePhase("idle"); }
+    } finally {
+      setIsAutoChainRunning(false);
+      setIsRunning(false);
+      abortRef.current = null;
+    }
+  }, [avatarImage, scenes, kieApiKey, falApiKey, videoModel, addLog, authFetch, uploadAvatarToServer]);
+
+  // ─── Two-Phase: Regenerate a single scene's frame ──
+  const regenerateSceneFrame = useCallback(async (sceneIndex: number) => {
+    if (!kieApiKey) { alert("KIE API key is required."); return; }
+    const scene = scenes[sceneIndex];
+    if (!scene) return;
+
+    setRegeneratingFrameIndex(sceneIndex);
+    addLog(`🔄 Regenerating frame for Scene ${sceneIndex + 1}...`);
+
+    try {
+      // Upload character image if needed
+      let uploadedCharUrl = avatarUrl || "";
+      if (avatarImage && !uploadedCharUrl) {
+        uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey);
+        setAvatarUrl(uploadedCharUrl);
+      }
+
+      // Upload reference image if present
+      let customRefUrl = "";
+      if (scene.referenceImage) {
+        const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
+        const formData = new FormData();
+        formData.append("avatar", refBlob, `scene_${sceneIndex}_ref.jpg`);
+        formData.append("kieApiKey", kieApiKey);
+        const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData });
+        if (uploadRes.ok) { const data = await uploadRes.json(); if (data.avatarUrl) customRefUrl = data.avatarUrl; }
+      }
+
+      const customRefImages: string[] = [];
+      if (customRefUrl) customRefImages[sceneIndex] = customRefUrl;
+
+      const framePrompt = scene.framePrompt.trim() || scene.description.trim() || `Person looking at camera, scene ${sceneIndex + 1}. Photorealistic.`;
+
+      const pipelineRes = await authFetch("/api/auto-chain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "regenerate_frame",
+          regenerateSceneIndex: sceneIndex,
+          characterImageUrl: uploadedCharUrl || undefined,
+          existingFrameUrls: autoChainFrameUrlsRef.current,
+          scenes: [{ script: scene.script.trim(), framePrompt, description: scene.description.trim(), label: scene.label || `Scene ${sceneIndex + 1}` }],
+          kieApiKey,
+          customReferenceImages: customRefImages.length > 0 ? customRefImages : undefined,
+        }),
+      });
+
+      if (!pipelineRes.ok) { const errData = await pipelineRes.json().catch(() => ({ error: "Regeneration failed" })); throw new Error(errData.error || "Regeneration failed"); }
+
+      const reader = pipelineRes.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "ping") continue;
+            if (event.type === "frame_done") {
+              // Update just this scene's frame URL
+              setAutoChainFrameUrls((prev) => {
+                const next = [...prev];
+                next[event.sceneIndex] = event.frameUrl;
+                autoChainFrameUrlsRef.current = next;
+                return next;
+              });
+              addLog(`✅ Scene ${event.sceneIndex + 1} frame regenerated!`);
+            }
+            if (event.type === "frame_error") { addLog(`❌ Scene ${event.sceneIndex + 1} regeneration FAILED: ${event.error}`); }
+            if (event.type === "done") { addLog("Frame regeneration complete."); }
+            if (event.type === "error") { addLog(`ERROR: ${event.message}`); }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      addLog(`Frame regeneration error: ${msg}`);
+    } finally {
+      setRegeneratingFrameIndex(null);
+    }
+  }, [scenes, kieApiKey, avatarImage, avatarUrl, authFetch, uploadAvatarToServer, addLog]);
+
+  // ─── Two-Phase: Generate Videos from approved frames ──
+  const startVideosFromFrames = useCallback(async () => {
+    const frameUrls = autoChainFrameUrlsRef.current;
+    const validFrames = frameUrls.filter(Boolean);
+    if (validFrames.length === 0) { alert("No frames available to generate videos from."); return; }
+    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
+    setPipelinePhase("generating_videos");
+    setIsAutoChainRunning(true);
+    setIsRunning(true);
+    setAutoChainStep("videos");
+    setAutoChainProgress(0);
+    setAutoChainCurrentScene(0);
+    setAutoChainError("");
+    setAutoChainVideoUrls([]);
+    autoChainVideoUrlsRef.current = [];
+    setPipelineStep(2);
+
+    const controller = new AbortController();
+    abortRef.current = controller;
+
+    try {
+      addLog("🎬 Generating videos from approved frames...");
+
+      const chainScenes = autoChainScenes.length > 0 ? autoChainScenes : scenes.filter(s => s.script.trim() || s.framePrompt.trim()).map((s, i) => ({
+        script: s.script.trim(),
+        framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}.`,
+        description: s.description.trim() || `Scene ${i + 1}`,
+        label: s.label || `Scene ${i + 1}`,
+      }));
+
+      const pipelineRes = await authFetch("/api/auto-chain", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          action: "videos_only",
+          scenes: chainScenes,
+          kieApiKey,
+          falApiKey,
+          videoModel,
+          existingFrameUrls: frameUrls,
+        }),
+      });
+
+      if (!pipelineRes.ok) { const errData = await pipelineRes.json().catch(() => ({ error: "Video pipeline failed" })); throw new Error(errData.error || "Video pipeline failed"); }
+
+      const reader = pipelineRes.body?.getReader();
+      if (!reader) throw new Error("No response stream");
+      const decoder = new TextDecoder();
+      let buffer = "";
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+        if (controller.signal.aborted) break;
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || "";
+
+        for (const line of lines) {
+          if (!line.startsWith("data: ")) continue;
+          const jsonStr = line.slice(6).trim();
+          if (!jsonStr) continue;
+          try {
+            const event = JSON.parse(jsonStr);
+            if (event.type === "ping") continue;
+            if (event.type === "step_change") {
+              const step = event.step;
+              if (step === "videos") { setAutoChainStep("videos"); setPipelineStep(2); addLog("Step: Generating videos..."); }
+              if (step === "merge") { setAutoChainStep("merge"); setPipelineStep(3); addLog("Step: Merging videos..."); }
+            }
+            if (event.type === "video_progress") { setAutoChainCurrentScene(event.sceneIndex + 1); setAutoChainProgress(event.pct || 0); addLog(event.message); }
+            if (event.type === "video_done") {
+              addLog(`Video ${event.sceneIndex + 1} complete!`);
+              setAutoChainVideoUrls((prev) => { const next = [...prev]; next[event.sceneIndex] = event.videoUrl; autoChainVideoUrlsRef.current = next; return next; });
+            }
+            if (event.type === "video_error") { addLog(`Video ${event.sceneIndex + 1} ERROR: ${event.error}`); }
+            if (event.type === "videos_complete") { addLog(`Videos done: ${event.successCount} successful`); }
+            if (event.type === "merge_error") { addLog(`Merge ERROR: ${event.error}`); }
+            if (event.type === "done") {
+              setAutoChainStep("done");
+              setAutoChainProgress(100);
+              setPipelineStep(4);
+              setPipelinePhase("done");
+              if (event.videoUrl) {
+                setAutoChainMergedUrl(event.videoUrl);
+                setFinalVideoUrl(event.videoUrl);
+                addLog("✅ Video generation complete! Merged video ready.");
+                doSaveToLibrary(event.videoUrl, autoChainFrameUrlsRef.current);
+                clearPipelineCheckpoint();
+              } else if (event.videoUrls) {
+                addLog(`✅ Video generation complete! ${event.videoUrls.length} videos ready.`);
+                if (event.videoUrls.length === 1) {
+                  setFinalVideoUrl(event.videoUrls[0]);
+                  doSaveToLibrary(event.videoUrls[0], autoChainFrameUrlsRef.current);
+                  clearPipelineCheckpoint();
+                }
+              }
+              setShowConfetti(true);
+              setTimeout(() => setShowConfetti(false), 4000);
+            }
+            if (event.type === "error") { addLog(`PIPELINE ERROR: ${event.message}`); setAutoChainStep("error"); setAutoChainError(event.message); setPipelinePhase("reviewing_frames"); }
+          } catch { /* ignore */ }
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (msg !== "aborted") { addLog(`Video generation ERROR: ${msg}`); setAutoChainError(msg); setPipelinePhase("reviewing_frames"); }
+    } finally {
+      setIsAutoChainRunning(false);
+      setIsRunning(false);
+      abortRef.current = null;
+    }
+  }, [autoChainScenes, scenes, kieApiKey, falApiKey, videoModel, addLog, authFetch, doSaveToLibrary, clearPipelineCheckpoint]);
 
   // ─── Status Polling Fallback (for when SSE stream is unreliable) ──
   const processedLogsRef = useRef<Set<string>>(new Set());
@@ -4533,15 +4815,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               </div>
             )}
             {/* Regular generate button - hidden when auto chain is running */}
-            {!isRunning && pipelineStep === 0 && !isAutoChainRunning && (
+            {!isRunning && pipelineStep === 0 && !isAutoChainRunning && !framesReviewReady && (
               <>
                 <button
-                  onClick={frameMode === "custom" ? startAutoChain : runGeneration}
+                  onClick={frameMode === "custom" ? startFramesOnly : startAutoChain}
                   disabled={frameMode === "custom" ? (() => {
                     const hasAnyFrames = scenes.some(s => s.customFrameImage);
                     const hasAvatar = !!avatarImage;
                     const hasContent = scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage).length > 0;
-                    // Need: (avatar OR uploaded frames) AND at least one scene with content
                     return (!hasAvatar && !hasAnyFrames) || !hasContent;
                   })() : !avatarImage || (videoProvider === "heygen" ? !heygenScript.trim() : scenes.filter((s) => s.description.trim() || s.script.trim()).length === 0)}
                   className="px-8 py-4 rounded-2xl text-base font-black uppercase tracking-wider transition-all duration-300 cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98] shadow-lg hover:shadow-xl"
@@ -4551,7 +4832,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                     boxShadow: (frameMode === "custom" || avatarImage) ? `0 8px 30px ${T.pink}40` : "none",
                   }}
                 >
-                  🚀 Generate Video
+                  {frameMode === "custom" ? "🖼️ Generate Frames" : "🚀 Generate Video"}
                 </button>
 
                 {/* Delete Button — only shown when there are scenes/scripts with content */}
@@ -4576,7 +4857,99 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               </>
             )}
 
-            {isRunning && (
+            {/* ── Frames Review Phase (Custom Frames two-phase pipeline) ── */}
+            {framesReviewReady && pipelinePhase === "reviewing_frames" && !isRunning && (
+              <div className="w-full max-w-2xl mx-auto animate-fade-in">
+                <div className="rounded-2xl border-2 p-5" style={{ borderColor: T.lime, backgroundColor: `${T.lime}08` }}>
+                  <div className="flex items-center gap-2 mb-4">
+                    <span className="text-2xl">🖼️</span>
+                    <h3 className="text-base font-black uppercase tracking-wide" style={{ color: T.text }}>
+                      Frames Generated — Review & Edit
+                    </h3>
+                  </div>
+                  <p className="text-xs mb-4" style={{ color: T.textMuted }}>
+                    Review each scene's frame below. Click "🔄 Regenerate" to recreate a frame, or edit the frame prompt first and then regenerate. When satisfied, click "🎬 Generate Video" to proceed.
+                  </p>
+
+                  {/* Frame Review Grid */}
+                  <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 mb-4">
+                    {autoChainFrameUrls.map((url, i) => (
+                      <div key={i} className="relative group">
+                        <div className="rounded-xl overflow-hidden border-2" style={{ borderColor: url ? T.lime : T.cardBorder }}>
+                          {url ? (
+                            <img src={url} alt={`Scene ${i + 1}`} className="w-full aspect-[9/16] object-cover" />
+                          ) : (
+                            <div className="w-full aspect-[9/16] flex items-center justify-center" style={{ backgroundColor: T.inputBg }}>
+                              <span className="text-xs" style={{ color: T.textMuted }}>Failed</span>
+                            </div>
+                          )}
+                        </div>
+                        {/* Scene label */}
+                        <div className="absolute top-1 left-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold" style={{ backgroundColor: "rgba(0,0,0,0.7)", color: T.white }}>
+                          Scene {i + 1}
+                        </div>
+                        {/* Regenerate button */}
+                        <button
+                          onClick={() => regenerateSceneFrame(i)}
+                          disabled={regeneratingFrameIndex !== null}
+                          className="absolute bottom-1 right-1 px-2 py-1 rounded-lg text-[9px] font-bold transition-all cursor-pointer disabled:opacity-40"
+                          style={{ backgroundColor: T.pink, color: T.white }}
+                          title="Regenerate this frame"
+                        >
+                          {regeneratingFrameIndex === i ? (
+                            <span className="flex items-center gap-1">
+                              <span className="w-2.5 h-2.5 border-2 rounded-full animate-spin" style={{ borderColor: "rgba(255,255,255,0.3)", borderTopColor: T.white }} />
+                              ...
+                            </span>
+                          ) : "🔄"}
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Action buttons */}
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setFramesReviewReady(false); setPipelinePhase("idle"); setPipelineStep(0); setAutoChainStep("idle"); setAutoChainFrameUrls([]); autoChainFrameUrlsRef.current = []; }}
+                      className="px-5 py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition-all cursor-pointer border-2"
+                      style={{ borderColor: T.cardBorder, backgroundColor: T.cardBg, color: T.textMuted }}
+                    >
+                      ↺ Discard & Start Over
+                    </button>
+                    <button
+                      onClick={startVideosFromFrames}
+                      disabled={autoChainFrameUrls.filter(Boolean).length === 0}
+                      className="flex-1 px-5 py-3 rounded-xl text-sm font-black uppercase tracking-wider transition-all cursor-pointer disabled:opacity-40 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-[0.98]"
+                      style={{ backgroundColor: T.cyan, color: T.white, boxShadow: `0 8px 30px ${T.cyan}40` }}
+                    >
+                      🎬 Generate Video
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── Generating Frames Progress ── */}
+            {pipelinePhase === "generating_frames" && isRunning && (
+              <div className="flex items-center gap-3 px-6 py-4 rounded-2xl border-2" style={{ borderColor: T.lime, backgroundColor: `${T.lime}08` }}>
+                <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: `${T.lime}30`, borderTopColor: T.lime }} />
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: T.lime }}>
+                  🖼️ Generating Frames... Scene {autoChainCurrentScene}
+                </span>
+              </div>
+            )}
+
+            {/* ── Generating Videos Progress ── */}
+            {pipelinePhase === "generating_videos" && isRunning && (
+              <div className="flex items-center gap-3 px-6 py-4 rounded-2xl border-2" style={{ borderColor: T.cyan, backgroundColor: T.lightBlue }}>
+                <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: `${T.cyan}30`, borderTopColor: T.cyan }} />
+                <span className="text-sm font-bold uppercase tracking-wide" style={{ color: T.cyan }}>
+                  🎬 Generating Videos... Scene {autoChainCurrentScene}
+                </span>
+              </div>
+            )}
+
+            {isRunning && pipelinePhase === "idle" && (
               <div className="flex items-center gap-3 px-6 py-4 rounded-2xl border-2" style={{ borderColor: T.cyan, backgroundColor: T.lightBlue }}>
                 <span className="w-4 h-4 border-2 rounded-full animate-spin" style={{ borderColor: `${T.cyan}30`, borderTopColor: T.cyan }} />
                 <span className="text-sm font-bold uppercase tracking-wide" style={{ color: T.cyan }}>
