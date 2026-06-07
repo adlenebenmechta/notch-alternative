@@ -258,15 +258,38 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   // Sign in with Google
   // Strategy 1: Firebase signInWithPopup (requires domain in Firebase authorized domains)
-  // Strategy 2: REST API with Google ID token (bypasses domain check)
+  // Strategy 2: GIS One Tap → REST API (bypasses domain check)
+  // Strategy 3: Direct OAuth2 Popup → REST API (bypasses ALL domain checks)
   const signInGoogle = useCallback(async () => {
-    // ── Strategy 1: Firebase SDK signInWithPopup (most reliable) ──
+    // Helper: finalize Google sign-in with a Firebase ID token or Google ID token
+    const finalizeGoogleSignIn = async (googleIdToken: string) => {
+      const data = await signInWithGoogleRest(googleIdToken);
+      const sessionData = saveAuthSession(data);
+      setSession(sessionData);
+
+      let appUser = await syncUserWithBackend(data.idToken);
+      if (!appUser) {
+        console.warn("Backend sync failed, using local user data from REST");
+        const email = data.email || "";
+        appUser = {
+          id: data.localId,
+          name: data.displayName || data.email?.split("@")[0] || "User",
+          email,
+          role: isVipUser(email) ? "admin" : "user",
+          plan: isVipUser(email) ? "enterprise" : "free",
+          creditsUsed: 0,
+          creditsLimit: isVipUser(email) ? 999999 : 3,
+        };
+      }
+      setUser(appUser);
+    };
+
+    // ── Strategy 1: Firebase SDK signInWithPopup ──
     try {
       const result = await firebaseSignInWithPopup(fbAuth, fbGoogleProvider);
       const firebaseUser = result.user;
       const idToken = await firebaseUser.getIdToken();
 
-      // Build session from Firebase user
       const sessionData: RestAuthResponse = {
         idToken,
         refreshToken: firebaseUser.refreshToken,
@@ -280,11 +303,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const savedSession = saveAuthSession(sessionData);
       setSession(savedSession);
 
-      // Sync with backend — use fallback if backend fails
       let appUser = await syncUserWithBackend(idToken);
       if (!appUser) {
-        // Backend sync failed — create a local user from Firebase data
-        console.warn("Backend sync failed, using local Firebase user data");
         const email = firebaseUser.email || "";
         appUser = {
           id: firebaseUser.uid,
@@ -301,60 +321,51 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return {};
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
-      console.warn("Firebase signInWithPopup failed:", err.code, err.message);
+      console.warn("Strategy 1 (signInWithPopup) failed:", err.code, err.message);
 
-      // If popup was closed by user, don't show error
       if (err.code === "auth/popup-closed-by-user") {
         return { error: "" };
       }
-
-      // If domain is not authorized, show clear message
-      if (err.code === "auth/unauthorized-domain") {
-        const currentDomain = typeof window !== "undefined" ? window.location.hostname : "";
-        return {
-          error: `Domain "${currentDomain}" is not authorized. Please add it in Firebase Console → Authentication → Settings → Authorized domains, then try again.`,
-        };
-      }
-
-      // For other errors, try REST API fallback
+      // For unauthorized-domain or other errors, fall through to next strategy
     }
 
-    // ── Strategy 2: GIS One Tap → REST API (bypasses domain check) ──
+    // ── Strategy 2: GIS One Tap → REST API ──
     try {
       const { initGoogleSignIn } = await import("@/lib/firebase");
       const gis = await initGoogleSignIn();
       if (gis) {
         const token = await gis.getToken();
         if (token) {
-          const data = await signInWithGoogleRest(token);
-          const sessionData = saveAuthSession(data);
-          setSession(sessionData);
-
-          let appUser = await syncUserWithBackend(data.idToken);
-          if (!appUser) {
-            console.warn("Backend sync failed, using local user data from REST");
-            const email = data.email || "";
-            appUser = {
-              id: data.localId,
-              name: data.displayName || data.email?.split("@")[0] || "User",
-              email,
-              role: isVipUser(email) ? "admin" : "user",
-              plan: isVipUser(email) ? "enterprise" : "free",
-              creditsUsed: 0,
-              creditsLimit: isVipUser(email) ? 999999 : 3,
-            };
-          }
-          setUser(appUser);
-
+          await finalizeGoogleSignIn(token);
           return {};
         }
       }
     } catch (error) {
-      console.warn("GIS fallback failed:", error);
+      console.warn("Strategy 2 (GIS One Tap) failed:", error);
+    }
+
+    // ── Strategy 3: Direct OAuth2 Popup → REST API (bypasses ALL domain checks) ──
+    try {
+      const { signInWithGooglePopup } = await import("@/lib/firebase");
+      const result = await signInWithGooglePopup();
+
+      if ("idToken" in result && result.idToken) {
+        await finalizeGoogleSignIn(result.idToken);
+        return {};
+      }
+
+      if ("error" in result) {
+        if (result.error === "popup_closed") {
+          return { error: "" }; // User closed popup, don't show error
+        }
+        console.warn("Strategy 3 (OAuth2 Popup) error:", result.error);
+      }
+    } catch (error) {
+      console.warn("Strategy 3 (OAuth2 Popup) failed:", error);
     }
 
     // ── All strategies failed ──
-    return { error: "Google sign-in failed. Please try again or sign in with email." };
+    return { error: "Google sign-in failed. Please try email sign-in instead." };
   }, []);
 
   // Sign out
