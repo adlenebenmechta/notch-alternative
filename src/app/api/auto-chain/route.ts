@@ -141,7 +141,7 @@ async function generateScript(
   throw new Error("Script generation failed after retries");
 }
 
-// ─── Generate Frame with Reference (nano-banana-pro-2k) ─────────────────
+// ─── Generate Frame with Reference (nano-banana-pro) ─────────────────
 async function generateFrameWithRef(
   prompt: string,
   referenceImageUrl: string,
@@ -157,8 +157,8 @@ async function generateFrameWithRef(
     method: "POST",
     headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "nano-banana-pro-2k",
-      input: { prompt: imgPrompt, image_urls: [referenceImageUrl], image_size: "768x1344", output_format: "png", strength: 0.5 },
+      model: "nano-banana-pro",
+      input: { prompt: imgPrompt, image_urls: [referenceImageUrl], image_size: "768x1344", output_format: "png", strength: 0.45 },
     }),
   });
 
@@ -477,7 +477,7 @@ export async function POST(req: NextRequest) {
             const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
               method: "POST",
               headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
-              body: JSON.stringify({ model: "nano-banana-pro-2k", input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.5 } }),
+              body: JSON.stringify({ model: "nano-banana-pro", input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.45 } }),
             });
 
             const submitJson = await submitRes.json();
@@ -813,8 +813,8 @@ export async function POST(req: NextRequest) {
                 method: "POST",
                 headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  model: "nano-banana-pro-2k",
-                  input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.5 },
+                  model: "nano-banana-pro",
+                  input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "768x1344", output_format: "png", strength: 0.45 },
                 }),
               });
 

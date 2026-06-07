@@ -158,7 +158,7 @@ async function downloadAndReuploadFrame(
   }
 }
 
-// ─── Generate Frame (nano-banana-pro-2k) — with auto-retry ─────────────
+// ─── Generate Frame (nano-banana-pro) — with auto-retry ─────────────
 async function generateFrame(
   jobId: string,
   sceneIndex: number,
@@ -220,8 +220,8 @@ async function generateFrame(
           method: "POST",
           headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
           body: JSON.stringify({
-            model: "nano-banana-pro-2k",
-            input: { prompt: imgPrompt, image_urls: [avatarUrl], image_size: "768x1344", output_format: "png", strength: 0.5 },
+            model: "nano-banana-pro",
+            input: { prompt: imgPrompt, image_urls: [avatarUrl], image_size: "768x1344", output_format: "png", strength: 0.45 },
           }),
         });
         const json = await res.json();
