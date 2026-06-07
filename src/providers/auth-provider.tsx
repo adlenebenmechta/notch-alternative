@@ -145,25 +145,34 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       if (stored) {
         let idToken = stored.idToken;
+        let currentSession = stored;
 
-        // Check if token needs refresh
-        if (Date.now() > stored.expiresAt - 5 * 60 * 1000) {
-          try {
-            const refreshed = await refreshIdToken(stored.refreshToken);
-            const newSession = saveAuthSession(refreshed);
-            idToken = refreshed.idToken;
-            setSession(newSession);
-          } catch {
-            // Refresh failed — keep session so authFetch can retry later
-            console.warn("initAuth: token refresh failed, keeping existing session for authFetch retry");
+        // Always try to refresh token on startup for reliability
+        // Even if token isn't expired yet, a fresh token avoids edge cases
+        try {
+          const refreshed = await refreshIdToken(stored.refreshToken);
+          const newSession = saveAuthSession(refreshed);
+          idToken = refreshed.idToken;
+          currentSession = newSession;
+          setSession(newSession);
+        } catch {
+          // Refresh failed — if token is still valid, keep using it
+          if (Date.now() < stored.expiresAt) {
+            console.warn("initAuth: token refresh failed, using existing valid token");
             setSession(stored);
+          } else {
+            // Token is expired AND refresh failed — clear session
+            console.warn("initAuth: token expired and refresh failed, clearing session");
+            clearAuthSession();
+            setSession(null);
+            setUser(null);
+            setLoading(false);
+            return;
           }
-        } else {
-          setSession(stored);
         }
 
-        // Sync with backend (use current token even if refresh failed)
-        await doSync(idToken, stored);
+        // Sync with backend
+        await doSync(idToken, currentSession);
       }
 
       setLoading(false);
