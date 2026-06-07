@@ -198,9 +198,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const sessionData = saveAuthSession(data);
       setSession(sessionData);
 
-      // Sync with backend
-      const appUser = await syncUserWithBackend(data.idToken);
-      if (appUser) setUser(appUser);
+      // Sync with backend — use fallback if backend fails
+      let appUser = await syncUserWithBackend(data.idToken);
+      if (!appUser) {
+        // Backend sync failed — create user from Firebase session data
+        console.warn("signUp: Backend sync failed, using session data");
+        const email = data.email || "";
+        appUser = {
+          id: data.localId,
+          name: data.displayName || data.email?.split("@")[0] || "User",
+          email,
+          role: isVipUser(email) ? "admin" : "user",
+          plan: isVipUser(email) ? "enterprise" : "free",
+          creditsUsed: 0,
+          creditsLimit: isVipUser(email) ? 999999 : 3,
+        };
+      }
+      setUser(appUser);
 
       return {};
     } catch (error: unknown) {
@@ -232,9 +246,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       const sessionData = saveAuthSession(data);
       setSession(sessionData);
 
-      // Sync with backend
-      const appUser = await syncUserWithBackend(data.idToken);
-      if (appUser) setUser(appUser);
+      // Sync with backend — use fallback if backend fails
+      let appUser = await syncUserWithBackend(data.idToken);
+      if (!appUser) {
+        // Backend sync failed — create user from Firebase session data
+        console.warn("signIn: Backend sync failed, using session data");
+        const email = data.email || "";
+        appUser = {
+          id: data.localId,
+          name: data.displayName || data.email?.split("@")[0] || "User",
+          email,
+          role: isVipUser(email) ? "admin" : "user",
+          plan: isVipUser(email) ? "enterprise" : "free",
+          creditsUsed: 0,
+          creditsLimit: isVipUser(email) ? 999999 : 3,
+        };
+      }
+      setUser(appUser);
 
       return {};
     } catch (error: unknown) {

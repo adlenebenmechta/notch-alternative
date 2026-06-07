@@ -23,13 +23,32 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the Firebase ID token
-    const decodedToken = await verifyIdToken(idToken);
-    const uid = decodedToken.uid || decodedToken.sub;
-    const email = (decodedToken.email || "").toLowerCase().trim();
-    const name = decodedToken.name || email.split("@")[0] || "User";
-    const picture = decodedToken.picture || "";
+    let decodedToken: { uid?: string; sub?: string; email?: string; name?: string; picture?: string } | null = null;
+    try {
+      decodedToken = await verifyIdToken(idToken) as typeof decodedToken;
+    } catch (verifyErr) {
+      console.error("Token verification failed:", verifyErr);
+      return NextResponse.json(
+        { error: "Invalid or expired token" },
+        { status: 401 }
+      );
+    }
 
-    // Look up user in database by email
+    const uid = decodedToken?.uid || decodedToken?.sub || "";
+    const email = (decodedToken?.email || "").toLowerCase().trim();
+    const name = decodedToken?.name || email.split("@")[0] || "User";
+    const picture = decodedToken?.picture || "";
+
+    if (!email) {
+      return NextResponse.json(
+        { error: "No email in token" },
+        { status: 400 }
+      );
+    }
+
+    const isVip = VIP_EMAILS.has(email);
+
+    // Try to look up user in database (non-blocking — don't fail if DB is down)
     let dbUser: {
       id: string;
       name: string;
@@ -53,10 +72,8 @@ export async function POST(request: NextRequest) {
         },
       });
     } catch (e) {
-      console.warn("Failed to look up user in database:", e);
+      console.warn("DB lookup failed (non-critical):", e);
     }
-
-    const isVip = VIP_EMAILS.has(email);
 
     // For VIP users, ensure DB is in sync
     if (isVip && dbUser) {
@@ -75,7 +92,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Auto-create user in DB if not found (first Google sign-in)
+    // Auto-create user in DB if not found (first sign-in)
     if (!dbUser && email) {
       try {
         dbUser = await db.user.create({
@@ -102,11 +119,11 @@ export async function POST(request: NextRequest) {
           },
         });
       } catch (createErr) {
-        console.warn("Failed to auto-create user in DB:", createErr);
+        console.warn("Auto-create user failed (non-critical):", createErr);
       }
     }
 
-    // Build user object
+    // Build user object — always succeeds even if DB is completely down
     const user = {
       id: dbUser?.id || uid,
       name: dbUser?.name || name,
@@ -120,10 +137,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ user });
   } catch (error) {
-    console.error("Session API error:", error);
+    console.error("Session API unexpected error:", error);
     return NextResponse.json(
-      { error: "Invalid or expired token" },
-      { status: 401 }
+      { error: "Internal server error" },
+      { status: 500 }
     );
   }
 }
