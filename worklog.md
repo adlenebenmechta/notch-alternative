@@ -132,3 +132,30 @@ Stage Summary:
 - This explains why BOTH email AND Google sign-in were failing - neither could access the auth context
 - Also added DB auto-migration on startup for fresh Railway deployments
 - Added health check endpoint at /api/health
+
+---
+Task ID: 2
+Agent: Main + Full-stack developer subagent
+Task: Rebuild AllInOneMachine to match viewmax.io exactly - each tool in own page
+
+Work Log:
+- Used Puppeteer to scrape viewmax.io with user credentials (armoraybof@gmail.com)
+- Captured all 11 tool pages, sidebar navigation, home grid, and detailed UI elements
+- Documented viewmax.io design system (light sidebar, white content, specific colors)
+- Delegated the complete rebuild to full-stack-developer subagent
+- Subagent rebuilt AllInOneMachine.tsx from scratch with:
+  - Left sidebar (250px, #F7F7F7) with logo, Create button, Home nav, 11 tools list, user section
+  - Home view with greeting + tools grid (3 columns) + Beta Templates section
+  - 11 individual tool pages, each with proper form controls matching viewmax.io
+  - Mobile-responsive hamburger menu
+  - Light theme design matching viewmax.io
+- Build succeeded, committed and pushed to GitHub
+
+Stage Summary:
+- AllInOneMachine.tsx completely rewritten to match viewmax.io
+- 11 tools: AI Video Generator, AI Image Generator (Beta), Scriptwriter, AI Voiceover, Video Downloader, AI Clone (Beta), Auto Captions (Beta), Voice Changer (Beta), Caption Remover (Beta), Watermark Remover, AI Ad Generator (Beta)
+- Each tool opens in its OWN PAGE (not inline accordion)
+- Light theme sidebar with tool navigation
+- Home page shows tools grid with "Try now" buttons
+- Backend API routes preserved (kie.ai + fal.ai)
+- Pushed to GitHub for Railway auto-deploy
