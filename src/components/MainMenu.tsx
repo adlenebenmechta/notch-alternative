@@ -236,8 +236,9 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
       } else {
         onClose();
       }
-    } catch {
-      setError("Something went wrong.");
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err || "Unknown error");
+      setError(`Sign-in error: ${msg}`);
     } finally {
       setLoading(false);
     }

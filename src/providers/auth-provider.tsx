@@ -182,10 +182,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [doSync]);
 
   // Sign up with email/password
-  const signUp = useCallback(async (email: string, password: string, name: string) => {
+  const signUp = useCallback(async (emailInput: string, password: string, name: string) => {
     try {
       // Use REST API to create account (bypasses domain check)
-      const data = await signUpWithEmailRest(email.toLowerCase().trim(), password);
+      const data = await signUpWithEmailRest(emailInput.toLowerCase().trim(), password);
 
       // Update display name
       try {
@@ -203,15 +203,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!appUser) {
         // Backend sync failed — create user from Firebase session data
         console.warn("signUp: Backend sync failed, using session data");
-        const email = data.email || "";
+        const fallbackEmail = data.email || emailInput.toLowerCase().trim();
         appUser = {
           id: data.localId,
-          name: data.displayName || data.email?.split("@")[0] || "User",
-          email,
-          role: isVipUser(email) ? "admin" : "user",
-          plan: isVipUser(email) ? "enterprise" : "free",
+          name: name.trim() || fallbackEmail.split("@")[0] || "User",
+          email: fallbackEmail,
+          role: isVipUser(fallbackEmail) ? "admin" : "user",
+          plan: isVipUser(fallbackEmail) ? "enterprise" : "free",
           creditsUsed: 0,
-          creditsLimit: isVipUser(email) ? 999999 : 3,
+          creditsLimit: isVipUser(fallbackEmail) ? 999999 : 3,
         };
       }
       setUser(appUser);
@@ -220,7 +220,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       const code = err.code || "";
-      const msg = err.message || "Something went wrong.";
+      const msg = err.message || "Unknown error";
 
       if (code.includes("EMAIL_EXISTS")) {
         return { error: "An account with this email already exists." };
@@ -231,16 +231,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (code.includes("INVALID_EMAIL")) {
         return { error: "Invalid email address." };
       }
+      if (code.includes("NETWORK") || code.includes("Failed to fetch") || msg.includes("Failed to fetch")) {
+        return { error: "Network error. Please check your internet connection and try again." };
+      }
       console.error("Sign up error:", code, msg);
-      return { error: msg };
+      return { error: `Sign-up failed: ${msg}` };
     }
   }, []);
 
   // Sign in with email/password
-  const signIn = useCallback(async (email: string, password: string) => {
+  const signIn = useCallback(async (emailInput: string, password: string) => {
     try {
       // Use REST API to sign in (bypasses domain check)
-      const data = await signInWithEmailRest(email.toLowerCase().trim(), password);
+      const data = await signInWithEmailRest(emailInput.toLowerCase().trim(), password);
 
       // Save session
       const sessionData = saveAuthSession(data);
@@ -251,15 +254,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       if (!appUser) {
         // Backend sync failed — create user from Firebase session data
         console.warn("signIn: Backend sync failed, using session data");
-        const email = data.email || "";
+        const fallbackEmail = data.email || emailInput.toLowerCase().trim();
         appUser = {
           id: data.localId,
-          name: data.displayName || data.email?.split("@")[0] || "User",
-          email,
-          role: isVipUser(email) ? "admin" : "user",
-          plan: isVipUser(email) ? "enterprise" : "free",
+          name: data.displayName || fallbackEmail.split("@")[0] || "User",
+          email: fallbackEmail,
+          role: isVipUser(fallbackEmail) ? "admin" : "user",
+          plan: isVipUser(fallbackEmail) ? "enterprise" : "free",
           creditsUsed: 0,
-          creditsLimit: isVipUser(email) ? 999999 : 3,
+          creditsLimit: isVipUser(fallbackEmail) ? 999999 : 3,
         };
       }
       setUser(appUser);
@@ -268,19 +271,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     } catch (error: unknown) {
       const err = error as { code?: string; message?: string };
       const code = err.code || "";
-      const msg = err.message || "Something went wrong.";
+      const msg = err.message || "Unknown error";
 
-      if (code.includes("INVALID_LOGIN_CREDENTIALS") || code.includes("USER_NOT_FOUND") || code.includes("WRONG_PASSWORD")) {
+      if (code.includes("INVALID_LOGIN_CREDENTIALS") || code.includes("USER_NOT_FOUND") || code.includes("WRONG_PASSWORD") || code.includes("EMAIL_NOT_FOUND") || code.includes("INVALID_PASSWORD")) {
         return { error: "Invalid email or password." };
       }
-      if (code.includes("TOO_MANY_ATTEMPTS")) {
+      if (code.includes("TOO_MANY_ATTEMPTS") || code.includes("TOO_MANY_ATTEMPTS_TRY_LATER")) {
         return { error: "Too many attempts. Please try again later." };
       }
       if (code.includes("INVALID_EMAIL")) {
         return { error: "Invalid email address." };
       }
+      if (code.includes("NETWORK") || code.includes("Failed to fetch") || msg.includes("Failed to fetch")) {
+        return { error: "Network error. Please check your internet connection and try again." };
+      }
       console.error("Sign in error:", code, msg);
-      return { error: msg };
+      return { error: `Login failed: ${msg}` };
     }
   }, []);
 
