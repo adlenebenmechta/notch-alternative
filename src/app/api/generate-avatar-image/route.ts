@@ -86,16 +86,16 @@ export async function POST(req: NextRequest) {
 
     const hasReference = referenceImageUrl && referenceImageUrl.trim();
 
-    // Use nano-banana-2 for text-to-image (no reference), nano-banana-edit for image editing (with reference)
+    // Use nano-banana-2 for text-to-image (no reference), nano-banana-pro-2k for image editing (with reference)
     const requestBody: Record<string, unknown> = hasReference
       ? {
-          model: "google/nano-banana-edit",
+          model: "nano-banana-pro-2k",
           input: {
             prompt: imgPrompt,
             image_urls: [referenceImageUrl.trim()],
-            image_size: editSize,
+            image_size: isVertical ? "768x1344" : "1344x768",
             output_format: "png",
-            strength: 0.65,
+            strength: 0.5,
           },
         }
       : {
