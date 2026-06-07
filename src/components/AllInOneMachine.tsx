@@ -2094,29 +2094,249 @@ function WatermarkRemoverPage({ onBack }: { onBack: () => void }) {
   );
 }
 
-// ─── AI Ad Generator Page ─────────────────────────────────────────────────
+// ─── AI Ad Generator Page (viewmax.io-style) ──────────────────────────────
+
+const AD_FORMATS = [
+  { value: "blank", label: "Blank", desc: "No format assist" },
+  { value: "ugc_handheld", label: "UGC Handheld", desc: "Static selfie product reads" },
+  { value: "clothing_try_on", label: "Clothing Try On", desc: "Creator garment try-ons" },
+  { value: "ugc_yapping", label: "UGC Yapping", desc: "FaceTime-style app rants" },
+  { value: "fruit_cutting", label: "Fruit Cutting", desc: "Low-key cutting board reads" },
+  { value: "hyper_motion", label: "Hyper Motion", desc: "Fast product highlights" },
+];
+
+const AD_MODELS = [
+  { value: "seedance", label: "Seedance 2", icon: "🎬" },
+  { value: "seedance_fast", label: "Seedance 2 Fast", icon: "⚡" },
+  { value: "veo3_fast", label: "Veo 3.1 Fast", icon: "🚀" },
+  { value: "veo3", label: "Veo 3.1", icon: "🌟" },
+  { value: "grok_imagine", label: "Grok Imagine", icon: "✨" },
+];
+
+const AD_VOICES = [
+  { value: "alexis_vale", label: "Alexis Vale", desc: "Warm female, conversational" },
+  { value: "evan_brooks", label: "Evan Brooks", desc: "Deep male, authoritative" },
+  { value: "claire_benne", label: "Claire Benne", desc: "Bright female, energetic" },
+  { value: "miles_carter", label: "Miles Carter", desc: "Casual male, friendly" },
+  { value: "sofia_lane", label: "Sofia Lane", desc: "Soft female, approachable" },
+  { value: "clara_wren", label: "Clara Wren", desc: "Professional female, clear" },
+  { value: "dante_cruz", label: "Dante Cruz", desc: "Bold male, dramatic" },
+];
+
+// Format-specific prompt augmentations
+const FORMAT_PROMPTS: Record<string, string> = {
+  blank: "",
+  ugc_handheld: "UGC handheld selfie style: A person holds the product close to the camera, speaking directly to the viewer as if showing a friend. Shaky handheld camera, natural lighting, authentic and relatable tone. The person reads the product name and key selling points while showing it off. ",
+  clothing_try_on: "Clothing try-on style: A creator shows off wearing the garment, doing a full spin to display how it fits. They touch the fabric, comment on the material quality, and show the item from multiple angles. Natural body movement, fashion-forward presentation. ",
+  ugc_yapping: "UGC yapping FaceTime-style: The creator rants passionately about the product while holding it up, like they're on a FaceTime call with a friend. Fast-paced talking, animated expressions, pointing at features. The energy is authentic, slightly chaotic, and highly engaging. ",
+  fruit_cutting: "Fruit cutting style: Close-up shot of someone's hands cutting fruit on a wooden cutting board, with the product subtly placed nearby. The satisfying ASMR-like cutting sounds and visuals create a calming, low-key atmosphere while the product is naturally integrated into the scene. ",
+  hyper_motion: "Hyper motion style: Rapid-cut product showcase with dynamic camera movements, zoom-ins, and fast transitions. The product is shown from multiple angles with quick reveals, feature callouts, and high-energy visuals. Bold text overlays highlight key benefits. ",
+};
 
 function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
+  // State
   const [prompt, setPrompt] = useState("");
-  const [format, setFormat] = useState("ugc");
+  const [format, setFormat] = useState("blank");
   const [model, setModel] = useState("seedance");
-  const [duration, setDuration] = useState("8s");
-  const [productUrl, setProductUrl] = useState("");
-  const [result, setResult] = useState<ToolResult>({ loading: false, error: null });
-  const [feed, setFeed] = useState<{ url: string; id: string }[]>([]);
+  const [duration, setDuration] = useState(8);
+  const [aspectRatio, setAspectRatio] = useState("9:16");
+  const [resolution, setResolution] = useState("720p");
+  const [activeTab, setActiveTab] = useState<"generate" | "history">("generate");
 
+  // Product upload
+  const [productFile, setProductFile] = useState<File | null>(null);
+  const [productPreview, setProductPreview] = useState<string>("");
+  const [productUploading, setProductUploading] = useState(false);
+  const [productImageUrl, setProductImageUrl] = useState("");
+
+  // Avatar upload
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
+  const [avatarPreview, setAvatarPreview] = useState<string>("");
+  const [avatarUploading, setAvatarUploading] = useState(false);
+  const [avatarImageUrl, setAvatarImageUrl] = useState("");
+
+  // Voice
+  const [selectedVoice, setSelectedVoice] = useState("");
+  const [voiceFile, setVoiceFile] = useState<File | null>(null);
+  const [voicePreview, setVoicePreview] = useState<string>("");
+  const [voiceUploading, setVoiceUploading] = useState(false);
+  const [voiceAudioUrl, setVoiceAudioUrl] = useState("");
+
+  // Reference media
+  const [refImages, setRefImages] = useState<File[]>([]);
+  const [refVideo, setRefVideo] = useState<File | null>(null);
+
+  // Result
+  const [result, setResult] = useState<ToolResult>({ loading: false, error: null });
+  const [feed, setFeed] = useState<{ url: string; prompt: string; model: string; format: string; id: string }[]>([]);
+
+  // Show product upload dialog
+  const [showProductDialog, setShowProductDialog] = useState(false);
+  // Show avatar upload dialog
+  const [showAvatarDialog, setShowAvatarDialog] = useState(false);
+  // Show voice dialog
+  const [showVoiceDialog, setShowVoiceDialog] = useState(false);
+  // Show format selector
+  const [showFormatPicker, setShowFormatPicker] = useState(false);
+  // Show model selector
+  const [showModelPicker, setShowModelPicker] = useState(false);
+  // Show video settings
+  const [showVideoSettings, setShowVideoSettings] = useState(false);
+  // Show references
+  const [showReferences, setShowReferences] = useState(false);
+
+  // File input refs
+  const productInputRef = useRef<HTMLInputElement>(null);
+  const avatarInputRef = useRef<HTMLInputElement>(null);
+  const voiceInputRef = useRef<HTMLInputElement>(null);
+  const refImageInputRef = useRef<HTMLInputElement>(null);
+  const refVideoInputRef = useRef<HTMLInputElement>(null);
+
+  // Close popups on outside click
+  useEffect(() => {
+    const handler = () => {
+      setShowFormatPicker(false);
+      setShowModelPicker(false);
+      setShowVideoSettings(false);
+      setShowReferences(false);
+    };
+    document.addEventListener("click", handler);
+    return () => document.removeEventListener("click", handler);
+  }, []);
+
+  // Handle product file selection
+  const handleProductSelect = async (file: File) => {
+    setProductFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setProductPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    setProductUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kieApiKey", process.env.NEXT_PUBLIC_KIE_KEY || "");
+      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.avatarUrl) {
+        setProductImageUrl(data.avatarUrl);
+      }
+    } catch (err) {
+      console.error("Product upload failed:", err);
+    } finally {
+      setProductUploading(false);
+    }
+  };
+
+  // Handle avatar file selection
+  const handleAvatarSelect = async (file: File) => {
+    setAvatarFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setAvatarPreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    setAvatarUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("kieApiKey", process.env.NEXT_PUBLIC_KIE_KEY || "");
+      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.avatarUrl) {
+        setAvatarImageUrl(data.avatarUrl);
+      }
+    } catch (err) {
+      console.error("Avatar upload failed:", err);
+    } finally {
+      setAvatarUploading(false);
+    }
+  };
+
+  // Handle voice file selection
+  const handleVoiceSelect = async (file: File) => {
+    setVoiceFile(file);
+    const reader = new FileReader();
+    reader.onload = (e) => setVoicePreview(e.target?.result as string);
+    reader.readAsDataURL(file);
+
+    // Upload to server
+    setVoiceUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("audio", file);
+      const res = await fetch("/api/allinone/upload-voice", { method: "POST", body: formData });
+      const data = await res.json();
+      if (data.url) {
+        setVoiceAudioUrl(data.url);
+      }
+    } catch (err) {
+      console.error("Voice upload failed:", err);
+    } finally {
+      setVoiceUploading(false);
+    }
+  };
+
+  // Build the full prompt with format augmentation
+  const buildFullPrompt = (): string => {
+    const formatPrefix = FORMAT_PROMPTS[format] || "";
+    let fullPrompt = formatPrefix + prompt.trim();
+
+    // Add product context
+    if (productImageUrl) {
+      fullPrompt += " [Product image reference provided]";
+    }
+    // Add avatar context
+    if (avatarImageUrl) {
+      fullPrompt += " [Creator/Avatar reference provided]";
+    }
+    // Add voice context
+    if (selectedVoice) {
+      const voice = AD_VOICES.find((v) => v.value === selectedVoice);
+      if (voice) {
+        fullPrompt += ` [Voice style: ${voice.desc}]`;
+      }
+    }
+    if (voiceAudioUrl) {
+      fullPrompt += " [Voice audio reference provided]";
+    }
+
+    return fullPrompt;
+  };
+
+  // Map model value to API model name
+  const mapModel = (m: string): string => {
+    switch (m) {
+      case "seedance": return "seedance";
+      case "seedance_fast": return "seedance";
+      case "veo3_fast": return "veo3_fast";
+      case "veo3": return "veo3_lite";
+      case "grok_imagine": return "grok_imagine";
+      default: return "seedance";
+    }
+  };
+
+  // Handle generation
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setResult({ loading: true, error: null });
     try {
-      const res = await fetch("/api/allinone/video-generate", {
+      const fullPrompt = buildFullPrompt();
+      const res = await fetch("/api/allinone/ad-generate", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          prompt: `Create an ad: ${prompt.trim()}`,
-          model,
-          duration: parseInt(duration),
-          aspectRatio: "9:16",
+          prompt: fullPrompt,
+          format,
+          model: mapModel(model),
+          duration,
+          aspectRatio,
+          resolution,
+          productImageUrl: productImageUrl || undefined,
+          avatarImageUrl: avatarImageUrl || undefined,
+          selectedVoice: selectedVoice || undefined,
+          voiceAudioUrl: voiceAudioUrl || undefined,
         }),
       });
       const data = await res.json();
@@ -2126,92 +2346,535 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
       }
       setResult({ loading: false, error: null, url: data.videoUrl });
       if (data.videoUrl) {
-        setFeed((prev) => [{ url: data.videoUrl, id: Date.now().toString() }, ...prev]);
+        setFeed((prev) => [{
+          url: data.videoUrl,
+          prompt: prompt.trim(),
+          model: AD_MODELS.find((m) => m.value === model)?.label || model,
+          format: AD_FORMATS.find((f) => f.value === format)?.label || format,
+          id: Date.now().toString(),
+        }, ...prev]);
       }
     } catch (err) {
       setResult({ loading: false, error: err instanceof Error ? err.message : "Failed to generate ad" });
     }
   };
 
+  // Determine if voice option is available (Seedance models only)
+  const isVoiceAvailable = model === "seedance" || model === "seedance_fast";
+
+  // Check if generate button should be disabled
+  const canGenerate = prompt.trim().length > 0;
+
   return (
-    <ToolPageLayout
-      title="AI Ad Generator"
-      subtitle="Choose a format, product, avatar, voice, and script to generate high-converting AI video ads."
-      badge="Beta"
-      color={D.purple}
-      onBack={onBack}
-    >
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Left: Controls */}
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: D.textPrimary }}>Prompt</label>
-            <textarea
-              value={prompt}
-              onChange={(e) => setPrompt(e.target.value)}
-              placeholder="Describe your ad concept..."
-              rows={3}
-              className="w-full rounded-xl px-4 py-3 text-sm placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-              style={{ backgroundColor: D.inputBg, border: `1px solid ${D.inputBorder}`, color: D.textPrimary }}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: D.textMuted }}>Format</label>
-            <PillSelector
-              options={[
-                { value: "ugc", label: "UGC" },
-                { value: "demo", label: "Product Demo" },
-                { value: "story", label: "Story" },
-              ]}
-              value={format}
-              onChange={setFormat}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: D.textMuted }}>Model</label>
-            <PillSelector
-              options={[
-                { value: "seedance", label: "Seedance 2" },
-                { value: "kling3.0", label: "Kling 3.0" },
-              ]}
-              value={model}
-              onChange={setModel}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: D.textMuted }}>Duration</label>
-            <PillSelector
-              options={[
-                { value: "8s", label: "8s" },
-                { value: "15s", label: "15s" },
-              ]}
-              value={duration}
-              onChange={setDuration}
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1.5" style={{ color: D.textMuted }}>Product URL</label>
-            <input
-              type="url"
-              value={productUrl}
-              onChange={(e) => setProductUrl(e.target.value)}
-              placeholder="https://your-product-page.com"
-              className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-              style={{ backgroundColor: D.inputBg, border: `1px solid ${D.inputBorder}`, color: D.textPrimary }}
-            />
-          </div>
-
-          <GenerateButton onClick={handleGenerate} loading={result.loading} disabled={!prompt.trim()} label="Generate" creditCost={20} />
-
-          {result.error && <ErrorDisplay error={result.error} />}
-          {result.url && <VideoResult url={result.url} />}
+    <div className="max-w-[1060px] mx-auto px-3 sm:px-6 py-4">
+      {/* Header */}
+      <div className="mb-4">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-1.5 text-sm font-medium mb-3 transition-colors hover:opacity-70"
+          style={{ color: D.textMuted }}
+        >
+          <ArrowLeft /> Back to Home
+        </button>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold" style={{ color: D.textPrimary }}>AI Ad Generator</h1>
+          <span
+            className="px-2 py-0.5 rounded-full text-[10px] font-bold"
+            style={{ backgroundColor: `${D.purple}20`, color: D.purple }}
+          >
+            Beta
+          </span>
         </div>
+      </div>
 
-        {/* Right: Feed */}
+      {/* Tabs: Generate / History */}
+      <div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: D.inputBg }}>
+        <button
+          onClick={() => setActiveTab("generate")}
+          className="px-4 py-2 rounded-md text-sm font-medium transition-all"
+          style={{
+            backgroundColor: activeTab === "generate" ? D.white : "transparent",
+            color: activeTab === "generate" ? D.textPrimary : D.textMuted,
+            boxShadow: activeTab === "generate" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+          }}
+        >
+          Generate
+        </button>
+        <button
+          onClick={() => setActiveTab("history")}
+          className="px-4 py-2 rounded-md text-sm font-medium transition-all"
+          style={{
+            backgroundColor: activeTab === "history" ? D.white : "transparent",
+            color: activeTab === "history" ? D.textPrimary : D.textMuted,
+            boxShadow: activeTab === "history" ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+          }}
+        >
+          History
+        </button>
+      </div>
+
+      {activeTab === "generate" ? (
+        <div className="flex flex-col lg:flex-row gap-3">
+          {/* Main Content Area */}
+          <div className="flex-1 min-w-0">
+            {/* Prompt + Toolbar Card */}
+            <div
+              className="rounded-[22px] sm:rounded-[28px] border p-3 sm:p-3.5 transition-colors"
+              style={{ backgroundColor: "rgba(120,120,120,0.08)", borderColor: "rgba(120,120,120,0.2)" }}
+            >
+              {/* Prompt Textarea */}
+              <div className="relative mb-3">
+                <textarea
+                  value={prompt}
+                  onChange={(e) => setPrompt(e.target.value)}
+                  placeholder="Describe what happens in the ad..."
+                  rows={4}
+                  className="w-full rounded-xl px-4 py-3 text-[15px] leading-6 font-medium placeholder-gray-400 resize-none focus:outline-none focus:ring-2 focus:ring-blue-500/20"
+                  style={{
+                    backgroundColor: "transparent",
+                    border: "none",
+                    color: D.textPrimary,
+                    minHeight: "132px",
+                  }}
+                />
+              </div>
+
+              {/* Toolbar Row */}
+              <div className="flex flex-wrap items-center gap-1.5">
+                {/* Format Button */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setShowFormatPicker(!showFormatPicker); setShowModelPicker(false); setShowVideoSettings(false); setShowReferences(false); }}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-xs font-semibold tracking-tight transition-all"
+                    style={{
+                      borderColor: "rgba(120,120,120,0.2)",
+                      backgroundColor: showFormatPicker ? "rgba(120,120,120,0.16)" : "rgba(116,116,128,0.08)",
+                      color: "rgba(0,0,0,0.8)",
+                    }}
+                  >
+                    <PlusIconSmall />
+                    <span>Format</span>
+                  </button>
+                  {showFormatPicker && (
+                    <div
+                      className="absolute top-full left-0 mt-2 w-[340px] rounded-2xl border p-3 z-50"
+                      style={{ backgroundColor: D.white, border: `1px solid #EEF0F4`, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}
+                    >
+                      <p className="mb-2.5 text-[10px] font-semibold tracking-[0.16em] uppercase" style={{ color: "#6B7280" }}>Format</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        {AD_FORMATS.map((f) => (
+                          <button
+                            key={f.value}
+                            onClick={() => { setFormat(f.value); setShowFormatPicker(false); }}
+                            className="flex min-h-14 items-center justify-between gap-2 rounded-2xl border px-3 py-2.5 text-left transition active:scale-[0.99]"
+                            style={{
+                              borderColor: format === f.value ? "rgba(0,117,253,0.4)" : "#E2E8F0",
+                              backgroundColor: format === f.value ? "#EAF3FF" : "#F8FAFC",
+                              color: format === f.value ? "#0075FD" : D.textPrimary,
+                            }}
+                          >
+                            <span className="min-w-0">
+                              <span className="block truncate text-[13px] font-black tracking-tight">{f.label}</span>
+                              <span className="mt-0.5 block truncate text-[10px] font-medium" style={{ color: "#64748B" }}>{f.desc}</span>
+                            </span>
+                            {format === f.value && (
+                              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0075FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                <path d="M20 6L9 17l-5-5" />
+                              </svg>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* Model Button */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setShowModelPicker(!showModelPicker); setShowFormatPicker(false); setShowVideoSettings(false); setShowReferences(false); }}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-xs font-semibold tracking-tight transition-all"
+                    style={{
+                      borderColor: "rgba(120,120,120,0.2)",
+                      backgroundColor: showModelPicker ? "rgba(120,120,120,0.16)" : "rgba(116,116,128,0.08)",
+                      color: "rgba(0,0,0,0.8)",
+                    }}
+                  >
+                    <span className="text-sm">{AD_MODELS.find((m) => m.value === model)?.icon}</span>
+                    <span>{AD_MODELS.find((m) => m.value === model)?.label}</span>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className="opacity-60">
+                      <path d="m6 9 6 6 6-6" />
+                    </svg>
+                  </button>
+                  {showModelPicker && (
+                    <div
+                      className="absolute top-full left-0 mt-2 w-[280px] rounded-2xl border p-1.5 z-50"
+                      style={{ backgroundColor: "rgba(0,0,0,0.03)", border: `1px solid #EEF0F4`, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}
+                    >
+                      {AD_MODELS.map((m) => (
+                        <button
+                          key={m.value}
+                          onClick={() => { setModel(m.value); setShowModelPicker(false); }}
+                          className="flex w-full min-h-12 items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left transition"
+                          style={{
+                            border: model === m.value ? "1px solid rgba(0,117,253,0.35)" : "1px solid transparent",
+                            backgroundColor: model === m.value ? "#EAF3FF" : "transparent",
+                            color: model === m.value ? "#0075FD" : D.textPrimary,
+                          }}
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <span className="grid size-8 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: model === m.value ? "#D9EAFF" : D.white }}>
+                              <span className="text-base">{m.icon}</span>
+                            </span>
+                            <span className="text-[13px] font-semibold">{m.label}</span>
+                          </span>
+                          {model === m.value && (
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#0075FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                              <path d="M20 6L9 17l-5-5" />
+                            </svg>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Duration Button */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setShowVideoSettings(!showVideoSettings); setShowFormatPicker(false); setShowModelPicker(false); setShowReferences(false); }}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-xs font-semibold tracking-tight transition-all"
+                    style={{
+                      borderColor: "rgba(120,120,120,0.2)",
+                      backgroundColor: showVideoSettings ? "rgba(120,120,120,0.16)" : "rgba(116,116,128,0.08)",
+                      color: "rgba(0,0,0,0.8)",
+                    }}
+                  >
+                    <ClockIcon />
+                    <span>{duration}s</span>
+                  </button>
+                  {showVideoSettings && (
+                    <div
+                      className="absolute top-full left-0 mt-2 w-[280px] rounded-2xl border bg-white p-3 z-50"
+                      style={{ border: `1px solid #EEF0F4`, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}
+                    >
+                      <p className="mb-2.5 text-[10px] font-semibold tracking-[0.16em] uppercase" style={{ color: "#6B7280" }}>Video Settings</p>
+                      {/* Aspect Ratio */}
+                      <div className="mb-3">
+                        <div className="grid grid-cols-3 gap-1.5 rounded-2xl p-1.5" style={{ backgroundColor: "rgba(0,0,0,0.03)" }}>
+                          {[
+                            { value: "9:16", label: "Portrait", icon: <PortraitIcon /> },
+                            { value: "16:9", label: "Landscape", icon: <LandscapeIcon /> },
+                            { value: "1:1", label: "Square", icon: <SquareIcon /> },
+                          ].map((ar) => (
+                            <button
+                              key={ar.value}
+                              onClick={() => setAspectRatio(ar.value)}
+                              className="flex min-h-10 items-center justify-center gap-1.5 rounded-xl px-2 text-[12px] font-semibold transition active:scale-[0.98]"
+                              style={{
+                                backgroundColor: aspectRatio === ar.value ? D.white : "transparent",
+                                color: aspectRatio === ar.value ? "#0075FD" : "#64748B",
+                                boxShadow: aspectRatio === ar.value ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                              }}
+                            >
+                              {ar.icon}
+                              <span className="truncate">{ar.label}</span>
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Resolution */}
+                      <div className="mb-3">
+                        <div className="grid grid-cols-3 gap-1.5 rounded-2xl p-1.5" style={{ backgroundColor: "rgba(0,0,0,0.03)" }}>
+                          {["480p", "720p", "1080p"].map((res) => (
+                            <button
+                              key={res}
+                              onClick={() => setResolution(res)}
+                              className="min-h-10 rounded-xl px-2 text-[12px] font-semibold transition active:scale-[0.98]"
+                              style={{
+                                backgroundColor: resolution === res ? D.white : "transparent",
+                                color: resolution === res ? "#0075FD" : "#64748B",
+                                boxShadow: resolution === res ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+                              }}
+                            >
+                              {res}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                      {/* Duration Slider */}
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between px-0.5">
+                          <span className="text-[10px] font-black tracking-[0.12em] uppercase" style={{ color: "#8A95A6" }}>Duration</span>
+                          <span className="text-[10px] font-black tracking-[0.12em] tabular-nums uppercase" style={{ color: D.textPrimary }}>{duration}s</span>
+                        </div>
+                        <input
+                          type="range"
+                          min={4}
+                          max={15}
+                          step={1}
+                          value={duration}
+                          onChange={(e) => setDuration(parseInt(e.target.value))}
+                          className="w-full h-10 cursor-grab active:cursor-grabbing"
+                          style={{ accentColor: "#0075FD" }}
+                        />
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {/* References Button */}
+                <div className="relative" onClick={(e) => e.stopPropagation()}>
+                  <button
+                    onClick={() => { setShowReferences(!showReferences); setShowFormatPicker(false); setShowModelPicker(false); setShowVideoSettings(false); }}
+                    className="inline-flex items-center gap-1.5 rounded-[10px] border px-2.5 py-2 text-xs font-semibold tracking-tight transition-all shrink-0"
+                    style={{
+                      borderColor: "rgba(120,120,120,0.2)",
+                      backgroundColor: showReferences ? "rgba(120,120,120,0.16)" : "rgba(116,116,128,0.08)",
+                      color: "rgba(0,0,0,0.8)",
+                    }}
+                  >
+                    <PlusIconSmall />
+                    <span>References</span>
+                  </button>
+                  {showReferences && (
+                    <div
+                      className="absolute top-full left-0 mt-2 w-[340px] rounded-2xl border bg-white p-3 z-50"
+                      style={{ border: `1px solid #EEF0F4`, boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}
+                    >
+                      <p className="mb-2.5 text-[10px] font-semibold tracking-[0.16em] uppercase" style={{ color: "#6B7280" }}>References</p>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          onClick={() => refImageInputRef.current?.click()}
+                          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-[13px] font-semibold transition active:scale-[0.99]"
+                          style={{ borderColor: "#D8DCE3", backgroundColor: "#F8FAFC", color: D.textPrimary }}
+                        >
+                          <ImageIcon /> Images
+                        </button>
+                        <button
+                          onClick={() => refVideoInputRef.current?.click()}
+                          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-[13px] font-semibold transition active:scale-[0.99]"
+                          style={{ borderColor: "#D8DCE3", backgroundColor: "#F8FAFC", color: D.textPrimary }}
+                        >
+                          <VideoIconSmall /> Video
+                        </button>
+                        <button
+                          onClick={() => voiceInputRef.current?.click()}
+                          className="flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-[13px] font-semibold transition active:scale-[0.99]"
+                          style={{ borderColor: "#D8DCE3", backgroundColor: "#F8FAFC", color: D.textPrimary }}
+                        >
+                          <AudioIcon /> Audio
+                        </button>
+                        <button
+                          onClick={() => { setShowVoiceDialog(true); setShowReferences(false); }}
+                          className="col-span-2 flex min-h-12 items-center justify-center gap-2 rounded-2xl border border-dashed px-3 py-2.5 text-[13px] font-semibold transition active:scale-[0.99]"
+                          style={{ borderColor: "#D8DCE3", backgroundColor: "#F8FAFC", color: D.textPrimary }}
+                        >
+                          <SparklesIcon /> Voice Library
+                        </button>
+                      </div>
+                      {/* Show uploaded reference previews */}
+                      {refImages.length > 0 && (
+                        <div className="mt-2 flex gap-2 flex-wrap">
+                          {refImages.map((img, i) => (
+                            <div key={i} className="relative w-12 h-12 rounded-lg overflow-hidden" style={{ border: "1px solid #E2E8F0" }}>
+                              <img src={URL.createObjectURL(img)} alt="" className="w-full h-full object-cover" />
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                      {/* Hidden inputs */}
+                      <input
+                        ref={refImageInputRef}
+                        type="file"
+                        accept="image/*"
+                        multiple
+                        className="hidden"
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files || []);
+                          setRefImages((prev) => [...prev, ...files]);
+                        }}
+                      />
+                      <input
+                        ref={refVideoInputRef}
+                        type="file"
+                        accept="video/mp4,video/quicktime,.mp4,.mov"
+                        className="hidden"
+                        onChange={(e) => { const f = e.target.files?.[0]; if (f) setRefVideo(f); }}
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Video Settings (gear icon) */}
+                <button
+                  onClick={() => { setShowVideoSettings(!showVideoSettings); setShowFormatPicker(false); setShowModelPicker(false); setShowReferences(false); }}
+                  className="inline-grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-all"
+                  style={{
+                    borderColor: "rgba(120,120,120,0.2)",
+                    backgroundColor: showVideoSettings ? "rgba(120,120,120,0.16)" : "rgba(116,116,128,0.08)",
+                    color: "rgba(0,0,0,0.8)",
+                  }}
+                  title="Video settings"
+                >
+                  <SettingsIcon />
+                </button>
+              </div>
+            </div>
+
+            {/* Result */}
+            {result.error && <ErrorDisplay error={result.error} />}
+            {result.loading && (
+              <div className="mt-4 rounded-xl p-6 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+                <div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin mx-auto mb-3" />
+                <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Generating your ad...</p>
+                <p className="text-xs mt-1" style={{ color: D.textMuted }}>This may take 1-3 minutes</p>
+              </div>
+            )}
+            {result.url && !result.loading && <VideoResult url={result.url} />}
+          </div>
+
+          {/* Right Side Panel: Product / Avatar / Voice / Generate */}
+          <div className="flex flex-col gap-3 lg:w-[260px] shrink-0">
+            {/* Product Upload Card */}
+            <div className="aspect-[2/3] w-full">
+              <button
+                onClick={() => setShowProductDialog(true)}
+                className="group relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-[10px] border p-2.5 text-center transition hover:border-transparent active:scale-[0.99] sm:rounded-[14px]"
+                style={{
+                  borderColor: productPreview ? "rgba(0,117,253,0.4)" : "rgba(120,120,120,0.2)",
+                  backgroundColor: productPreview ? "transparent" : "rgba(116,116,128,0.08)",
+                  overflow: "hidden",
+                }}
+              >
+                {productPreview ? (
+                  <>
+                    <img src={productPreview} alt="Product" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition flex items-center justify-center opacity-0 hover:opacity-100">
+                      <span className="text-white text-xs font-semibold">Change Product</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative inline-flex size-6 items-center justify-center" style={{ color: "rgba(0,0,0,0.8)" }}>
+                      <PackageIcon />
+                    </span>
+                    <span className="text-xs font-semibold tracking-tight" style={{ color: "rgba(0,0,0,0.8)" }}>Product</span>
+                  </>
+                )}
+                {productUploading && (
+                  <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Avatar Upload Card */}
+            <div className="aspect-[2/3] w-full">
+              <button
+                onClick={() => setShowAvatarDialog(true)}
+                className="group relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-[10px] border p-2.5 text-center transition hover:border-transparent active:scale-[0.99] sm:rounded-[14px]"
+                style={{
+                  borderColor: avatarPreview ? "rgba(0,117,253,0.4)" : "rgba(120,120,120,0.2)",
+                  backgroundColor: avatarPreview ? "transparent" : "rgba(116,116,128,0.08)",
+                  overflow: "hidden",
+                }}
+              >
+                {avatarPreview ? (
+                  <>
+                    <img src={avatarPreview} alt="Avatar" className="absolute inset-0 w-full h-full object-cover" />
+                    <div className="absolute inset-0 bg-black/0 hover:bg-black/30 transition flex items-center justify-center opacity-0 hover:opacity-100">
+                      <span className="text-white text-xs font-semibold">Change Avatar</span>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <span className="relative inline-flex size-6 items-center justify-center" style={{ color: "rgba(0,0,0,0.8)" }}>
+                      <UserRoundIcon />
+                    </span>
+                    <span className="text-xs font-semibold tracking-tight" style={{ color: "rgba(0,0,0,0.8)" }}>Avatar</span>
+                  </>
+                )}
+                {avatarUploading && (
+                  <div className="absolute inset-0 bg-white/60 flex items-center justify-center">
+                    <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                  </div>
+                )}
+              </button>
+            </div>
+
+            {/* Voice Card */}
+            <div className="aspect-[2/3] w-full">
+              <button
+                onClick={() => {
+                  if (isVoiceAvailable) {
+                    setShowVoiceDialog(true);
+                  }
+                }}
+                className="group relative flex h-full w-full flex-col items-center justify-center gap-2 rounded-[10px] border p-2.5 text-center transition active:scale-[0.99] sm:rounded-[14px]"
+                style={{
+                  borderColor: selectedVoice || voicePreview ? "rgba(0,117,253,0.4)" : "rgba(120,120,120,0.2)",
+                  backgroundColor: selectedVoice || voicePreview ? "rgba(0,117,253,0.06)" : "rgba(116,116,128,0.08)",
+                  opacity: isVoiceAvailable ? 1 : 0.4,
+                  cursor: isVoiceAvailable ? "pointer" : "not-allowed",
+                  overflow: "hidden",
+                }}
+                title={isVoiceAvailable ? "Voice reference library" : "Voice only available with Seedance 2 models"}
+              >
+                {voicePreview ? (
+                  <div className="flex flex-col items-center gap-1 w-full px-2">
+                    <span className="text-[10px] font-semibold" style={{ color: "#0075FD" }}>Custom Voice</span>
+                    <audio src={voicePreview} controls className="w-full" style={{ height: "30px" }} />
+                  </div>
+                ) : selectedVoice ? (
+                  <div className="flex flex-col items-center gap-1">
+                    <span className="text-[10px] font-semibold" style={{ color: "#0075FD" }}>Voice</span>
+                    <span className="text-xs font-semibold" style={{ color: D.textPrimary }}>
+                      {AD_VOICES.find((v) => v.value === selectedVoice)?.label}
+                    </span>
+                  </div>
+                ) : (
+                  <>
+                    <span className="relative inline-flex size-6 items-center justify-center" style={{ color: "rgba(0,0,0,0.8)" }}>
+                      <VoiceIconSmall />
+                    </span>
+                    <span className="text-xs font-semibold tracking-tight" style={{ color: "rgba(0,0,0,0.8)" }}>Voice</span>
+                    {!isVoiceAvailable && (
+                      <span className="text-[9px] mt-0.5" style={{ color: D.textDim }}>Seedance only</span>
+                    )}
+                  </>
+                )}
+              </button>
+            </div>
+
+            {/* Generate Button */}
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || result.loading}
+              className="w-full py-3 rounded-[10px] text-sm font-semibold text-white transition-all duration-200 flex items-center justify-center gap-1.5 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: canGenerate && !result.loading ? D.black : "rgba(120,120,120,0.16)",
+                color: canGenerate && !result.loading ? D.white : "rgba(0,0,0,0.4)",
+              }}
+            >
+              {result.loading ? (
+                <>
+                  <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Generating...
+                </>
+              ) : (
+                <>
+                  <span>Generate</span>
+                  <SparklesIcon />
+                  <span className="opacity-70">20</span>
+                </>
+              )}
+            </button>
+          </div>
+        </div>
+      ) : (
+        /* History Tab */
         <div>
           <h3 className="text-sm font-semibold mb-3" style={{ color: D.textPrimary }}>Recent Ad Generations</h3>
           {feed.length === 0 ? (
@@ -2219,17 +2882,381 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
               <p className="text-sm" style={{ color: D.textMuted }}>Your generated ads will appear here</p>
             </div>
           ) : (
-            <div className="grid grid-cols-2 gap-3 max-h-[600px] overflow-y-auto">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {feed.map((item) => (
-                <div key={item.id} className="rounded-lg overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}>
-                  <video src={item.url} controls className="w-full" style={{ maxHeight: "200px" }} />
+                <div
+                  key={item.id}
+                  className="rounded-xl overflow-hidden group cursor-pointer"
+                  style={{ border: `1px solid ${D.cardBorder}` }}
+                >
+                  <div className="relative">
+                    <video src={item.url} controls className="w-full" style={{ maxHeight: "250px" }} />
+                  </div>
+                  <div className="p-2.5 flex items-center justify-between" style={{ backgroundColor: D.inputBg }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate" style={{ color: D.textPrimary }}>
+                        {item.format} · {item.model}
+                      </p>
+                      <p className="text-[10px] truncate" style={{ color: D.textMuted }}>
+                        {item.prompt}
+                      </p>
+                    </div>
+                    <button
+                      onClick={() => setPrompt(item.prompt)}
+                      className="ml-2 px-2 py-1 rounded-md text-[10px] font-semibold shrink-0"
+                      style={{ backgroundColor: D.purpleLight, color: D.purple }}
+                    >
+                      Reuse
+                    </button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-      </div>
-    </ToolPageLayout>
+      )}
+
+      {/* ─── Product Upload Dialog ──────────────────────────── */}
+      {showProductDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowProductDialog(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-md rounded-2xl p-5"
+            style={{ backgroundColor: D.white, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-1" style={{ color: D.textPrimary }}>Upload Product</h3>
+            <p className="text-sm mb-4" style={{ color: D.textMuted }}>Add a product image for your ad. The AI will incorporate it into the generated video.</p>
+
+            {productPreview ? (
+              <div className="mb-4">
+                <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}>
+                  <img src={productPreview} alt="Product preview" className="w-full max-h-64 object-contain mx-auto" />
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => productInputRef.current?.click()}
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold"
+                    style={{ backgroundColor: D.inputBg, color: D.textPrimary, border: `1px solid ${D.inputBorder}` }}
+                  >
+                    Replace
+                  </button>
+                  <button
+                    onClick={() => { setProductFile(null); setProductPreview(""); setProductImageUrl(""); }}
+                    className="py-2 px-4 rounded-lg text-sm font-semibold"
+                    style={{ backgroundColor: D.redLight, color: D.red }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-all hover:border-purple-400 hover:bg-purple-50/30"
+                style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                onClick={() => productInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); }}
+                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("image/")) handleProductSelect(f); }}
+              >
+                <div className="mb-2" style={{ color: D.textDim }}>
+                  <PackageIcon />
+                </div>
+                <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Upload product image</p>
+                <p className="text-xs mt-1" style={{ color: D.textMuted }}>.jpg, .png, .webp up to 10 MB</p>
+              </div>
+            )}
+
+            <input
+              ref={productInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductSelect(f); }}
+            />
+
+            <button
+              onClick={() => setShowProductDialog(false)}
+              className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ backgroundColor: D.black }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Avatar Upload Dialog ──────────────────────────── */}
+      {showAvatarDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowAvatarDialog(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-md rounded-2xl p-5"
+            style={{ backgroundColor: D.white, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-1" style={{ color: D.textPrimary }}>Upload Avatar</h3>
+            <p className="text-sm mb-4" style={{ color: D.textMuted }}>
+              Add a creator avatar image. The AI will use this person as the character in your ad video.
+              Works with all models.
+            </p>
+
+            {avatarPreview ? (
+              <div className="mb-4">
+                <div className="relative rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}>
+                  <img src={avatarPreview} alt="Avatar preview" className="w-full max-h-64 object-contain mx-auto" />
+                </div>
+                <div className="flex gap-2 mt-3">
+                  <button
+                    onClick={() => avatarInputRef.current?.click()}
+                    className="flex-1 py-2 rounded-lg text-sm font-semibold"
+                    style={{ backgroundColor: D.inputBg, color: D.textPrimary, border: `1px solid ${D.inputBorder}` }}
+                  >
+                    Replace
+                  </button>
+                  <button
+                    onClick={() => { setAvatarFile(null); setAvatarPreview(""); setAvatarImageUrl(""); }}
+                    className="py-2 px-4 rounded-lg text-sm font-semibold"
+                    style={{ backgroundColor: D.redLight, color: D.red }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <div
+                className="rounded-xl border-2 border-dashed p-8 text-center cursor-pointer transition-all hover:border-purple-400 hover:bg-purple-50/30"
+                style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                onClick={() => avatarInputRef.current?.click()}
+                onDragOver={(e) => { e.preventDefault(); }}
+                onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("image/")) handleAvatarSelect(f); }}
+              >
+                <div className="mb-2" style={{ color: D.textDim }}>
+                  <UserRoundIcon />
+                </div>
+                <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Upload avatar image</p>
+                <p className="text-xs mt-1" style={{ color: D.textMuted }}>.jpg, .png, .webp up to 10 MB</p>
+              </div>
+            )}
+
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarSelect(f); }}
+            />
+
+            <button
+              onClick={() => setShowAvatarDialog(false)}
+              className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ backgroundColor: D.black }}
+            >
+              Done
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ─── Voice Selection Dialog ──────────────────────────── */}
+      {showVoiceDialog && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4" onClick={() => setShowVoiceDialog(false)}>
+          <div className="absolute inset-0 bg-black/40" />
+          <div
+            className="relative w-full max-w-lg rounded-2xl p-5 max-h-[80vh] overflow-y-auto"
+            style={{ backgroundColor: D.white, boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold mb-1" style={{ color: D.textPrimary }}>Select Voice</h3>
+            <p className="text-sm mb-4" style={{ color: D.textMuted }}>
+              Choose a voice for your Seedance 2.0 ad, or upload your own voice reference audio.
+            </p>
+
+            {/* Voice Library */}
+            <div className="mb-4">
+              <p className="mb-2 text-[10px] font-semibold tracking-[0.16em] uppercase" style={{ color: "#6B7280" }}>Voice Library</p>
+              <div className="space-y-1.5">
+                {AD_VOICES.map((voice) => (
+                  <button
+                    key={voice.value}
+                    onClick={() => { setSelectedVoice(voice.value); setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); }}
+                    className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition"
+                    style={{
+                      border: selectedVoice === voice.value ? "1px solid rgba(0,117,253,0.4)" : "1px solid #E2E8F0",
+                      backgroundColor: selectedVoice === voice.value ? "#EAF3FF" : "#F8FAFC",
+                    }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                        style={{
+                          backgroundColor: selectedVoice === voice.value ? "#D9EAFF" : D.inputBg,
+                          color: selectedVoice === voice.value ? "#0075FD" : D.textMuted,
+                        }}
+                      >
+                        {voice.label.charAt(0)}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold" style={{ color: selectedVoice === voice.value ? "#0075FD" : D.textPrimary }}>{voice.label}</p>
+                        <p className="text-xs" style={{ color: "#64748B" }}>{voice.desc}</p>
+                      </div>
+                    </div>
+                    {selectedVoice === voice.value && (
+                      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#0075FD" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 6L9 17l-5-5" />
+                      </svg>
+                    )}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Voice Upload */}
+            <div className="mb-4">
+              <p className="mb-2 text-[10px] font-semibold tracking-[0.16em] uppercase" style={{ color: "#6B7280" }}>Or Upload Your Own Voice</p>
+              {voicePreview ? (
+                <div className="rounded-xl p-3" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+                  <audio src={voicePreview} controls className="w-full" style={{ height: "40px" }} />
+                  <button
+                    onClick={() => { setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); setSelectedVoice(""); }}
+                    className="mt-2 text-xs font-semibold"
+                    style={{ color: D.red }}
+                  >
+                    Remove voice
+                  </button>
+                </div>
+              ) : (
+                <div
+                  className="rounded-xl border-2 border-dashed p-6 text-center cursor-pointer transition-all hover:border-purple-400"
+                  style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                  onClick={() => voiceInputRef.current?.click()}
+                  onDragOver={(e) => { e.preventDefault(); }}
+                  onDrop={(e) => { e.preventDefault(); const f = e.dataTransfer.files[0]; if (f && f.type.startsWith("audio/")) handleVoiceSelect(f); }}
+                >
+                  <div className="mb-2" style={{ color: D.textDim }}>
+                    <VoiceIconSmall />
+                  </div>
+                  <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Upload voice audio</p>
+                  <p className="text-xs mt-1" style={{ color: D.textMuted }}>.mp3, .wav up to 10 MB</p>
+                </div>
+              )}
+              <input
+                ref={voiceInputRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3,audio/wav,audio/x-wav,.mp3,.wav"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVoiceSelect(f); }}
+              />
+            </div>
+
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setSelectedVoice(""); setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ backgroundColor: D.inputBg, color: D.textPrimary, border: `1px solid ${D.inputBorder}` }}
+              >
+                Clear Voice
+              </button>
+              <button
+                onClick={() => setShowVoiceDialog(false)}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white"
+                style={{ backgroundColor: D.black }}
+              >
+                Done
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─── Additional Small Icons for Ad Generator ──────────────────────────────
+
+function PlusIconSmall() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M5 12h14" /><path d="M12 5v14" />
+    </svg>
+  );
+}
+function ClockIcon() {
+  return (
+    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16.5 12" />
+    </svg>
+  );
+}
+function SettingsIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <line x1="21" x2="14" y1="4" y2="4" /><line x1="10" x2="3" y1="4" y2="4" />
+      <line x1="21" x2="12" y1="12" y2="12" /><line x1="8" x2="3" y1="12" y2="12" />
+      <line x1="21" x2="16" y1="20" y2="20" /><line x1="12" x2="3" y1="20" y2="20" />
+      <line x1="14" x2="14" y1="2" y2="6" /><line x1="8" x2="8" y1="10" y2="14" />
+      <line x1="16" x2="16" y1="18" y2="22" />
+    </svg>
+  );
+}
+function PackageIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 21.73a2 2 0 002 0l7-4A2 2 0 0021 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73z" />
+      <path d="M12 22V12" /><polyline points="3.29 7 12 12 20.71 7" /><path d="m7.5 4.27 9 5.15" />
+    </svg>
+  );
+}
+function UserRoundIcon() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 00-16 0" />
+    </svg>
+  );
+}
+function VoiceIconSmall() {
+  return (
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M11 4.702a.705.705 0 00-1.203-.498L6.413 7.587A1.4 1.4 0 015.416 8H3a1 1 0 00-1 1v6a1 1 0 001 1h2.416a1.4 1.4 0 01.997.413l3.383 3.384A.705.705 0 0011 19.298z" />
+      <path d="M16 9a5 5 0 010 6" /><path d="M19.364 18.364a9 9 0 010-12.728" />
+    </svg>
+  );
+}
+function VideoIconSmall() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M20.2 6 3 11l-.9-2.4c-.3-1.1.3-2.2 1.3-2.5l13.5-4c1.1-.3 2.2.3 2.5 1.3z" />
+      <path d="m6.2 5.3 3.1 3.9" /><path d="m12.4 3.4 3.1 4" />
+      <path d="M3 11h18v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+    </svg>
+  );
+}
+function AudioIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.937 15.5A2 2 0 008.5 14.063l-6.135-1.582a.5.5 0 010-.962L8.5 9.936A2 2 0 009.937 8.5l1.582-6.135a.5.5 0 01.963 0L14.063 8.5A2 2 0 0015.5 9.937l6.135 1.581a.5.5 0 010 .964L15.5 14.063a2 2 0 00-1.437 1.437l-1.582 6.135a.5.5 0 01-.963 0z" />
+      <path d="M20 3v4" /><path d="M22 5h-4" /><path d="M4 17v2" /><path d="M5 18H3" />
+    </svg>
+  );
+}
+function PortraitIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="12" height="20" x="6" y="2" rx="2" />
+    </svg>
+  );
+}
+function LandscapeIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="20" height="12" x="2" y="6" rx="2" />
+    </svg>
+  );
+}
+function SquareIcon() {
+  return (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <rect width="18" height="18" x="3" y="3" rx="2" />
+    </svg>
   );
 }
 
