@@ -1364,6 +1364,57 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     }
   }, [scenes, avatarImage, kieApiKey, falApiKey, videoModel, addLog, uploadAvatarToServer, authFetch]);
 
+  // ─── Auto-save to library on completion ──────────────────────────
+  // NOTE: Must be defined BEFORE startAutoChain since it's used there.
+  const doSaveToLibrary = useCallback(async (videoUrl: string, frameUrls: string[]) => {
+    if (!videoUrl) return;
+    const duration = scenes.length * 8;
+    const videoData = {
+      title: "My AI Video",
+      videoUrl,
+      thumbnailUrl: frameUrls[0] || null,
+      duration: `${duration}s`,
+      scenesCount: videoProvider === "heygen" ? 1 : scenes.length,
+      provider: videoProvider,
+    };
+
+    const userEmail = user?.email || "";
+    let apiVideoId: string | null = null;
+
+    // Step 1: Try API save FIRST (database is primary storage)
+    try {
+      const res = await authFetch("/api/videos", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(videoData),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        apiVideoId = data.video?.id || null;
+        setSavedToLibrary(true);
+        addLog("✅ Video saved to library!");
+      } else {
+        const errData = await res.json().catch(() => ({}));
+        console.error("Auto-save to API failed:", res.status, errData);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("Auto-save API error:", msg);
+    }
+
+    // Step 2: Also save to localStorage as backup/cache
+    if (userEmail) {
+      saveVideoToStorage(userEmail, {
+        id: apiVideoId || "local_" + Date.now(),
+        ...videoData,
+        createdAt: new Date().toISOString(),
+      });
+      if (!apiVideoId) {
+        addLog("✅ Video saved to library (local backup — DB unavailable)");
+      }
+    }
+  }, [videoProvider, scenes.length, authFetch, user?.email]);
+
   // ─── Auto Chain Pipeline ──────────────────────────────────────────
   const startAutoChain = useCallback(async () => {
     // Check if user has uploaded their own frames (manual mode) or needs AI frame generation
@@ -2686,58 +2737,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
     }
   }, [logs, showLogs]);
-
-  // ─── Save to Library ──────────────────────────────────────────────
-  // ─── Auto-save to library on completion ──────────────────────────
-  // Database is the PRIMARY storage — localStorage is backup/cache only.
-  // This ensures videos persist even if browser data is cleared.
-  const doSaveToLibrary = useCallback(async (videoUrl: string, frameUrls: string[]) => {
-    if (!videoUrl) return;
-    const videoData = {
-      title: "My AI Video",
-      videoUrl,
-      thumbnailUrl: frameUrls[0] || null,
-      duration: `${totalDuration}s`,
-      scenesCount: videoProvider === "heygen" ? 1 : scenes.length,
-      provider: videoProvider,
-    };
-
-    const userEmail = user?.email || "";
-    let apiVideoId: string | null = null;
-
-    // Step 1: Try API save FIRST (database is primary storage)
-    try {
-      const res = await authFetch("/api/videos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(videoData),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        apiVideoId = data.video?.id || null;
-        setSavedToLibrary(true);
-        addLog("✅ Video saved to library!");
-      } else {
-        const errData = await res.json().catch(() => ({}));
-        console.error("Auto-save to API failed:", res.status, errData);
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : String(err);
-      console.error("Auto-save API error:", msg);
-    }
-
-    // Step 2: Also save to localStorage as backup/cache
-    if (userEmail) {
-      saveVideoToStorage(userEmail, {
-        id: apiVideoId || "local_" + Date.now(),
-        ...videoData,
-        createdAt: new Date().toISOString(),
-      });
-      if (!apiVideoId) {
-        addLog("✅ Video saved to library (local backup — DB unavailable)");
-      }
-    }
-  }, [totalDuration, videoProvider, scenes.length, authFetch, user?.email]);
 
   // Manual save (button click — retry if auto-save failed)
   const saveToLibrary = useCallback(async () => {
