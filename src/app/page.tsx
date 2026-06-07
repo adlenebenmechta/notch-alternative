@@ -13,6 +13,7 @@ import { updateVideoUrlInStorage } from "@/lib/video-store";
 import UserProfilePanel from "@/components/UserProfilePanel";
 import BOFVideosMachine from "@/components/BOFVideosMachine";
 import ClaymotionVideosMachine from "@/components/ClaymotionVideosMachine";
+import AllInOneMachine from "@/components/AllInOneMachine";
 
 // ─── Colors (matching the existing design) ────────────────────────────────────
 
@@ -302,7 +303,7 @@ function SubscriptionScreen({ userData, onComplete }: {
 export default function Home() {
   const { user, loading, signOut } = useAuth();
   const [showSubscription, setShowSubscription] = useState(false);
-  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion">("menu");
+  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion" | "allinone">("menu");
   const [initialView, setInitialView] = useState<string>("create");
   const [libraryEditorUrl, setLibraryEditorUrl] = useState("");
   const [libraryCaptionUrl, setLibraryCaptionUrl] = useState("");
@@ -313,7 +314,7 @@ export default function Home() {
 
   // Redirect to menu if user logs out while on a sub-view
   useEffect(() => {
-    if (!loading && !user && (currentView === "avatar" || currentView === "carousel" || currentView === "podcast" || currentView === "library" || currentView === "bof" || currentView === "claymotion")) {
+    if (!loading && !user && (currentView === "avatar" || currentView === "carousel" || currentView === "podcast" || currentView === "library" || currentView === "bof" || currentView === "claymotion" || currentView === "allinone")) {
       setCurrentView("menu");
     }
   }, [user, loading, currentView]);
@@ -357,6 +358,8 @@ export default function Home() {
             setCurrentView("bof");
           } else if (dest === "claymotion-videos-machine") {
             setCurrentView("claymotion");
+          } else if (dest === "allinone-machine") {
+            setCurrentView("allinone");
           }
         }}
         onOpenLibrary={() => {
@@ -384,6 +387,29 @@ export default function Home() {
   // Claymotion Videos Machine view
   if (currentView === "claymotion") {
     return <ClaymotionVideosMachine onBack={() => setCurrentView("menu")} />;
+  }
+
+  // All in One Machine view
+  if (currentView === "allinone") {
+    return (
+      <AllInOneMachine
+        onBack={() => setCurrentView("menu")}
+        onNavigate={(dest) => {
+          if (dest === "ai-avatar-machine") {
+            setInitialView("create");
+            setCurrentView("avatar");
+          } else if (dest === "ai-viral-carousel") {
+            setCurrentView("carousel");
+          } else if (dest === "ai-podcast-machine") {
+            setCurrentView("podcast");
+          } else if (dest === "bof-videos-machine") {
+            setCurrentView("bof");
+          } else if (dest === "claymotion-videos-machine") {
+            setCurrentView("claymotion");
+          }
+        }}
+      />
+    );
   }
 
   // Unified Library view

@@ -1342,6 +1342,25 @@ export default function MainMenu({
       ),
       accentColor: "#FFFFFF",
     },
+    {
+      id: "allinone-machine",
+      title: "All in One Machine",
+      subtitle: "Complete AI Video Suite",
+      description: "All AI tools in one place — generate videos, images, scripts, voiceovers, and more with a powerful suite of AI-powered tools.",
+      icon: (
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="4" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
+          <rect x="27" y="4" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
+          <rect x="4" y="27" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
+          <rect x="27" y="27" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
+          <circle cx="12.5" cy="12.5" r="3" fill="#8B5CF6" opacity="0.6" />
+          <circle cx="35.5" cy="12.5" r="3" fill="#8B5CF6" opacity="0.6" />
+          <circle cx="12.5" cy="35.5" r="3" fill="#8B5CF6" opacity="0.6" />
+          <circle cx="35.5" cy="35.5" r="3" fill="#8B5CF6" opacity="0.6" />
+        </svg>
+      ),
+      accentColor: "#8B5CF6",
+    },
   ];
 
   return (
@@ -1559,7 +1578,8 @@ export default function MainMenu({
                 const isCarouselCard = !item.disabled && item.id === "ai-viral-carousel";
                 const isBofCard = !item.disabled && item.id === "bof-videos-machine";
                 const isClaymotionCard = !item.disabled && item.id === "claymotion-videos-machine";
-                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard;
+                const isAllInOneCard = !item.disabled && item.id === "allinone-machine";
+                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard;
                 const isHovered = activeCard === index && !item.disabled;
                 return (
                 <div
