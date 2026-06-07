@@ -14,24 +14,23 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Z.ai Code Scaffold - AI-Powered Development",
-  description: "Modern Next.js scaffold optimized for AI-powered development with Z.ai. Built with TypeScript, Tailwind CSS, and shadcn/ui.",
-  keywords: ["Z.ai", "Next.js", "TypeScript", "Tailwind CSS", "shadcn/ui", "AI development", "React"],
-  authors: [{ name: "Z.ai Team" }],
+  title: "AI Avatar Machine - Create AI Videos & Avatars",
+  description: "Create stunning AI avatar videos, claymotion animations, viral carousels, and podcasts with the most powerful AI media generation platform.",
+  keywords: ["AI Avatar", "AI Video", "AI Podcast", "Claymotion", "AI Media Generation", "Video Creation", "Image Generation"],
+  authors: [{ name: "AI Avatar Machine" }],
   icons: {
-    icon: "https://z-cdn.chatglm.cn/z-ai/static/logo.svg",
+    icon: "/favicon.svg",
   },
   openGraph: {
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
-    url: "https://chat.z.ai",
-    siteName: "Z.ai",
+    title: "AI Avatar Machine - Create AI Videos & Avatars",
+    description: "Create stunning AI avatar videos, claymotion animations, viral carousels, and podcasts.",
+    siteName: "AI Avatar Machine",
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
-    title: "Z.ai Code Scaffold",
-    description: "AI-powered development with modern React stack",
+    title: "AI Avatar Machine - Create AI Videos & Avatars",
+    description: "Create stunning AI avatar videos, claymotion animations, viral carousels, and podcasts.",
   },
 };
 
