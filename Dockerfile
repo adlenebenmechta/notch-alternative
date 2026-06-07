@@ -37,6 +37,12 @@ RUN apk add --no-cache ffmpeg fontconfig freetype harfbuzz
 COPY --from=builder /app/public/fonts/Poppins-Bold.ttf /usr/share/fonts/truetype/custom/Poppins-Bold.ttf
 RUN fc-cache -f
 
+# Copy Prisma files for runtime DB migrations
+COPY --from=builder /app/prisma ./prisma
+COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
+COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
+COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
 
@@ -44,10 +50,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Ensure nextjs user owns the prisma files for db push
+RUN chown -R nextjs:nodejs /app/prisma /app/node_modules/.prisma /app/node_modules/@prisma /app/node_modules/prisma
+
 USER nextjs
 
 EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-CMD ["node", "server.js"]
+# Run prisma db push then start the server
+# db push creates/updates tables without migration files
+CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate 2>&1 || echo 'DB push failed, continuing anyway'; node server.js"]
