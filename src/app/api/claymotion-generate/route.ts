@@ -396,7 +396,7 @@ async function mergeVideosFal(
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { action, sceneImageUrls, videoPrompts, kieApiKey, falApiKey, videoUrls, startFrameUrl, endFrameUrl, prompt, videoModel } = body as {
+  const { action, sceneImageUrls, videoPrompts, kieApiKey, falApiKey, videoUrls, startFrameUrl, endFrameUrl, prompt, videoModel, existingVideoUrls } = body as {
     action?: string;
     sceneImageUrls?: string[];
     videoPrompts?: string[];
@@ -407,6 +407,7 @@ export async function POST(req: NextRequest) {
     endFrameUrl?: string;
     prompt?: string;
     videoModel?: string;
+    existingVideoUrls?: string[];
   };
 
   const model = videoModel || "veo3_lite";
@@ -506,7 +507,26 @@ export async function POST(req: NextRequest) {
 
       const videoUrls: string[] = [];
 
+      // Pre-fill with existing video URLs from resume
+      if (existingVideoUrls && existingVideoUrls.length > 0) {
+        for (let i = 0; i < totalVideos; i++) {
+          videoUrls[i] = existingVideoUrls[i] || "";
+        }
+        const doneCount = videoUrls.filter(Boolean).length;
+        sseSend(sw, { type: "resume", doneVideos: doneCount, totalVideos, message: `Resuming: ${doneCount}/${totalVideos} videos already done` });
+
+        // Log already-done videos so client can update UI
+        for (let i = 0; i < totalVideos; i++) {
+          if (videoUrls[i]) {
+            sseSend(sw, { type: "video_done", videoIndex: i, videoUrl: videoUrls[i], message: `Video ${i + 1}/${totalVideos}: Already done (resuming)` });
+          }
+        }
+      }
+
       for (let i = 0; i < totalVideos; i++) {
+        // Skip if video already exists from resume
+        if (videoUrls[i]) continue;
+
         const startFrame = sceneImageUrls[i];
         const endFrame = sceneImageUrls[i + 1];
         const videoPrompt = prompts[i] || `Smooth transition from scene ${i + 1} to scene ${i + 2}. Natural camera movement, cinematic quality.`;
@@ -515,10 +535,11 @@ export async function POST(req: NextRequest) {
 
         try {
           const videoUrl = await generateVideo(startFrame, endFrame, videoPrompt, kieApiKey || "", falApiKey || "", model);
-          videoUrls.push(videoUrl);
+          videoUrls[i] = videoUrl;
           sseSend(sw, { type: "video_done", videoIndex: i, videoUrl, message: `Video ${i + 1}/${totalVideos} complete!` });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);
+          videoUrls[i] = "";
           sseSend(sw, { type: "video_error", videoIndex: i, error: msg, message: `Video ${i + 1}/${totalVideos} failed: ${msg}` });
           // Continue with remaining videos even if one fails
         }

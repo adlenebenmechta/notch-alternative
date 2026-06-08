@@ -110,6 +110,8 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
   const autoRetryCountRef = useRef<number>(0);
   const isRunningRef = useRef(false);
   const runGenerationRef = useRef<() => void>(() => {});
+  const completedVideoUrlsRef = useRef<string[]>([]); // Track completed video URLs for resume
+  const uploadedSceneUrlsRef = useRef<string[]>([]); // Track uploaded scene image URLs for resume
 
   // ── Computed ──
   const allVideosDone = videoStatuses.length > 0 && videoStatuses.every((v) => v.status === "done");
@@ -211,30 +213,44 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
     return data.avatarUrl || data.url || "";
   }, []);
 
-  // ── Generate Videos (Full Pipeline with Auto-Retry) ──
+  // ── Generate Videos (Full Pipeline with Auto-Retry & Resume) ──
   const startGeneration = useCallback(async () => {
     if (!canGenerate) return;
+
+    const isRetry = autoRetryCountRef.current > 0;
+    const existingCompletedVideos = completedVideoUrlsRef.current;
+    const existingUploadedUrls = uploadedSceneUrlsRef.current;
+    const hasExistingWork = existingCompletedVideos.some(Boolean) || existingUploadedUrls.some(Boolean);
 
     setIsRunning(true);
     isRunningRef.current = true;
     setGenerationError("");
-    setMergedVideoUrl("");
     setMergeError("");
     setPipelineError("");
+
+    // On fresh start, clear saved progress; on retry, keep it
+    if (!isRetry && !hasExistingWork) {
+      setMergedVideoUrl("");
+      completedVideoUrlsRef.current = [];
+      uploadedSceneUrlsRef.current = [];
+    }
 
     const controller = new AbortController();
     abortRef.current = controller;
 
     // Build video pairs (N scenes → N-1 videos)
+    // On retry, preserve already-done video statuses
     const pairs: VideoStatus[] = [];
     for (let i = 0; i < scenes.length - 1; i++) {
+      const existingUrl = existingCompletedVideos[i] || "";
+      const existingStatus = isRetry && existingUrl ? "done" : "pending";
       pairs.push({
         id: uid(),
         sceneStartIndex: i,
         sceneEndIndex: i + 1,
-        status: "pending",
-        progress: 0,
-        videoUrl: "",
+        status: existingStatus as "pending" | "done",
+        progress: existingUrl ? 100 : 0,
+        videoUrl: existingUrl,
         error: "",
         retryCount: 0,
       });
@@ -242,41 +258,58 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
     setVideoStatuses(pairs);
 
     try {
-      // ── STEP 1: Upload Images ──
+      // ── STEP 1: Upload Images (skip if already uploaded on resume) ──
       setPipelineStep(1);
-      addLog("Uploading scene images...");
+
       const uploadedUrls: string[] = [];
 
-      for (let i = 0; i < scenes.length; i++) {
-        if (controller.signal.aborted) throw new Error("aborted");
+      // Use cached uploaded URLs if available on resume
+      if (isRetry && existingUploadedUrls.length === scenes.length && existingUploadedUrls.every(Boolean)) {
+        addLog("Reusing previously uploaded scene images...");
+        for (let i = 0; i < scenes.length; i++) {
+          uploadedUrls.push(existingUploadedUrls[i]);
+        }
+      } else {
+        addLog("Uploading scene images...");
+        for (let i = 0; i < scenes.length; i++) {
+          if (controller.signal.aborted) throw new Error("aborted");
 
-        addLog(`Uploading Scene ${i + 1} image...`);
-        setVideoStatuses((prev) =>
-          prev.map((v, idx) => (idx === 0 ? { ...v, status: "uploading", progress: Math.round(((i + 1) / scenes.length) * 10) } : v))
-        );
-
-        if (scenes[i].uploadedUrl) {
-          uploadedUrls.push(scenes[i].uploadedUrl);
-          addLog(`Scene ${i + 1} already uploaded, reusing URL.`);
-        } else if (scenes[i].imageUrl) {
-          const url = await uploadImage(scenes[i].imageUrl, kieApiKey);
-          uploadedUrls.push(url);
-          setScenes((prev) =>
-            prev.map((s, idx) => (idx === i ? { ...s, uploadedUrl: url } : s))
+          addLog(`Uploading Scene ${i + 1} image...`);
+          setVideoStatuses((prev) =>
+            prev.map((v, idx) => (idx === 0 ? { ...v, status: "uploading", progress: Math.round(((i + 1) / scenes.length) * 10) } : v))
           );
-          addLog(`Scene ${i + 1} uploaded successfully.`);
-        } else {
-          throw new Error(`Scene ${i + 1} has no image`);
+
+          if (scenes[i].uploadedUrl) {
+            uploadedUrls.push(scenes[i].uploadedUrl);
+            addLog(`Scene ${i + 1} already uploaded, reusing URL.`);
+          } else if (scenes[i].imageUrl) {
+            const url = await uploadImage(scenes[i].imageUrl, kieApiKey);
+            uploadedUrls.push(url);
+            setScenes((prev) =>
+              prev.map((s, idx) => (idx === i ? { ...s, uploadedUrl: url } : s))
+            );
+            addLog(`Scene ${i + 1} uploaded successfully.`);
+          } else {
+            throw new Error(`Scene ${i + 1} has no image`);
+          }
         }
       }
 
-      addLog(`All ${scenes.length} scene images uploaded!`);
+      // Cache uploaded URLs for future retries
+      uploadedSceneUrlsRef.current = uploadedUrls;
+
+      addLog(`All ${scenes.length} scene images ready!`);
       setPipelineStep(2);
 
       if (controller.signal.aborted) throw new Error("aborted");
 
-      // ── STEP 2: Generate Videos (SSE Stream) ──
-      addLog("Starting video generation pipeline...");
+      // ── STEP 2: Generate Videos (SSE Stream with Resume) ──
+      const doneCount = existingCompletedVideos.filter(Boolean).length;
+      if (isRetry && doneCount > 0) {
+        addLog(`Resuming video generation... (${doneCount}/${scenes.length - 1} videos already done)`);
+      } else {
+        addLog("Starting video generation pipeline...");
+      }
       addLog(`Generating ${scenes.length - 1} videos using ${videoModel === "veo3_lite" ? "Veo 3.1 Lite (KIE AI)" : videoModel === "veo3_fast" ? "Veo 3.1 Fast (KIE AI)" : "Grok Imagine (fal.ai)"}...`);
 
       const response = await fetch("/api/claymotion-generate", {
@@ -289,6 +322,8 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
           kieApiKey,
           falApiKey,
           videoModel,
+          // Send already-completed video URLs so server can skip them
+          existingVideoUrls: isRetry && existingCompletedVideos.length > 0 ? existingCompletedVideos : undefined,
         }),
       });
 
@@ -345,6 +380,8 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
 
             if (event.type === "video_done") {
               const videoIdx = event.videoIndex;
+              // Track completed video URL in ref for resume on retry
+              completedVideoUrlsRef.current[videoIdx] = event.videoUrl;
               setVideoStatuses((prev) =>
                 prev.map((v, i) =>
                   i === videoIdx
@@ -387,11 +424,12 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
 
             if (event.type === "error") {
               addLog(`PIPELINE ERROR: ${event.message || "Generation failed"}`);
-              // Auto-retry
+              // Auto-retry — progress will be preserved
               autoRetryCountRef.current += 1;
               if (autoRetryCountRef.current <= MAX_AUTO_RETRIES) {
                 const retryNum = autoRetryCountRef.current;
-                addLog(`Auto-retrying... (attempt ${retryNum}/${MAX_AUTO_RETRIES}) — waiting 10s...`);
+                const doneVids = completedVideoUrlsRef.current.filter(Boolean).length;
+                addLog(`Auto-retrying... (attempt ${retryNum}/${MAX_AUTO_RETRIES}) — ${doneVids} videos already done, will resume from where we left off. Waiting 10s...`);
                 setIsRunning(false);
                 isRunningRef.current = false;
                 try { reader.cancel(); } catch {}
@@ -414,6 +452,9 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
               }
               setPipelineStep(4);
               autoRetryCountRef.current = 0;
+              // Clear resume refs on success — pipeline finished
+              completedVideoUrlsRef.current = [];
+              uploadedSceneUrlsRef.current = [];
             }
           } catch {
             // ignore parse errors
@@ -421,9 +462,10 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
         }
       }
 
-      // If stream ended without "done" — auto retry
+      // If stream ended without "done" — auto retry (progress preserved)
       if (!streamEndedNormally && isRunningRef.current) {
-        addLog("Connection lost or server timed out. Auto-retrying...");
+        const doneVids = completedVideoUrlsRef.current.filter(Boolean).length;
+        addLog(`Connection lost or server timed out. ${doneVids} videos already done — will resume from where we left off.`);
         autoRetryCountRef.current += 1;
         if (autoRetryCountRef.current <= MAX_AUTO_RETRIES) {
           const retryNum = autoRetryCountRef.current;
@@ -444,11 +486,12 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
         addLog(`ERROR: ${msg}`);
         setGenerationError(msg);
 
-        // Auto-retry on error (not user abort)
+        // Auto-retry on error (not user abort) — progress will be preserved
         autoRetryCountRef.current += 1;
         if (autoRetryCountRef.current <= MAX_AUTO_RETRIES) {
           const retryNum = autoRetryCountRef.current;
-          addLog(`Auto-retrying... (attempt ${retryNum}/${MAX_AUTO_RETRIES}) — waiting 10s...`);
+          const doneVids = completedVideoUrlsRef.current.filter(Boolean).length;
+          addLog(`Auto-retrying... (attempt ${retryNum}/${MAX_AUTO_RETRIES}) — ${doneVids} videos already done, will resume from where we left off. Waiting 10s...`);
           setIsRunning(false);
           isRunningRef.current = false;
           await new Promise(r => setTimeout(r, 10000));
@@ -560,6 +603,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
             }
 
             if (event.type === "video_done" && event.videoIndex === 0) {
+              completedVideoUrlsRef.current[videoIndex] = event.videoUrl;
               setVideoStatuses((prev) =>
                 prev.map((v, i) =>
                   i === videoIndex
@@ -582,6 +626,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
             }
 
             if (event.type === "done" && event.videoUrl) {
+              completedVideoUrlsRef.current[videoIndex] = event.videoUrl;
               setVideoStatuses((prev) =>
                 prev.map((v, i) =>
                   i === videoIndex
@@ -660,6 +705,8 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
     setIsRunning(false);
     isRunningRef.current = false;
     autoRetryCountRef.current = 0;
+    completedVideoUrlsRef.current = [];
+    uploadedSceneUrlsRef.current = [];
     setLogs([]);
   }, []);
 
