@@ -660,7 +660,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [isGeneratingHeygenScript, setIsGeneratingHeygenScript] = useState(false);
 
   // ── Video Model (admin selects which KIE model to use) ──
-  const [videoModel, setVideoModel] = useState<"veo3_lite" | "veo3_fast">("veo3_lite");
+  const [videoModel, setVideoModel] = useState<"veo3_lite" | "veo3_fast" | "grok-imagine-video-1.5">("veo3_lite");
 
   // ── View Mode ──
   const [view, setView] = useState<"create" | "library" | "create-avatar">(initialView as "create" | "library" | "create-avatar");
@@ -799,7 +799,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (checkpoint.falApiKey) setFalApiKey(checkpoint.falApiKey);
       if (checkpoint.frameMode) setFrameMode(checkpoint.frameMode as "avatar" | "avatar_v2" | "scenes" | "custom");
       if (checkpoint.videoProvider) setVideoProvider(checkpoint.videoProvider as "kie" | "heygen");
-      if (checkpoint.videoModel) setVideoModel(checkpoint.videoModel as "veo3_lite" | "veo3_fast");
+      if (checkpoint.videoModel) setVideoModel(checkpoint.videoModel as "veo3_lite" | "veo3_fast" | "grok-imagine-video-1.5");
       if (checkpoint.heygenApiKey) setHeygenApiKey(checkpoint.heygenApiKey);
       if (checkpoint.heygenVoiceId) setHeygenVoiceId(checkpoint.heygenVoiceId);
       if (checkpoint.heygenScript) setHeygenScript(checkpoint.heygenScript);
@@ -3534,10 +3534,11 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                       <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
                         Video Model
                       </label>
-                      <div className="grid grid-cols-2 gap-2">
+                      <div className="grid grid-cols-3 gap-2">
                         {([
                           { value: "veo3_lite" as const, label: isSuperAdmin ? "Veo3.1 Lite" : "Best Model", emoji: "⚡", desc: isSuperAdmin ? "Standard quality, slower" : "Best quality output" },
                           { value: "veo3_fast" as const, label: isSuperAdmin ? "Veo3.1 Fast" : "Alternative", emoji: "🚀", desc: isSuperAdmin ? "Fast generation, high quality" : "Fast generation" },
+                          { value: "grok-imagine-video-1.5" as const, label: isSuperAdmin ? "Grok Video 1.5" : "Pro Model", emoji: "🎬", desc: isSuperAdmin ? "Grok Imagine Video 1.5" : "Advanced video AI" },
                         ]).map((model) => (
                           <button
                             key={model.value}
@@ -3557,7 +3558,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                         ))}
                       </div>
                       <p className="text-[10px] mt-1.5" style={{ color: T.textMuted }}>
-                        {videoModel === "veo3_lite" ? (isSuperAdmin ? "Image to Video First Frame — Veo3.1 Lite" : "Best quality video generation") : (isSuperAdmin ? "Image to Video First Frame — Veo3.1 Fast" : "Alternative fast generation")}
+                        {videoModel === "veo3_lite" ? (isSuperAdmin ? "Image to Video First Frame — Veo3.1 Lite" : "Best quality video generation") : videoModel === "veo3_fast" ? (isSuperAdmin ? "Image to Video First Frame — Veo3.1 Fast" : "Alternative fast generation") : (isSuperAdmin ? "Grok Imagine Video 1.5 — Image to Video" : "Advanced video generation")}
                       </p>
                     </div>
                   )}

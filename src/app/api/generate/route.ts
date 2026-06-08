@@ -90,16 +90,26 @@ async function pollKieVideo(
   sceneIndex: number,
   taskId: string,
   apiKey: string,
-  sw: SafeWriter | null
+  sw: SafeWriter | null,
+  isVeoModel: boolean = true
 ): Promise<string> {
-  const url = `https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`;
+  const url = isVeoModel
+    ? `https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`
+    : `https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`;
   for (let i = 0; i < 180; i++) {
     try {
       const res = await fetch(url, { headers: { Authorization: `Bearer ${apiKey}` } });
       const json = await res.json();
       if (json.code === 200) {
         const d = json.data;
-        if (d?.successFlag === 1 || d?.status === "success" || d?.state === "success") {
+        const isSuccess = isVeoModel
+          ? (d?.successFlag === 1 || d?.status === "success" || d?.state === "success")
+          : d?.state === "success";
+        const isFailed = isVeoModel
+          ? (d?.successFlag === 2 || d?.successFlag === 3 || d?.status === "failed" || d?.state === "fail")
+          : d?.state === "fail";
+
+        if (isSuccess) {
           let resp = d.response || d.result || d;
           if (typeof resp === "string") { try { resp = JSON.parse(resp); } catch {} }
           let videoUrl = resp?.resultUrls?.[0] || resp?.originUrls?.[0] || resp?.url || d.resultUrls?.[0] || d.videoUrl || d.video_url;
@@ -107,7 +117,7 @@ async function pollKieVideo(
           if (videoUrl) return videoUrl;
           throw new Error("Video ready but no URL: " + JSON.stringify(d).slice(0, 300));
         }
-        if (d?.successFlag === 2 || d?.successFlag === 3 || d?.status === "failed" || d?.state === "fail") {
+        if (isFailed) {
           throw new Error("Video gen failed: " + (d?.errorMessage || d?.error || d?.failMsg || "unknown error"));
         }
       }
@@ -468,17 +478,36 @@ async function generateVideo(
         addJobLog(jobId, `Video ${sceneIndex + 1}: submitting to AI video engine${attempt > 1 ? ` (attempt ${attempt})` : ""}...`);
         updateScene(jobId, sceneIndex, { videoProgress: 5 });
 
-        const res = await fetch("https://api.kie.ai/api/v1/veo/generate", {
-          method: "POST",
-          headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-          body: JSON.stringify({
-            prompt: videoPrompt,
-            imageUrls: [frameUrl],
-            model: videoModel,
-            aspect_ratio: "9:16",
-            enableTranslation: true,
-          }),
-        });
+        // Route to correct API based on model
+        const isVeoModel = videoModel.startsWith("veo");
+        let res: Response;
+        if (isVeoModel) {
+          res = await fetch("https://api.kie.ai/api/v1/veo/generate", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              prompt: videoPrompt,
+              imageUrls: [frameUrl],
+              model: videoModel,
+              aspect_ratio: "9:16",
+              enableTranslation: true,
+            }),
+          });
+        } else {
+          // Non-Veo models (Grok, etc.) use /api/v1/jobs/createTask
+          res = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+            method: "POST",
+            headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+            body: JSON.stringify({
+              model: videoModel,
+              input: {
+                prompt: videoPrompt,
+                image_urls: [frameUrl],
+                aspect_ratio: "9:16",
+              },
+            }),
+          });
+        }
         const json = await res.json();
         updateScene(jobId, sceneIndex, { videoProgress: 10 });
 
@@ -492,7 +521,7 @@ async function generateVideo(
         addJobLog(jobId, `Video ${sceneIndex + 1}: task submitted, waiting (5-15 min)...`);
       }
 
-      const videoUrl = await pollKieVideo(jobId, sceneIndex, taskId, apiKey, sw);
+      const videoUrl = await pollKieVideo(jobId, sceneIndex, taskId, apiKey, sw, videoModel.startsWith("veo"));
       updateScene(jobId, sceneIndex, { videoProgress: 100, videoDone: true, videoUrl, taskId: "" });
       addJobLog(jobId, `Video ${sceneIndex + 1}: complete!`);
       return videoUrl;

@@ -214,7 +214,7 @@ async function downloadAndReupload(imageUrl: string, apiKey: string, label: stri
   }
 }
 
-// ─── Generate Video (Veo) ────────────────────────────────────────────
+// ─── Generate Video (Veo / Grok) ────────────────────────────────────────────
 async function generateVideo(
   frameUrl: string,
   script: string,
@@ -233,38 +233,76 @@ async function generateVideo(
     `REFERENCE IMAGE: This is a talking-head video with expressive hand gestures and body language. The reference image is the ONLY source of truth for the person's appearance. Output must look like a raw, unedited, continuous webcam recording of an engaging speaker who uses natural hand gestures, head movements, and facial expressions while speaking. CRITICAL REMINDERS: NO fade-in at start. NO fade-out at end. NO transitions whatsoever. NO cuts. Camera stays STATIC (locked tripod). RAW FOOTAGE ONLY. INSTANT start, INSTANT end. Full brightness at all times. The person should use hand gestures, natural head movement, and expressive body language that MATCHES the dialogue content. Dialogue: "${script}" ` +
     `AUDIO RULES: MUTE ALL BACKGROUND AUDIO COMPLETELY. ZERO music — no background music, no instrumental music, no ambient music, no soundtrack, no beat, no melody, no jingle, no BGM of any kind. ZERO ambient sounds — no wind, no birds, no traffic, no footsteps, no nature sounds, no room tone, no echo, no reverb, no environmental audio whatsoever. The ONLY audio allowed is the person's own voice: a clear, warm, natural speaking voice with confident tone and friendly delivery. The audio track must contain ONLY clean, dry voice — no music intro, no music outro, no music transitions between scenes, no background score at any point. Absolutely no sound effects, no whoosh, no ding, no transition sounds. This is critical: the final audio must be 100% voice-only with zero musical or ambient elements.`;
 
-  const res = await fetch("https://api.kie.ai/api/v1/veo/generate", {
-    method: "POST",
-    headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
-    body: JSON.stringify({
-      prompt: videoPrompt,
-      imageUrls: [frameUrl],
-      model: videoModel,
-      aspect_ratio: "9:16",
-      enableTranslation: true,
-    }),
-  });
+  // ── Route to correct API based on model ──
+  const isVeoModel = videoModel.startsWith("veo");
+  let taskId: string;
 
-  const json = await res.json();
-  if (json.code !== 200) throw new Error("Video submit failed: " + (json.msg || JSON.stringify(json)));
-  const taskId = json.data?.taskId;
-  if (!taskId) throw new Error("No taskId for video generation");
+  if (isVeoModel) {
+    // Veo models use /api/v1/veo/generate endpoint
+    const res = await fetch("https://api.kie.ai/api/v1/veo/generate", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        prompt: videoPrompt,
+        imageUrls: [frameUrl],
+        model: videoModel,
+        aspect_ratio: "9:16",
+        enableTranslation: true,
+      }),
+    });
+    const json = await res.json();
+    if (json.code !== 200) throw new Error("Video submit failed: " + (json.msg || JSON.stringify(json)));
+    taskId = json.data?.taskId;
+    if (!taskId) throw new Error("No taskId for video generation");
+  } else {
+    // Non-Veo models (Grok, etc.) use /api/v1/jobs/createTask endpoint
+    const res = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+      method: "POST",
+      headers: { Authorization: `Bearer ${apiKey}`, "Content-Type": "application/json" },
+      body: JSON.stringify({
+        model: videoModel,
+        input: {
+          prompt: videoPrompt,
+          image_urls: [frameUrl],
+          aspect_ratio: "9:16",
+        },
+      }),
+    });
+    const json = await res.json();
+    if (json.code !== 200) throw new Error("Video submit failed: " + (json.msg || JSON.stringify(json)));
+    taskId = json.data?.taskId;
+    if (!taskId) throw new Error("No taskId for video generation");
+  }
 
-  // Poll for result
+  // Poll for result — use correct polling endpoint based on model
+  const pollEndpoint = isVeoModel
+    ? `https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`
+    : `https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`;
+
   for (let i = 0; i < 180; i++) {
     // Send progress update every 2 poll cycles (~10s)
     if (onProgress && i % 2 === 0) {
       onProgress(i * 5, i);
     }
     try {
-      const pollRes = await fetch(`https://api.kie.ai/api/v1/veo/record-info?taskId=${taskId}`, {
+      const pollRes = await fetch(pollEndpoint, {
         headers: { Authorization: `Bearer ${apiKey}` },
       });
       const pollJson = await pollRes.json();
 
       if (pollJson.code === 200) {
         const d = pollJson.data;
-        if (d?.successFlag === 1 || d?.status === "success" || d?.state === "success") {
+
+        // Check success — Veo uses successFlag/status/state, Jobs uses state
+        const isSuccess = isVeoModel
+          ? (d?.successFlag === 1 || d?.status === "success" || d?.state === "success")
+          : d?.state === "success";
+        const isFailed = isVeoModel
+          ? (d?.successFlag === 2 || d?.successFlag === 3 || d?.status === "failed" || d?.state === "fail")
+          : d?.state === "fail";
+
+        if (isSuccess) {
+          // Extract video URL from response
           let resp = d.response || d.result || d;
           if (typeof resp === "string") { try { resp = JSON.parse(resp); } catch {} }
           let videoUrl =
@@ -285,8 +323,8 @@ async function generateVideo(
           if (videoUrl) return videoUrl;
           throw new Error("Video ready but no URL");
         }
-        if (d?.successFlag === 2 || d?.successFlag === 3 || d?.status === "failed" || d?.state === "fail") {
-          throw new Error("Video generation failed: " + (d?.errorMessage || d?.error || "unknown"));
+        if (isFailed) {
+          throw new Error("Video generation failed: " + (d?.errorMessage || d?.error || d?.failMsg || "unknown"));
         }
       }
     } catch (err) {
