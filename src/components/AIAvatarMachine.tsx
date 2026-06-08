@@ -1852,6 +1852,8 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           falApiKey,
           videoModel,
           framesOnly: true,
+          // If ALL scenes have custom frames, skip frame generation entirely
+          skipFrames: scenesWithCustomFrames.length === scenesWithContent.length && scenesWithCustomFrames.length > 0,
           preUploadedFrameUrls: scenesWithCustomFrames.length > 0 ? preUploadedFrameUrls : undefined,
           customReferenceImages: customReferenceImageUrls.length > 0 ? customReferenceImageUrls : undefined,
         }),
