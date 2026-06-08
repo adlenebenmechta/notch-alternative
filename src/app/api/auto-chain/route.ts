@@ -581,43 +581,12 @@ export async function POST(req: NextRequest) {
             sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: attempt === 1 ? `Video ${i + 1}/${totalScenes}: Generating...` : `Video ${i + 1} retry ${attempt}/${MAX_VIDEO_RETRIES}: ${lastVideoError.slice(0, 60)}` });
 
             try {
-              const videoPrompt = scene.script.trim() + ". Subtle natural movement, person speaking gently to camera. Cinematic.";
-              const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
-                method: "POST",
-                headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
-                body: JSON.stringify({ model, input: { prompt: videoPrompt, image_urls: [frameUrls[i]], image_size: "768x1344", duration: 5 } }),
-              });
-              const submitJson = await submitRes.json();
-              if (submitJson.code !== 200) throw new Error("Video submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
-              const taskId = submitJson.data?.taskId;
-              if (!taskId) throw new Error("No taskId for video");
-
-              let rawVideoUrl = "";
-              for (let p = 0; p < 200; p++) {
-                if (p % 3 === 0) sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${p * 5}s)` });
-                try {
-                  const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${kieApiKey}` } });
-                  const pollJson = await pollRes.json();
-                  if (pollJson.code === 200) {
-                    const d = pollJson.data;
-                    if (d?.state === "success") {
-                      let result;
-                      if (typeof d.resultJson === "string") { try { result = JSON.parse(d.resultJson); } catch { result = d.resultJson; } } else { result = d.resultJson; }
-                      const url = result?.resultUrls?.[0] || result?.result_url || result?.url;
-                      if (url) { rawVideoUrl = url; break; }
-                      throw new Error("Video ready but no URL");
-                    }
-                    if (d?.state === "fail") throw new Error("Video generation failed: " + (d?.failMsg || "unknown"));
-                  }
-                } catch (err) {
-                  const msg = err instanceof Error ? err.message : String(err);
-                  if (msg.includes("generation failed") || msg.includes("no URL")) throw err;
+              videoUrl = await generateVideo(
+                frameUrls[i], scene.script, kieApiKey, model,
+                (elapsed, pollCount) => {
+                  sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed)` });
                 }
-                await sleep(5000);
-              }
-              if (!rawVideoUrl) throw new Error("Video generation timed out");
-
-              videoUrl = await downloadAndReupload(rawVideoUrl, kieApiKey, `chain_video_${i}`);
+              );
               lastVideoError = "";
               break;
             } catch (err) {
