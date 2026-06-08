@@ -694,6 +694,12 @@ export async function POST(req: NextRequest) {
           sseSend(sw, { type: "error", message: "No uploaded frames were provided" });
           return;
         }
+
+        // ── Frames-only mode: stop here, let user review before generating videos ──
+        if (framesOnly) {
+          sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames ready! Review and then generate videos." });
+          return;
+        }
       } else {
         // Generate frames using AI (Scene 1 uses character ref, Scenes 2+ use Scene 1 frame as ref) — with per-frame retry
         // Skip frames that already exist from resume
