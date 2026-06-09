@@ -159,3 +159,25 @@ Stage Summary:
 - Home page shows tools grid with "Try now" buttons
 - Backend API routes preserved (kie.ai + fal.ai)
 - Pushed to GitHub for Railway auto-deploy
+
+---
+Task ID: 3
+Agent: Main
+Task: Fix avatar-only mode skipping frame generation + Fix auto-retry resuming from failed video
+
+Work Log:
+- Diagnosed avatar-only mode issue: in "avatar" and "avatar_v2" frameModes, the auto-chain pipeline was still generating frames using nano-banana-edit, instead of using the uploaded avatar image directly as the frame for every scene
+- Fixed by modifying startAutoChain in AIAvatarMachine.tsx to detect avatar-only mode and set skipFrames=true with preUploadedFrameUrls as the avatar URL repeated for each scene
+- Added "Avatar Only mode: Using your avatar image as frame for all scenes (skipping frame generation)..." log message
+- Updated auto-chain route.ts to show better messages for pre-set frames (avatar image vs uploaded frame)
+- Fixed auto-retry resume issue: added isResume flag to video_done and frame_done SSE events when they are resume updates (not new completions), so the client doesn't log "Video X complete!" for already-done videos during resume, which confused users into thinking the pipeline restarted from video 1
+- Added resume event handler in ClaymotionVideosMachine.tsx
+- Added per-video retry (5 attempts) to claymotion-generate route.ts, matching the auto-chain route's retry behavior
+- Applied isResume handling to both ClaymotionVideosMachine.tsx and AIAvatarMachine.tsx for both frame_done and video_done events
+
+Stage Summary:
+- Avatar-only mode now skips frame generation and uses the uploaded avatar image as the frame for all scenes
+- Auto-retry on network error now properly resumes from the failed video (not from video 1)
+- Resume events are now silent (no confusing "Video X complete!" logs for already-done videos)
+- Claymotion pipeline now has per-video retry (5 attempts) for better resilience
+- Build successful with no errors

@@ -1335,7 +1335,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     if (isResume) {
       setAutoChainStep("videos"); // Resume goes straight to video step
     } else {
-      setAutoChainStep("frames");
+      setAutoChainStep("frames"); // Even avatar-only starts with frames step (briefly assigns avatar URL as frames)
       autoRetryCountRef.current = 0; // Reset retry counter on fresh start
     }
     setAutoChainProgress(0);
@@ -1461,9 +1461,24 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
       if (controller.signal.aborted) throw new Error("aborted");
 
+      // ── Avatar Only mode: use avatar image as the frame for every scene (skip frame generation) ──
+      const isAvatarOnlyMode = frameMode === "avatar" || frameMode === "avatar_v2";
+      const avatarOnlyFrameUrls = isAvatarOnlyMode && uploadedCharUrl
+        ? chainScenes.map(() => uploadedCharUrl)
+        : [];
+
       // Step 2: Run the auto-chain pipeline
+      const shouldSkipFrames = hasManualFrames || isAvatarOnlyMode;
+      const effectiveFrameUrls = hasManualFrames
+        ? preUploadedFrameUrls
+        : avatarOnlyFrameUrls.length > 0
+          ? avatarOnlyFrameUrls
+          : undefined;
+
       if (isResume) {
         addLog("Resuming from where we left off...");
+      } else if (isAvatarOnlyMode) {
+        addLog("Avatar Only mode: Using your avatar image as frame for all scenes (skipping frame generation)...");
       } else if (hasManualFrames) {
         addLog("Starting video-only pipeline (using your uploaded frames)...");
       } else if (someManualFrames) {
@@ -1483,9 +1498,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           kieApiKey,
           falApiKey,
           videoModel,
-          // Manual frames mode: skip frame generation for scenes with uploaded frames
-          skipFrames: hasManualFrames,
-          preUploadedFrameUrls: hasManualFrames ? preUploadedFrameUrls : undefined,
+          // Skip frame generation: either manual custom frames OR avatar-only mode
+          skipFrames: shouldSkipFrames,
+          preUploadedFrameUrls: shouldSkipFrames ? effectiveFrameUrls : undefined,
           // Resume mode: pass already-completed URLs so the server skips them
           existingFrameUrls: isResume ? existingFrameUrls : undefined,
           existingVideoUrls: isResume ? existingVideoUrls : undefined,
@@ -1543,7 +1558,10 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             }
 
             if (event.type === "frame_done") {
-              addLog(`Frame ${event.sceneIndex + 1} complete!`);
+              const isResumeUpdate = event.isResume === true;
+              if (!isResumeUpdate) {
+                addLog(`Frame ${event.sceneIndex + 1} complete!`);
+              }
               setAutoChainFrameUrls((prev) => {
                 const next = [...prev];
                 next[event.sceneIndex] = event.frameUrl;
@@ -1572,7 +1590,10 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             }
 
             if (event.type === "video_done") {
-              addLog(`Video ${event.sceneIndex + 1} complete!`);
+              const isResumeUpdate = event.isResume === true;
+              if (!isResumeUpdate) {
+                addLog(`Video ${event.sceneIndex + 1} complete!`);
+              }
               setAutoChainVideoUrls((prev) => {
                 const next = [...prev];
                 next[event.sceneIndex] = event.videoUrl;

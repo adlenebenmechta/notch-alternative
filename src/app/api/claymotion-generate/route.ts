@@ -515,10 +515,10 @@ export async function POST(req: NextRequest) {
         const doneCount = videoUrls.filter(Boolean).length;
         sseSend(sw, { type: "resume", doneVideos: doneCount, totalVideos, message: `Resuming: ${doneCount}/${totalVideos} videos already done` });
 
-        // Log already-done videos so client can update UI
+        // Log already-done videos so client can update UI (silently, not as "new" completions)
         for (let i = 0; i < totalVideos; i++) {
           if (videoUrls[i]) {
-            sseSend(sw, { type: "video_done", videoIndex: i, videoUrl: videoUrls[i], message: `Video ${i + 1}/${totalVideos}: Already done (resuming)` });
+            sseSend(sw, { type: "video_done", videoIndex: i, videoUrl: videoUrls[i], isResume: true, message: `Video ${i + 1}/${totalVideos}: Already done (resuming)` });
           }
         }
       }
@@ -531,17 +531,36 @@ export async function POST(req: NextRequest) {
         const endFrame = sceneImageUrls[i + 1];
         const videoPrompt = prompts[i] || `Smooth transition from scene ${i + 1} to scene ${i + 2}. Natural camera movement, cinematic quality.`;
 
-        sseSend(sw, { type: "video_progress", videoIndex: i, pct: 5, message: `Video ${i + 1}/${totalVideos}: Submitting to ${modelLabel}...` });
+        // Per-video retry with up to 5 attempts
+        const MAX_VIDEO_RETRIES = 5;
+        let videoUrl = "";
+        let lastVideoError = "";
 
-        try {
-          const videoUrl = await generateVideo(startFrame, endFrame, videoPrompt, kieApiKey || "", falApiKey || "", model);
+        for (let attempt = 1; attempt <= MAX_VIDEO_RETRIES; attempt++) {
+          sseSend(sw, { type: "video_progress", videoIndex: i, pct: 5, message: attempt === 1
+            ? `Video ${i + 1}/${totalVideos}: Submitting to ${modelLabel}...`
+            : `Video ${i + 1}/${totalVideos}: Retry ${attempt}/${MAX_VIDEO_RETRIES} — ${lastVideoError.slice(0, 80)}`
+          });
+
+          try {
+            videoUrl = await generateVideo(startFrame, endFrame, videoPrompt, kieApiKey || "", falApiKey || "", model);
+            lastVideoError = "";
+            break; // Success — exit retry loop
+          } catch (err) {
+            lastVideoError = err instanceof Error ? err.message : String(err);
+            if (attempt < MAX_VIDEO_RETRIES) {
+              sseSend(sw, { type: "video_error", videoIndex: i, error: lastVideoError, retryAttempt: attempt, maxRetries: MAX_VIDEO_RETRIES, message: `Video ${i + 1}/${totalVideos} ERROR (attempt ${attempt}/${MAX_VIDEO_RETRIES}): ${lastVideoError} — retrying in 10s...` });
+              await sleep(10000);
+            }
+          }
+        }
+
+        if (videoUrl) {
           videoUrls[i] = videoUrl;
           sseSend(sw, { type: "video_done", videoIndex: i, videoUrl, message: `Video ${i + 1}/${totalVideos} complete!` });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : String(err);
+        } else {
           videoUrls[i] = "";
-          sseSend(sw, { type: "video_error", videoIndex: i, error: msg, message: `Video ${i + 1}/${totalVideos} failed: ${msg}` });
-          // Continue with remaining videos even if one fails
+          sseSend(sw, { type: "video_error", videoIndex: i, error: lastVideoError, message: `Video ${i + 1}/${totalVideos} FAILED after ${MAX_VIDEO_RETRIES} attempts: ${lastVideoError}` });
         }
 
         // Progress for next video

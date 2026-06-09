@@ -701,7 +701,7 @@ export async function POST(req: NextRequest) {
   // Run pipeline in background
   (async () => {
     try {
-      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (manual frames)" : ""}${existingVideoUrls?.some(Boolean) ? " (resuming)" : ""}` });
+      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (pre-set frames — skipping generation)" : ""}${existingVideoUrls?.some(Boolean) ? " (resuming)" : ""}` });
 
       // ── STEP 1: Frame Generation (skip if user uploaded their own frames OR resuming with existing frames) ──
       const frameUrls: string[] = [];
@@ -715,18 +715,20 @@ export async function POST(req: NextRequest) {
 
       if (skipFrames && preUploadedFrameUrls) {
         // User already has frames — skip generation, use pre-uploaded URLs directly
-        sseSend(sw, { type: "step_change", step: "frames", message: "Using your uploaded frames (skipping generation)..." });
+        sseSend(sw, { type: "step_change", step: "frames", message: "Using pre-set frames (skipping generation)..." });
         for (let i = 0; i < totalScenes; i++) {
           const frameUrl = preUploadedFrameUrls[i] || "";
           frameUrls.push(frameUrl);
           if (frameUrl) {
-            sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl, message: `Frame ${i + 1}/${totalScenes}: Using uploaded frame` });
+            const isSameUrl = preUploadedFrameUrls.every((u: string) => u === preUploadedFrameUrls[0]);
+            sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl, message: `Frame ${i + 1}/${totalScenes}: ${isSameUrl ? "Using avatar image" : "Using uploaded frame"}` });
           } else {
             sseSend(sw, { type: "frame_error", sceneIndex: i, error: "No frame uploaded", message: `Frame ${i + 1}: No uploaded frame` });
           }
         }
         const successfulFrames = frameUrls.filter(Boolean);
-        sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready (uploaded)` });
+        const isAvatarOnly = preUploadedFrameUrls.length > 0 && preUploadedFrameUrls.every((u: string) => u === preUploadedFrameUrls[0]);
+        sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready (${isAvatarOnly ? "avatar image" : "uploaded"})` });
 
         if (successfulFrames.length === 0) {
           sseSend(sw, { type: "error", message: "No uploaded frames were provided" });
@@ -759,7 +761,7 @@ export async function POST(req: NextRequest) {
         if (existingFrameCount > 0) {
           for (let j = 0; j < totalScenes; j++) {
             if (frameUrls[j]) {
-              sseSend(sw, { type: "frame_done", sceneIndex: j, frameUrl: frameUrls[j], message: `Frame ${j + 1}/${totalScenes}: Already done (resuming)` });
+              sseSend(sw, { type: "frame_done", sceneIndex: j, frameUrl: frameUrls[j], isResume: true, message: `Frame ${j + 1}/${totalScenes}: Already done (resuming)` });
             }
           }
         }
@@ -944,10 +946,10 @@ export async function POST(req: NextRequest) {
       const existingVideoCount = videoUrls.filter(Boolean).length;
       sseSend(sw, { type: "step_change", step: "videos", message: existingVideoCount > 0 ? `Resuming: ${existingVideoCount} videos already done, generating remaining...` : "Generating videos..." });
 
-      // Log skipped (already done) videos
+      // Log skipped (already done) videos (silently, not as "new" completions)
       for (let i = 0; i < totalScenes; i++) {
         if (videoUrls[i]) {
-          sseSend(sw, { type: "video_done", sceneIndex: i, videoUrl: videoUrls[i], message: `Video ${i + 1}/${totalScenes}: Already done (resuming)` });
+          sseSend(sw, { type: "video_done", sceneIndex: i, videoUrl: videoUrls[i], isResume: true, message: `Video ${i + 1}/${totalScenes}: Already done (resuming)` });
         }
       }
 

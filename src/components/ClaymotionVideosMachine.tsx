@@ -363,6 +363,11 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
               addLog(`Pipeline started! Generating ${event.totalVideos} videos...`);
             }
 
+            if (event.type === "resume") {
+              const doneVids = event.doneVideos || 0;
+              addLog(`Resuming pipeline — ${doneVids}/${event.totalVideos} videos already done, continuing from where we left off...`);
+            }
+
             if (event.type === "video_progress") {
               const videoIdx = event.videoIndex;
               const pct = event.pct || 0;
@@ -380,6 +385,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
 
             if (event.type === "video_done") {
               const videoIdx = event.videoIndex;
+              const isResumeUpdate = event.isResume === true;
               // Track completed video URL in ref for resume on retry
               completedVideoUrlsRef.current[videoIdx] = event.videoUrl;
               setVideoStatuses((prev) =>
@@ -389,7 +395,11 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
                     : v
                 )
               );
-              addLog(`Video ${videoIdx + 1} complete! (Scene ${videoIdx + 1} → Scene ${videoIdx + 2})`);
+              if (isResumeUpdate) {
+                // Don't log "complete!" for resume updates — just silently update the UI
+              } else {
+                addLog(`Video ${videoIdx + 1} complete! (Scene ${videoIdx + 1} → Scene ${videoIdx + 2})`);
+              }
             }
 
             if (event.type === "video_error") {
