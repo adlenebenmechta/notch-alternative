@@ -227,6 +227,7 @@ async function generateVideo(
     `1. ABSOLUTE BAN ON ALL TRANSITIONS (ZERO TOLERANCE): Do NOT add ANY visual transitions at ANY point — beginning, middle, or end of the video. BANNED transitions (ALL of these are FORBIDDEN): fade-in from black, fade-out to black, fade-in from white, fade-out to white, cross-dissolve, cross-fade, wipe, flash, glitch, jump cut, whip pan, blur transition, iris wipe, slide transition, zoom transition, dip to color, soft wipe, hard cut, morph transition, ink wipe, clock wipe, star wipe, any fade effect, any dissolve effect, any color flash. The video must START INSTANTLY at full brightness — NO fade-in. The video must END INSTANTLY at full brightness — NO fade-out. There must be ZERO cuts, ZERO edits, ZERO transition effects of ANY kind at ANY timestamp in the video. Every single frame from 0:00 to the end must maintain full, consistent visibility with NO opacity changes, NO color shifts, NO brightness changes. ` +
     `2. STATIC CAMERA (LOCKED TRIPOD): The camera angle, framing, and composition MUST remain IDENTICAL to the reference image for the ENTIRE duration. NO zooming, NO panning, NO tilting, NO tracking, NO dolly, NO camera shake, NO floating camera movement. The camera must be 100% locked and static — no movement whatsoever. ` +
     `3. OBJECT LOCK: Do NOT add, remove, modify, or animate ANY objects that were not in the reference image. NO floating text, NO graphics, NO subtitles, NO overlays, NO particles, NO sparkles, NO light rays, NO lens flare, NO bokeh. The background must remain EXACTLY as shown in the reference image — no changes. ` +
+    `3.5. ABSOLUTE BAN ON TEXT (ZERO TOLERANCE): Do NOT add ANY text, words, letters, numbers, captions, subtitles, titles, watermarks, logos, or typography of ANY kind ANYWHERE in the video — not on screen, not floating, not embedded in the background, not on clothing, not on objects. NO text overlays, NO lower thirds, NO name cards, NO credits, NO chyron, NO ticker, NO speech bubbles, NO comic-style text, NO animated text. This includes ALL languages and ALL scripts (Latin, Arabic, Chinese, Japanese, Korean, Cyrillic, etc.). The video must contain ZERO text of any kind from the first frame to the last frame. If any text appears in the video, it will be REJECTED. ` +
     `4. EXPRESSIVE PERSON MOVEMENT (natural speaker style): The person should be an engaging, expressive speaker — NOT a stiff news anchor. Movement should feel natural and contextual. ENCOURAGED movements that match the dialogue: Hand gestures: pointing, open palms, counting on fingers, waving, thumbs up, natural gesticulation while speaking. Arm movement: natural arm raises, gentle hand sweeps, bringing hands together or apart to emphasize points. Head movement: natural head tilts, slight nods for emphasis, occasional head turns, looking side to side naturally. Shoulder movement: subtle shoulder shrugs, natural shoulder shifts when gesturing. Upper body: slight torso rotation, natural lean forward when making important points. Facial expressions: animated eyebrows, natural smiles, expressive eyes, raised eyebrows for emphasis, thoughtful expressions. IMPORTANT: All movements must be SMOOTH and NATURAL — not robotic, not exaggerated, not dramatic. Movements should correlate with the content being spoken. When listing items, use counting gestures. When emphasizing a point, use hand gestures. When asking a question, raise eyebrows slightly. FORBIDDEN: standing up, walking, dancing, jumping, running, touching face excessively, picking up objects, crossing arms tightly, putting hands in pockets, overly dramatic or theatrical movements. ` +
     `5. LIGHTING CONSISTENCY: Lighting must remain EXACTLY as shown in the reference image — NO changes, NO flickering, NO color shifts, NO brightness changes. ` +
     `6. SCRIPT BOUNDARY — SILENCE AFTER LAST WORD: The person must say ONLY the exact words in the dialogue and NOTHING ELSE. After the last word: mouth CLOSED, gentle smile, hands come to rest naturally, steady eye contact. ZERO extra words, ZERO filler sounds, ZERO lip movement after script ends. ` +
@@ -411,6 +412,8 @@ export async function POST(req: NextRequest) {
     framesOnly,
     // Single-scene frame regeneration: regenerate just one scene's frame
     regenerateSceneIndex,
+    // Avatar-only mode: skip frame generation, use characterImageUrl as frame for every scene
+    avatarOnly,
   } = body as {
     action?: string;
     topic?: string;
@@ -430,6 +433,7 @@ export async function POST(req: NextRequest) {
     videoUrls?: string[];
     framesOnly?: boolean;
     regenerateSceneIndex?: number;
+    avatarOnly?: boolean;
   };
 
   // ── Action: Generate Script Only ──
@@ -681,10 +685,12 @@ export async function POST(req: NextRequest) {
 
   // ── Action: Full Auto Chain Pipeline ──
   // In skipFrames mode, characterImageUrl is optional (user uploaded their own frames)
-  if (!skipFrames && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required" }, { status: 400 });
+  // In avatarOnly mode, characterImageUrl IS required (it becomes the frame for every scene)
+  if (!skipFrames && !avatarOnly && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required" }, { status: 400 });
+  if (avatarOnly && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required for avatar-only mode" }, { status: 400 });
   if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
   if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
-  if (skipFrames && (!preUploadedFrameUrls || preUploadedFrameUrls.length === 0)) {
+  if (skipFrames && !avatarOnly && (!preUploadedFrameUrls || preUploadedFrameUrls.length === 0)) {
     return NextResponse.json({ error: "Pre-uploaded frame URLs are required when skipFrames is true" }, { status: 400 });
   }
 
@@ -701,9 +707,9 @@ export async function POST(req: NextRequest) {
   // Run pipeline in background
   (async () => {
     try {
-      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${skipFrames ? " (pre-set frames — skipping generation)" : ""}${existingVideoUrls?.some(Boolean) ? " (resuming)" : ""}` });
+      sseSend(sw, { type: "pipeline_started", totalScenes, message: `Auto Chain: ${totalScenes} scenes${avatarOnly ? " (avatar only — skipping frame generation)" : skipFrames ? " (pre-set frames — skipping generation)" : ""}${existingVideoUrls?.some(Boolean) ? " (resuming)" : ""}` });
 
-      // ── STEP 1: Frame Generation (skip if user uploaded their own frames OR resuming with existing frames) ──
+      // ── STEP 1: Frame Generation (skip if avatar-only, user uploaded their own frames, OR resuming with existing frames) ──
       const frameUrls: string[] = [];
 
       // Pre-fill with existing frame URLs from resume
@@ -713,7 +719,22 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      if (skipFrames && preUploadedFrameUrls) {
+      if (avatarOnly && characterImageUrl) {
+        // ── Avatar-Only mode: use the character/avatar image as the frame for EVERY scene ──
+        // No AI frame generation — the uploaded avatar IS the first frame for all scenes
+        sseSend(sw, { type: "step_change", step: "frames", message: "Avatar Only mode: using your avatar image as frame for all scenes (skipping frame generation)..." });
+        for (let i = 0; i < totalScenes; i++) {
+          frameUrls.push(characterImageUrl);
+          sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl: characterImageUrl, message: `Frame ${i + 1}/${totalScenes}: Using avatar image` });
+        }
+        sseSend(sw, { type: "frames_complete", frameUrls, successCount: totalScenes, message: `${totalScenes}/${totalScenes} frames ready (avatar image)` });
+
+        // ── Frames-only mode: stop here, let user review before generating videos ──
+        if (framesOnly) {
+          sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames ready! Review and then generate videos." });
+          return;
+        }
+      } else if (skipFrames && preUploadedFrameUrls) {
         // User already has frames — skip generation, use pre-uploaded URLs directly
         sseSend(sw, { type: "step_change", step: "frames", message: "Using pre-set frames (skipping generation)..." });
         for (let i = 0; i < totalScenes; i++) {

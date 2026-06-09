@@ -1367,12 +1367,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       // Upload character image if needed (not needed in full manual mode)
-      let uploadedCharUrl = "";
-      if (avatarImage && !hasManualFrames) {
+      let uploadedCharUrl = avatarUrl || ""; // Use existing avatarUrl if already uploaded (e.g. from library or previous run)
+      if (avatarImage && !hasManualFrames && !uploadedCharUrl) {
         addLog("Uploading character image...");
         uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey, controller.signal);
         setAvatarUrl(uploadedCharUrl);
         addLog("Character image uploaded!");
+      } else if (uploadedCharUrl) {
+        addLog("Using existing avatar URL (already uploaded)");
       }
 
       // Upload custom frame images to KIE for scenes that have them
@@ -1463,22 +1465,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
       // ── Avatar Only mode: use avatar image as the frame for every scene (skip frame generation) ──
       const isAvatarOnlyMode = frameMode === "avatar" || frameMode === "avatar_v2";
-      const avatarOnlyFrameUrls = isAvatarOnlyMode && uploadedCharUrl
-        ? chainScenes.map(() => uploadedCharUrl)
-        : [];
 
       // Step 2: Run the auto-chain pipeline
       const shouldSkipFrames = hasManualFrames || isAvatarOnlyMode;
-      const effectiveFrameUrls = hasManualFrames
-        ? preUploadedFrameUrls
-        : avatarOnlyFrameUrls.length > 0
-          ? avatarOnlyFrameUrls
-          : undefined;
 
       if (isResume) {
         addLog("Resuming from where we left off...");
       } else if (isAvatarOnlyMode) {
-        addLog("Avatar Only mode: Using your avatar image as frame for all scenes (skipping frame generation)...");
+        addLog(`Avatar Only mode: Using your avatar image as frame for all scenes (skipping frame generation)... [charUrl=${uploadedCharUrl ? 'yes' : 'NO'}]`);
       } else if (hasManualFrames) {
         addLog("Starting video-only pipeline (using your uploaded frames)...");
       } else if (someManualFrames) {
@@ -1498,9 +1492,12 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           kieApiKey,
           falApiKey,
           videoModel,
+          // Avatar-only mode: explicitly tell the backend to skip frame generation
+          // and use characterImageUrl as the frame for every scene
+          avatarOnly: isAvatarOnlyMode,
           // Skip frame generation: either manual custom frames OR avatar-only mode
           skipFrames: shouldSkipFrames,
-          preUploadedFrameUrls: shouldSkipFrames ? effectiveFrameUrls : undefined,
+          preUploadedFrameUrls: shouldSkipFrames && !isAvatarOnlyMode ? preUploadedFrameUrls : undefined,
           // Resume mode: pass already-completed URLs so the server skips them
           existingFrameUrls: isResume ? existingFrameUrls : undefined,
           existingVideoUrls: isResume ? existingVideoUrls : undefined,

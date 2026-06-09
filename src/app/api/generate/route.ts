@@ -319,6 +319,13 @@ const VIDEO_VISUAL_CONSTRAINTS =
   "NO floating text, NO graphics, NO subtitles, NO overlays, NO particles, NO sparkles, NO light rays, NO lens flare, NO bokeh. " +
   "The background must remain EXACTLY as shown in the reference image — no changes. " +
   "\n" +
+  "3.5. ABSOLUTE BAN ON TEXT (ZERO TOLERANCE): " +
+  "Do NOT add ANY text, words, letters, numbers, captions, subtitles, titles, watermarks, logos, or typography of ANY kind ANYWHERE in the video — not on screen, not floating, not embedded in the background, not on clothing, not on objects. " +
+  "NO text overlays, NO lower thirds, NO name cards, NO credits, NO chyron, NO ticker, NO speech bubbles, NO comic-style text, NO animated text. " +
+  "This includes ALL languages and ALL scripts (Latin, Arabic, Chinese, Japanese, Korean, Cyrillic, etc.). " +
+  "The video must contain ZERO text of any kind from the first frame to the last frame. " +
+  "If any text appears in the video, it will be REJECTED. " +
+  "\n" +
   "4. MINIMAL PERSON MOVEMENT (news anchor style): " +
   "ONLY lip movement for speech and VERY SUBTLE facial micro-expressions. " +
   "Allowed: slight lip movement, very subtle occasional blink, extremely gentle eyebrow raise. " +
@@ -359,6 +366,13 @@ const VIDEO_VISUAL_CONSTRAINTS_V2 =
   "Do NOT add, remove, modify, or animate ANY objects that were not in the reference image. " +
   "NO floating text, NO graphics, NO subtitles, NO overlays, NO particles, NO sparkles, NO light rays, NO lens flare, NO bokeh. " +
   "The background must remain EXACTLY as shown in the reference image — no changes. " +
+  "\n" +
+  "3.5. ABSOLUTE BAN ON TEXT (ZERO TOLERANCE): " +
+  "Do NOT add ANY text, words, letters, numbers, captions, subtitles, titles, watermarks, logos, or typography of ANY kind ANYWHERE in the video — not on screen, not floating, not embedded in the background, not on clothing, not on objects. " +
+  "NO text overlays, NO lower thirds, NO name cards, NO credits, NO chyron, NO ticker, NO speech bubbles, NO comic-style text, NO animated text. " +
+  "This includes ALL languages and ALL scripts (Latin, Arabic, Chinese, Japanese, Korean, Cyrillic, etc.). " +
+  "The video must contain ZERO text of any kind from the first frame to the last frame. " +
+  "If any text appears in the video, it will be REJECTED. " +
   "\n" +
   "4. EXPRESSIVE PERSON MOVEMENT (natural speaker style): " +
   "The person should be an engaging, expressive speaker — NOT a stiff news anchor. Movement should feel natural and contextual. " +
