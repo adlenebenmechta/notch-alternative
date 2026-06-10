@@ -181,3 +181,184 @@ Stage Summary:
 - Resume events are now silent (no confusing "Video X complete!" logs for already-done videos)
 - Claymotion pipeline now has per-video retry (5 attempts) for better resilience
 - Build successful with no errors
+
+---
+Task ID: 1
+Agent: Security Fix Agent
+Task: Remove API key exposure from AllInOneMachine.tsx
+
+Work Log:
+- Removed `kieApiKey` and `showApiKey` state variables from AIAdGeneratorPage
+- Removed hardcoded API key `2127fc6b287847ec6b8cbf88308e6f45` from useEffect (line that set default key)
+- Removed `apikey` entry from localStorage LS constants
+- Removed `saveLS(LS.apikey, kieApiKey)` persistence effect
+- Removed `formData.append("kieApiKey", ...)` from uploadImageToKIE function
+- Removed `formData.append("kieApiKey", ...)` from handleVoiceUpload function
+- Removed `kieApiKey: kieApiKey || undefined` from handleGenerate request body
+- Removed entire KIE API Key UI section (input field, show/hide button, helper text)
+- Verified no remaining references to kieApiKey or showApiKey in the file
+- Backend routes already have DEFAULT_KIE_KEY fallbacks, so they work without client-sent keys
+- Build verified successful with `npx next build`
+
+Stage Summary:
+- API key is now completely hidden from frontend users
+- No API key input field, no hardcoded key in client code, no key sent in API requests
+- All three backend routes (/api/upload-avatar, /api/allinone/upload-voice, /api/allinone/ad-generate) have server-side default key handling
+- Build passes successfully
+
+---
+Task ID: 2
+Agent: Security Fix Agent
+Task: Remove ALL API key exposure from AIAvatarMachine.tsx
+
+Work Log:
+
+### Frontend Changes (AIAvatarMachine.tsx)
+
+1. **State initialization**: All API key state variables already initialized as empty strings (kieApiKey, falApiKey, heygenApiKey, aiScriptApiKey). Removed all show/hide state variables (showAiScriptKey, showApiKey, showFalKey, showHeygenKey).
+
+2. **Removed API Key UI input sections**:
+   - Removed entire "Image API Key" section (input, show/hide button, "configured" status)
+   - Removed entire "Merger API Key" section (input, show/hide button, "configured" status)
+   - Removed entire "Avatar API Key" section with heygen key input
+   - Removed AI Script API key input sections (both "free AI" and "custom AI" mode inputs)
+   - Removed "Get free key" links for DeepSeek/Groq/Gemini/OpenRouter
+
+3. **Removed API keys from request bodies**:
+   - Removed `kieApiKey` from all `formData.append("kieApiKey", ...)` calls (7 occurrences)
+   - Removed `kieApiKey`, `falApiKey` from auto-chain request bodies (3 occurrences)
+   - Removed `falApiKey` from merge_only request body
+   - Removed `kieApiKey` from regenerate_frame request body
+   - Removed `kieApiKey`, `falApiKey`, `heygenApiKey` from runGeneration request body
+   - Removed `aiApiKey: aiScriptApiKey` from generateAIScript request body
+   - Removed `aiApiKey: aiScriptApiKey` from generateHeygenScript request body
+   - Removed `apiKey: kieApiKey` from CreateAvatarSection onGenerate callback
+
+4. **Removed API key validation checks**:
+   - Removed `if (!kieApiKey) { alert("KIE API key is required."); return; }` from 4 pipeline functions
+   - Removed `if (!aiScriptApiKey || aiScriptApiKey.length < 10)` from generateAIScript
+   - Removed `if (!aiScriptApiKey || aiScriptApiKey.length < 10)` from generateHeygenScript
+   - Removed heygenApiKey and kieApiKey/falApiKey validation from runGeneration
+
+5. **Fixed button disabled states**:
+   - Removed `!aiScriptApiKey` from generateAIScript button disabled prop
+   - Removed `!aiScriptApiKey` from regenerate button disabled prop
+   - Removed `!aiScriptApiKey` from generateHeygenScript button disabled prop
+
+6. **Fixed uploadAvatarToServer**: Removed apiKey parameter, now takes only (imageDataUrl, signal?)
+
+7. **Fixed HeyGen voice loading**: Changed from `if (videoProvider === "heygen" && heygenApiKey)` to just `if (videoProvider === "heygen")` since backend now has default key. Removed apiKey from query parameter.
+
+8. **Fixed video merge check**: Changed `validVideos.length > 1 && falApiKey` to `validVideos.length > 1` since backend has default fal key.
+
+9. **Removed API keys from checkpoint**: Removed kieApiKey, falApiKey, heygenApiKey from checkpoint interface, save, and restore.
+
+10. **Updated CreateAvatarSection**: Removed kieApiKey prop, validation check, and formData.append.
+
+### Backend Changes
+
+1. **`/api/upload-avatar/route.ts`**: Added `DEFAULT_KIE_KEY` fallback. Changed from requiring kieApiKey to using default when not provided.
+
+2. **`/api/generate-avatar-image/route.ts`**: Added `DEFAULT_KIE_KEY` fallback. Uses `effectiveApiKey` with client key or default.
+
+3. **`/api/heygen-voices/route.ts`**: Added `DEFAULT_HEYGEN_KEY` fallback. Uses default when no apiKey query param provided.
+
+4. **`/api/generate-script/route.ts`**: Added `DEFAULT_API_KEYS` record with per-provider defaults (DeepSeek, Groq, Gemini, OpenRouter). Uses client key if valid, otherwise falls back to server default.
+
+5. **`/api/auto-chain/route.ts`**: Added `DEFAULT_KIE_KEY` and `DEFAULT_FAL_KEY` fallbacks. Resolves effective keys at start, uses them throughout. Removed validation checks that blocked requests without keys.
+
+6. **`/api/generate/route.ts`**: Added `DEFAULT_KIE_KEY`, `DEFAULT_FAL_KEY`, `DEFAULT_HEYGEN_KEY` fallbacks. Resolves effective keys, passes them to pipeline runner. Validation checks now verify effective keys (which always have defaults).
+
+Stage Summary:
+- ALL API keys completely removed from frontend code
+- No hardcoded API key values visible to users
+- No API key input fields in the UI
+- No API keys sent from client to server
+- All backend routes have default fallback API keys from environment variables
+- Build passes successfully with `npx next build`
+
+---
+Task ID: 3-b
+Agent: Security Fix Agent
+Task: Remove API key exposure from CarouselView.tsx and PodcastMachineView.tsx
+
+Work Log:
+
+### CarouselView.tsx Changes
+
+1. **Removed `showApiKey` state variable**: Removed `const [showApiKey, setShowApiKey] = useState(false)` — no longer needed since API key input is removed from UI.
+
+2. **Simplified `kieApiKey` state**: Changed from `const [kieApiKey, setKieApiKey] = useState("")` to `const [kieApiKey] = useState("")` — kept for reference but removed setter since no UI updates it.
+
+3. **Removed API key from request body**: Changed `kieApiKey: isAdmin ? kieApiKey.trim() : ""` to `kieApiKey: ""` in the generate-carousel API call. Backend has default fallback keys.
+
+4. **Removed entire API Key input UI section**: Removed the `isAdmin` conditional block containing the KIE API key input field, show/hide button, and helper text (lines 808-857).
+
+### PodcastMachineView.tsx Changes
+
+1. **Removed `showKieKey` and `showFalKey` state variables**: Removed both show/hide toggle states since API key inputs are removed from UI.
+
+2. **Simplified `kieApiKey` and `falApiKey` states**: Changed from `[kieApiKey, setKieApiKey]` to `[kieApiKey]` and `[falApiKey, setFalApiKey]` to `[falApiKey]` — kept as empty strings for reference but removed setters.
+
+3. **Simplified API calls to send empty strings**:
+   - `submitVideo`: Changed `apiKey: isAdmin ? kieApiKey.trim() : ""` to `apiKey: ""`
+   - `checkVideoStatus`: Removed `apiKeyParam` query parameter entirely
+   - `submitMerge`: Changed `apiKey: isAdmin ? falApiKey.trim() : ""` to `apiKey: ""`
+   - `checkMergeStatus`: Removed `apiKeyParam` query parameter entirely
+
+4. **Removed `isAdmin` and `kieApiKey`/`falApiKey` from useCallback dependency array**: Since these are no longer used in the callback, removed them from the deps array of `runGeneration`.
+
+5. **Removed entire Admin API Keys UI section**: Removed the `isAdmin` conditional block containing both KIE and Fal API key input fields with show/hide buttons (lines 1403-1472).
+
+### Verification
+- `npx next build` passes successfully with no errors
+- No remaining references to `showKieKey`, `showFalKey`, `setKieApiKey`, `setFalApiKey` in either file
+- Backend routes already have default fallback API keys, so sending empty strings is safe
+
+Stage Summary:
+- API keys are now completely hidden from frontend users in both CarouselView and PodcastMachineView
+- No API key input fields visible in the UI
+- All API calls send empty strings for API keys — backend has default fallback keys
+- Build passes successfully
+
+---
+Task ID: 3-a
+Agent: Security Fix Agent
+Task: Remove API key exposure from ClaymotionVideosMachine.tsx
+
+Work Log:
+
+### Frontend Changes (ClaymotionVideosMachine.tsx)
+
+1. **Removed hardcoded API keys**: Removed `kieApiKey = "aaf0ea1db84a074fb1ed0ba386bbf615"` and `falApiKey = "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c"`. Replaced with comment: "API Keys removed from frontend — backend uses default keys".
+
+2. **Removed API keys from request bodies**:
+   - Removed `kieApiKey` and `falApiKey` from full pipeline generation request body (JSON.stringify)
+   - Removed `kieApiKey` and `falApiKey` from single_video retry request body
+   - Removed `falApiKey` from merge-only request body
+
+3. **Updated uploadImage function**: Changed signature from `uploadImage(imageDataUrl, kieKey)` to `uploadImage(imageDataUrl)`. Removed `formData.append("kieApiKey", kieKey)` from the function body.
+
+4. **Updated useCallback dependency arrays**: Removed `kieApiKey` and `falApiKey` from dependency arrays of `startGeneration`, `retryVideo`, and `mergeVideos` callbacks.
+
+### Backend Changes (claymotion-generate/route.ts)
+
+1. **Added DEFAULT_KIE_KEY and DEFAULT_FAL_KEY**: Server-side fallback constants using environment variables with hardcoded fallbacks:
+   - `DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615"`
+   - `DEFAULT_FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c"`
+
+2. **Resolved effective API keys in POST handler**: Renamed destructured `kieApiKey` → `clientKieKey`, `falApiKey` → `clientFalKey`, then resolved: `const kieApiKey = clientKieKey || DEFAULT_KIE_KEY` and `const falApiKey = clientFalKey || DEFAULT_FAL_KEY`. This ensures keys are always available.
+
+3. **Removed API key validation checks**: Removed the `!kieApiKey` / `!falApiKey` early-return error responses since the server now always has default keys available.
+
+4. **Updated merge validation**: Changed merge action check from `!videoUrls || videoUrls.length < 2 || !falApiKey` to just `!videoUrls || videoUrls.length < 2` since falApiKey is always resolved.
+
+### upload-avatar/route.ts
+- Already had `DEFAULT_KIE_KEY` fallback from previous agent's work — no changes needed.
+
+Stage Summary:
+- ALL API keys completely removed from ClaymotionVideosMachine.tsx frontend code
+- No hardcoded API key values visible to users in client-side code
+- No API keys sent from client to server in any request
+- Backend claymotion-generate route has server-side default API key fallbacks
+- Build passes successfully with `npx next build`

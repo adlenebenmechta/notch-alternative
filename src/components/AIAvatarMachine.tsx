@@ -204,7 +204,6 @@ function useThemeColors(theme: "light" | "dark") {
 
 function CreateAvatarSection({
   theme,
-  kieApiKey,
   avatarImage,
   onGenerate,
   isGenerating,
@@ -214,7 +213,6 @@ function CreateAvatarSection({
   saved,
 }: {
   theme: string;
-  kieApiKey: string;
   avatarImage: string | null;
   onGenerate: (prompt: string, referenceImageUrl: string, aspectRatio: string) => Promise<void>;
   isGenerating: boolean;
@@ -245,11 +243,6 @@ function CreateAvatarSection({
       alert("Please describe your character and environment in detail (at least 10 characters).");
       return;
     }
-    if (!kieApiKey || kieApiKey.length < 10) {
-      alert("Please enter a valid Image API key in the Create Video section first.");
-      return;
-    }
-
     let refUrl = "";
     if (useReference) {
       if (uploadedRefImage) {
@@ -258,8 +251,6 @@ function CreateAvatarSection({
           const blob = await res.blob();
           const formData = new FormData();
           formData.append("avatar", blob, "reference.jpg");
-          formData.append("kieApiKey", kieApiKey);
-
           const uploadRes = await fetch("/api/upload-avatar", {
             method: "POST",
             body: formData,
@@ -276,7 +267,7 @@ function CreateAvatarSection({
     }
 
     await onGenerate(prompt.trim(), refUrl, aspectRatio);
-  }, [prompt, kieApiKey, useReference, uploadedRefImage, aspectRatio, onGenerate]);
+  }, [prompt, useReference, uploadedRefImage, aspectRatio, onGenerate]);
 
   const samplePrompts = [
     "A professional young woman with dark hair wearing a navy blue blazer, standing confidently in front of a modern glass office building with city skyline at golden hour",
@@ -604,8 +595,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [aiDuration, setAiDuration] = useState(30);
   const [aiNumScenes, setAiNumScenes] = useState(0); // 0 = auto
   const [isGeneratingScript, setIsGeneratingScript] = useState(false);
-  const [aiScriptApiKey, setAiScriptApiKey] = useState("sk-b1cf6ffa8ebd457abc96da5904912931");
-  const [showAiScriptKey, setShowAiScriptKey] = useState(false);
+  const [aiScriptApiKey, setAiScriptApiKey] = useState("");
   const [useFreeAi, setUseFreeAi] = useState(true);
   const [aiProvider, setAiProvider] = useState<"deepseek" | "groq" | "gemini" | "openrouter" | "custom">("deepseek");
 
@@ -644,18 +634,16 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const [scriptVariation, setScriptVariation] = useState(0); // for regeneration
 
   // ── API Keys ──
-  const [kieApiKey, setKieApiKey] = useState("aaf0ea1db84a074fb1ed0ba386bbf615");
-  const [showApiKey, setShowApiKey] = useState(false);
-  const [falApiKey, setFalApiKey] = useState("c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c");
-  const [showFalKey, setShowFalKey] = useState(false);
+  const [kieApiKey, setKieApiKey] = useState("");
+  const [falApiKey, setFalApiKey] = useState("");
 
   // ── Video Provider ──
   const [videoProvider, setVideoProvider] = useState<"kie" | "heygen">("kie");
-  const [heygenApiKey, setHeygenApiKey] = useState("sk_V2_hgu_kGRI9nkoelM_3gwvWJWLvYxhPq44jDMMaBOUvQDRtsMG");
+  const [heygenApiKey, setHeygenApiKey] = useState("");
   const [heygenVoiceId, setHeygenVoiceId] = useState("");
   const [heygenVoices, setHeygenVoices] = useState<Array<{ voice_id: string; name: string; display_name: string }>>([]);
   const [loadingVoices, setLoadingVoices] = useState(false);
-  const [showHeygenKey, setShowHeygenKey] = useState(false);
+
   const [heygenScript, setHeygenScript] = useState("");
   const [isGeneratingHeygenScript, setIsGeneratingHeygenScript] = useState(false);
 
@@ -754,12 +742,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     avatarUrl: string;
     avatarImage: string | null;
     scenes: Scene[];
-    kieApiKey: string;
-    falApiKey: string;
     frameMode: string;
     videoProvider: string;
     videoModel: string;
-    heygenApiKey: string;
     heygenVoiceId: string;
     heygenScript: string;
     timestamp: number;
@@ -795,12 +780,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (checkpoint.scenes && checkpoint.scenes.length > 0) {
         setScenes(checkpoint.scenes);
       }
-      if (checkpoint.kieApiKey) setKieApiKey(checkpoint.kieApiKey);
-      if (checkpoint.falApiKey) setFalApiKey(checkpoint.falApiKey);
       if (checkpoint.frameMode) setFrameMode(checkpoint.frameMode as "avatar" | "avatar_v2" | "scenes" | "custom");
       if (checkpoint.videoProvider) setVideoProvider(checkpoint.videoProvider as "kie" | "heygen");
       if (checkpoint.videoModel) setVideoModel(checkpoint.videoModel as "veo3_lite" | "veo3_fast" | "grok-imagine-video-1.5");
-      if (checkpoint.heygenApiKey) setHeygenApiKey(checkpoint.heygenApiKey);
       if (checkpoint.heygenVoiceId) setHeygenVoiceId(checkpoint.heygenVoiceId);
       if (checkpoint.heygenScript) setHeygenScript(checkpoint.heygenScript);
       // Restore the jobId ref so resume works
@@ -842,9 +824,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
   // ── Fetch Voices ──
   useEffect(() => {
-    if (videoProvider === "heygen" && heygenApiKey) {
+    if (videoProvider === "heygen") {
       setLoadingVoices(true);
-      fetch(`/api/heygen-voices?apiKey=${encodeURIComponent(heygenApiKey)}`)
+      fetch(`/api/heygen-voices`)
         .then((res) => res.json())
         .then((data) => {
           if (data.voices && Array.isArray(data.voices)) {
@@ -863,7 +845,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         })
         .finally(() => setLoadingVoices(false));
     }
-  }, [videoProvider, heygenApiKey]);
+  }, [videoProvider]);
 
   // ─── Avatar Upload (client-side compression) ────────────────────────────
   const handleAvatarUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
@@ -1123,10 +1105,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   const generateAIScript = useCallback(async () => {
     const topic = useFreeAi ? productUrl : aiTopic;
     if (!topic.trim() || isGeneratingScript) return;
-    if (!aiScriptApiKey || aiScriptApiKey.length < 10) {
-      alert(`Please enter your ${useFreeAi ? (aiProvider === "deepseek" ? "DeepSeek" : aiProvider === "groq" ? "Groq" : aiProvider === "gemini" ? "Google AI" : "OpenRouter") : "AI API"} key for script generation.`);
-      return;
-    }
     setIsGeneratingScript(true);
     addLog("Analyzing product & generating script...");
 
@@ -1138,7 +1116,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           topic: topic.trim(),
           duration: aiDuration,
           numScenes: aiNumScenes || 4,
-          aiApiKey: aiScriptApiKey,
           useFreeAi: false, // Always use the selected provider now
           aiProvider: useFreeAi ? aiProvider : "custom",
           productUrl: useFreeAi ? productUrl.trim() : undefined,
@@ -1213,7 +1190,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   }, []);
 
   // ─── Upload Avatar to Server ──────────────────────────────────────────
-  const uploadAvatarToServer = useCallback(async (imageDataUrl: string, apiKey: string, signal?: AbortSignal): Promise<string> => {
+  const uploadAvatarToServer = useCallback(async (imageDataUrl: string, signal?: AbortSignal): Promise<string> => {
     addLog("Compressing & uploading avatar...");
 
     // Convert data URL to Blob
@@ -1222,7 +1199,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
     const formData = new FormData();
     formData.append("avatar", blob, "avatar.jpg");
-    formData.append("kieApiKey", apiKey);
 
     const uploadRes = await authFetch("/api/upload-avatar", {
       method: "POST",
@@ -1320,7 +1296,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       alert("Please select a character from the Character Library or upload frames for all scenes.");
       return;
     }
-    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
     if (scenesWithContent.length === 0) { alert("Please add scenes with scripts or uploaded frames."); return; }
 
     // Check if we have existing progress to resume from
@@ -1370,7 +1346,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       let uploadedCharUrl = avatarUrl || ""; // Use existing avatarUrl if already uploaded (e.g. from library or previous run)
       if (avatarImage && !hasManualFrames && !uploadedCharUrl) {
         addLog("Uploading character image...");
-        uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey, controller.signal);
+        uploadedCharUrl = await uploadAvatarToServer(avatarImage, controller.signal);
         setAvatarUrl(uploadedCharUrl);
         addLog("Character image uploaded!");
       } else if (uploadedCharUrl) {
@@ -1389,7 +1365,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
               const formData = new FormData();
               formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
-              formData.append("kieApiKey", kieApiKey);
+
               const uploadRes = await authFetch("/api/upload-avatar", {
                 method: "POST",
                 body: formData,
@@ -1424,7 +1400,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
               const formData = new FormData();
               formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
-              formData.append("kieApiKey", kieApiKey);
+
               const uploadRes = await authFetch("/api/upload-avatar", {
                 method: "POST",
                 body: formData,
@@ -1489,8 +1465,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         body: JSON.stringify({
           characterImageUrl: uploadedCharUrl || undefined,
           scenes: chainScenes,
-          kieApiKey,
-          falApiKey,
           videoModel,
           // Avatar-only mode: explicitly tell the backend to skip frame generation
           // and use characterImageUrl as the frame for every scene
@@ -1682,7 +1656,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             // Auto-save to library
             doSaveToLibrary(validVideos[0], validFrames);
             clearPipelineCheckpoint();
-          } else if (validVideos.length > 1 && falApiKey) {
+          } else if (validVideos.length > 1) {
             try {
               const mergeRes = await authFetch("/api/auto-chain", {
                 method: "POST",
@@ -1690,7 +1664,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 body: JSON.stringify({
                   action: "merge_only",
                   videoUrls: validVideos,
-                  falApiKey,
                 }),
               });
               if (mergeRes.ok) {
@@ -1763,7 +1736,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       alert("Please select a character from the Character Library or upload frames for all scenes.");
       return;
     }
-    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
     const scenesWithContent = scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage);
     if (scenesWithContent.length === 0) { alert("Please add scenes with scripts."); return; }
 
@@ -1795,7 +1768,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       let uploadedCharUrl = "";
       if (avatarImage) {
         addLog("Uploading character image...");
-        uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey, controller.signal);
+        uploadedCharUrl = await uploadAvatarToServer(avatarImage, controller.signal);
         setAvatarUrl(uploadedCharUrl);
         addLog("Character image uploaded!");
       }
@@ -1812,7 +1785,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
               const formData = new FormData();
               formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
-              formData.append("kieApiKey", kieApiKey);
+
               const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
               if (uploadRes.ok) {
                 const uploadData = await uploadRes.json();
@@ -1835,7 +1808,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
               const formData = new FormData();
               formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
-              formData.append("kieApiKey", kieApiKey);
+
               const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
               if (uploadRes.ok) {
                 const uploadData = await uploadRes.json();
@@ -1866,8 +1839,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         body: JSON.stringify({
           characterImageUrl: uploadedCharUrl || undefined,
           scenes: chainScenes,
-          kieApiKey,
-          falApiKey,
           videoModel,
           framesOnly: true,
           // If ALL scenes have custom frames, skip frame generation entirely
@@ -1943,7 +1914,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
   // ─── Two-Phase: Regenerate a single scene's frame ──
   const regenerateSceneFrame = useCallback(async (sceneIndex: number) => {
-    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
     const scene = scenes[sceneIndex];
     if (!scene) return;
 
@@ -1954,7 +1925,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       // Upload character image if needed
       let uploadedCharUrl = avatarUrl || "";
       if (avatarImage && !uploadedCharUrl) {
-        uploadedCharUrl = await uploadAvatarToServer(avatarImage, kieApiKey);
+        uploadedCharUrl = await uploadAvatarToServer(avatarImage);
         setAvatarUrl(uploadedCharUrl);
       }
 
@@ -1964,7 +1935,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
         const formData = new FormData();
         formData.append("avatar", refBlob, `scene_${sceneIndex}_ref.jpg`);
-        formData.append("kieApiKey", kieApiKey);
         const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData });
         if (uploadRes.ok) { const data = await uploadRes.json(); if (data.avatarUrl) customRefUrl = data.avatarUrl; }
       }
@@ -1983,7 +1953,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           characterImageUrl: uploadedCharUrl || undefined,
           existingFrameUrls: autoChainFrameUrlsRef.current,
           scenes: [{ script: scene.script.trim(), framePrompt, description: scene.description.trim(), label: scene.label || `Scene ${sceneIndex + 1}` }],
-          kieApiKey,
           customReferenceImages: customRefImages.length > 0 ? customRefImages : undefined,
         }),
       });
@@ -2038,7 +2007,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     const frameUrls = autoChainFrameUrlsRef.current;
     const validFrames = frameUrls.filter(Boolean);
     if (validFrames.length === 0) { alert("No frames available to generate videos from."); return; }
-    if (!kieApiKey) { alert("KIE API key is required."); return; }
+
 
     setPipelinePhase("generating_videos");
     setIsAutoChainRunning(true);
@@ -2071,8 +2040,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         body: JSON.stringify({
           action: "videos_only",
           scenes: chainScenes,
-          kieApiKey,
-          falApiKey,
           videoModel,
           existingFrameUrls: frameUrls,
         }),
@@ -2306,10 +2273,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
   // ─── Generate Talking Photo Script (AI) ──────────────────────────
   const generateHeygenScript = useCallback(async () => {
     if (!aiTopic.trim() || isGeneratingHeygenScript) return;
-    if (!aiScriptApiKey || aiScriptApiKey.length < 10) {
-      alert("Please enter your AI API key for script generation.");
-      return;
-    }
     setIsGeneratingHeygenScript(true);
     addLog("Generating script with AI...");
 
@@ -2317,7 +2280,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const res = await authFetch("/api/generate-script", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ topic: aiTopic.trim(), duration: aiDuration, singleScript: true, aiApiKey: aiScriptApiKey, useFreeAi: false, aiProvider: "deepseek" }),
+        body: JSON.stringify({ topic: aiTopic.trim(), duration: aiDuration, singleScript: true, useFreeAi: false, aiProvider: "deepseek" }),
       });
 
       if (!res.ok) {
@@ -2398,14 +2361,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         alert("Please write or generate a script for your video.");
         return;
       }
-      if (!kieApiKey || kieApiKey.length < 10) {
-        alert("Please enter a valid Image API key (needed for avatar upload).");
-        return;
-      }
-      if (!heygenApiKey || heygenApiKey.length < 10) {
-        alert("Please enter a valid Avatar API key.");
-        return;
-      }
       if (!heygenVoiceId) {
         alert("Please select a voice.");
         return;
@@ -2415,14 +2370,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       validScenes = scenes.filter((s) => s.description.trim() || s.script.trim());
       if (validScenes.length === 0) {
         alert("Please add at least one scene with a script.");
-        return;
-      }
-      if (!kieApiKey || kieApiKey.length < 10) {
-        alert("Please enter a valid Image API key.");
-        return;
-      }
-      if (!falApiKey || falApiKey.length < 10) {
-        alert("Please enter a valid Merger API key.");
         return;
       }
     }
@@ -2473,7 +2420,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const skipAvatarUpload = isRetry && uploadedUrl && uploadedUrl.startsWith("http");
       if (frameMode !== "custom" && avatarImage && !skipAvatarUpload) {
         addLog("Uploading avatar to server...");
-        uploadedUrl = await uploadAvatarToServer(avatarImage, kieApiKey, abortController.signal);
+        uploadedUrl = await uploadAvatarToServer(avatarImage, abortController.signal);
         setAvatarUrl(uploadedUrl);
         addLog("Avatar uploaded successfully!");
       } else if (skipAvatarUpload) {
@@ -2496,9 +2443,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           customFrameImage: s.customFrameImage || undefined,
           framePrompt: s.framePrompt || undefined,
         })),
-        kieApiKey,
-        falApiKey,
-        heygenApiKey,
         heygenVoiceId,
         videoModel,
       };
@@ -2687,12 +2631,9 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   avatarUrl: uploadedUrl,
                   avatarImage: avatarImage,
                   scenes: scenesRef.current || scenes,
-                  kieApiKey,
-                  falApiKey,
                   frameMode,
                   videoProvider,
                   videoModel,
-                  heygenApiKey,
                   heygenVoiceId,
                   heygenScript,
                   timestamp: Date.now(),
@@ -3321,7 +3262,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             <div className="mb-10 sm:mb-14">
               <CreateAvatarSection
                 theme={theme}
-                kieApiKey={kieApiKey}
                 avatarImage={avatarImage}
                 onGenerate={async (prompt, refUrl, aspectRatio) => {
                   setIsGeneratingAvatar(true);
@@ -3337,7 +3277,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                       body: JSON.stringify({
                         prompt,
                         referenceImageUrl: refUrl || undefined,
-                        apiKey: kieApiKey,
                         aspectRatio,
                       }),
                     });
@@ -3786,84 +3725,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   )}
 
                   {/* ── Image API Provider Fields (Admin Only) ── */}
-                  {videoProvider === "kie" && isAdmin && (
-                    <>
-                  {/* Image API Key */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-                        </svg>
-                        Image API Key
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showApiKey ? "text" : "password"}
-                        value={kieApiKey}
-                        onChange={(e) => setKieApiKey(e.target.value)}
-                        placeholder="Enter your image API key..."
-                        disabled={isRunning}
-                        className="w-full px-4 py-3 pr-10 rounded-xl text-sm font-mono transition-all disabled:opacity-50 outline-none border-2 focus:border-current"
-                        style={{ backgroundColor: T.inputBg, borderColor: kieApiKey ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }}
-                      />
-                      <button
-                        onClick={() => setShowApiKey(!showApiKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors cursor-pointer"
-                        style={{ color: T.textMuted }}
-                        type="button"
-                      >
-                        <EyeIcon open={showApiKey} />
-                      </button>
-                    </div>
-                    {kieApiKey && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: T.lime }} />
-                        <span className="text-[10px] font-semibold" style={{ color: "#22C55E" }}>Image API configured</span>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Merger API Key */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M13.19 8.688a4.5 4.5 0 0 1 1.242 7.244l-4.5 4.5a4.5 4.5 0 0 1-6.364-6.364l1.757-1.757m9.86-2.006a4.5 4.5 0 0 0-1.242-7.244l-4.5-4.5a4.5 4.5 0 0 0-6.364 6.364L4.34 8.342" />
-                        </svg>
-                        Merger API Key
-                        <span className="text-[9px] font-normal lowercase tracking-normal ml-1 opacity-60">(video merge)</span>
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showFalKey ? "text" : "password"}
-                        value={falApiKey}
-                        onChange={(e) => setFalApiKey(e.target.value)}
-                        placeholder="Enter your merger API key..."
-                        disabled={isRunning}
-                        className="w-full px-4 py-3 pr-10 rounded-xl text-sm font-mono transition-all disabled:opacity-50 outline-none border-2 focus:border-current"
-                        style={{ backgroundColor: T.inputBg, borderColor: falApiKey ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }}
-                      />
-                      <button
-                        onClick={() => setShowFalKey(!showFalKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors cursor-pointer"
-                        style={{ color: T.textMuted }}
-                        type="button"
-                      >
-                        <EyeIcon open={showFalKey} />
-                      </button>
-                    </div>
-                    {falApiKey && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: T.lime }} />
-                        <span className="text-[10px] font-semibold" style={{ color: "#22C55E" }}>Merger API configured</span>
-                      </div>
-                    )}
-                  </div>
-                    </>
-                  )}
 
                   {/* ── Frame Mode Toggle ── */}
                   <div>
@@ -3962,43 +3823,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   {/* ── Avatar API Provider Fields ── */}
                   {videoProvider === "heygen" && (
                     <>
-                  {/* Avatar API Key */}
-                  <div className="mb-4">
-                    <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
-                      <span className="inline-flex items-center gap-1.5">
-                        <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}>
-                          <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 5.25a3 3 0 0 1 3 3m3 0a6 6 0 0 1-7.029 5.912c-.563-.097-1.159.026-1.563.43L10.5 17.25H8.25v2.25H6v2.25H2.25v-2.818c0-.597.237-1.17.659-1.591l6.499-6.499c.404-.404.527-1 .43-1.563A6 6 0 1 1 21.75 8.25Z" />
-                        </svg>
-                        Avatar API Key
-                      </span>
-                    </label>
-                    <div className="relative">
-                      <input
-                        type={showHeygenKey ? "text" : "password"}
-                        value={heygenApiKey}
-                        onChange={(e) => setHeygenApiKey(e.target.value)}
-                        placeholder="Enter your avatar API key..."
-                        disabled={isRunning}
-                        className="w-full px-4 py-3 pr-10 rounded-xl text-sm font-mono transition-all disabled:opacity-50 outline-none border-2 focus:border-current"
-                        style={{ backgroundColor: T.inputBg, borderColor: heygenApiKey ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }}
-                      />
-                      <button
-                        onClick={() => setShowHeygenKey(!showHeygenKey)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 transition-colors cursor-pointer"
-                        style={{ color: T.textMuted }}
-                        type="button"
-                      >
-                        <EyeIcon open={showHeygenKey} />
-                      </button>
-                    </div>
-                    {heygenApiKey && (
-                      <div className="mt-1.5 flex items-center gap-1.5">
-                        <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: T.lime }} />
-                        <span className="text-[10px] font-semibold" style={{ color: "#22C55E" }}>Avatar API configured</span>
-                      </div>
-                    )}
-                  </div>
-
                   {/* Voice Selector */}
                   <div className="mb-4">
                     <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
@@ -4092,7 +3916,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                             </div>
                             <button
                               onClick={generateHeygenScript}
-                              disabled={isRunning || isGeneratingHeygenScript || !aiTopic.trim() || !aiScriptApiKey}
+                              disabled={isRunning || isGeneratingHeygenScript || !aiTopic.trim()}
                               className="px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap"
                               style={{ backgroundColor: isGeneratingHeygenScript ? T.textMuted : T.pink, color: T.white }}
                             >
@@ -4288,26 +4112,6 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                               </div>
                             )}
 
-                            {/* API Key for selected provider */}
-                            <div className="animate-fade-in">
-                              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: T.textMuted }}>
-                                🔑 {aiProvider === "deepseek" ? "DeepSeek" : aiProvider === "groq" ? "Groq" : aiProvider === "gemini" ? "Google AI" : "OpenRouter"} API Key
-                              </label>
-                              <div className="relative">
-                                <input type={showAiScriptKey ? "text" : "password"} value={aiScriptApiKey} onChange={(e) => setAiScriptApiKey(e.target.value)} placeholder={aiProvider === "deepseek" ? "sk-..." : aiProvider === "groq" ? "gsk_..." : aiProvider === "gemini" ? "AIza..." : "sk-or-..."} disabled={isRunning} className="w-full px-3 py-2.5 pr-16 rounded-xl text-sm font-mono transition-all disabled:opacity-50 outline-none border-2 focus:border-current" style={{ backgroundColor: T.inputBg, borderColor: aiScriptApiKey ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }} />
-                                <button onClick={() => setShowAiScriptKey(!showAiScriptKey)} className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all cursor-pointer" style={{ color: T.textMuted }}>
-                                  {showAiScriptKey ? "Hide" : "Show"}
-                                </button>
-                              </div>
-                              <div className="flex items-center gap-1 mt-1.5">
-                                <span className="text-[10px] font-light" style={{ color: T.textMuted }}>Get free key:</span>
-                                {aiProvider === "deepseek" && <a href="https://platform.deepseek.com/api_keys" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold underline" style={{ color: T.pink }}>platform.deepseek.com</a>}
-                                {aiProvider === "groq" && <a href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold underline" style={{ color: T.pink }}>console.groq.com</a>}
-                                {aiProvider === "gemini" && <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold underline" style={{ color: T.pink }}>aistudio.google.com</a>}
-                                {aiProvider === "openrouter" && <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-[10px] font-bold underline" style={{ color: T.pink }}>openrouter.ai</a>}
-                              </div>
-                            </div>
-
                             <div className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px]" style={{ backgroundColor: (aiProvider === "deepseek" ? T.lime : aiProvider === "groq" ? T.lime : aiProvider === "gemini" ? T.cyan : T.pink) + "15", color: T.text }}>
                               <span>{aiProvider === "deepseek" ? "🐋" : aiProvider === "groq" ? "⚡" : aiProvider === "gemini" ? "💎" : "🌐"}</span>
                               <span>Powered by <b>{aiProvider === "deepseek" ? "DeepSeek V3" : aiProvider === "groq" ? "Groq (Llama 3.3 70B)" : aiProvider === "gemini" ? "Google Gemini Flash" : "OpenRouter"}</b> — {aiProvider === "deepseek" ? "Cheap & excellent quality!" : aiProvider === "groq" ? "Ultra fast & free tier!" : aiProvider === "gemini" ? "Google quality, free tier!" : "Multiple free models!"}</span>
@@ -4321,17 +4125,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                               <input type="text" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} placeholder="e.g. 5 tips for productivity, AI future trends, motivational speech..." disabled={isRunning || isGeneratingScript} className="w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 outline-none border-2 focus:border-current" style={{ backgroundColor: T.inputBg, borderColor: T.cardBorder, color: T.text, caretColor: T.pink }} />
                             </div>
 
-                            {/* API Key (only in paid mode) */}
-                            <div className="animate-fade-in">
-                              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1.5" style={{ color: T.textMuted }}>🔑 Your AI API Key</label>
-                              <div className="relative">
-                                <input type={showAiScriptKey ? "text" : "password"} value={aiScriptApiKey} onChange={(e) => setAiScriptApiKey(e.target.value)} placeholder="sk-... or your API key" disabled={isRunning} className="w-full px-3 py-2.5 pr-16 rounded-xl text-sm font-mono transition-all disabled:opacity-50 outline-none border-2 focus:border-current" style={{ backgroundColor: T.inputBg, borderColor: aiScriptApiKey ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }} />
-                                <button onClick={() => setShowAiScriptKey(!showAiScriptKey)} className="absolute right-2 top-1/2 -translate-y-1/2 px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wide transition-all cursor-pointer" style={{ color: T.textMuted }}>
-                                  {showAiScriptKey ? "Hide" : "Show"}
-                                </button>
-                              </div>
-                              <p className="text-[10px] font-light mt-1" style={{ color: T.textMuted }}>Uses advanced AI model by default. Works with any OpenAI-compatible API.</p>
-                            </div>
+
                           </>
                         )}
 
@@ -4363,7 +4157,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                               </span>
                             </div>
                           </div>
-                          <button onClick={generateAIScript} disabled={isRunning || isGeneratingScript || (useFreeAi ? !productUrl.trim() : !aiTopic.trim()) || !aiScriptApiKey} className="px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" style={{ backgroundColor: isGeneratingScript ? T.textMuted : (useFreeAi ? (aiProvider === "deepseek" ? T.lime : aiProvider === "groq" ? T.lime : aiProvider === "gemini" ? T.cyan : T.pink) : T.pink), color: useFreeAi ? T.dark : T.white }}>
+                          <button onClick={generateAIScript} disabled={isRunning || isGeneratingScript || (useFreeAi ? !productUrl.trim() : !aiTopic.trim())} className="px-5 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap" style={{ backgroundColor: isGeneratingScript ? T.textMuted : (useFreeAi ? (aiProvider === "deepseek" ? T.lime : aiProvider === "groq" ? T.lime : aiProvider === "gemini" ? T.cyan : T.pink) : T.pink), color: useFreeAi ? T.dark : T.white }}>
                             {isGeneratingScript ? (<span className="inline-flex items-center gap-2"><span className="w-3 h-3 border-2 border-white/30 border-t-white rounded-full animate-spin" />Generating...</span>) : (useFreeAi ? `${aiProvider === "deepseek" ? "🐋" : aiProvider === "groq" ? "⚡" : aiProvider === "gemini" ? "💎" : "🌐"} Generate Script` : "🤖 Generate Script with AI")}
                           </button>
                           {/* Regenerate Script button - only appears after a script has been generated */}
@@ -4373,7 +4167,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                                 setScriptVariation(prev => prev + 1);
                                 setTimeout(() => generateAIScript(), 0);
                               }}
-                              disabled={isRunning || (useFreeAi ? !productUrl.trim() : !aiTopic.trim()) || !aiScriptApiKey}
+                              disabled={isRunning || (useFreeAi ? !productUrl.trim() : !aiTopic.trim())}
                               className="px-4 py-2.5 rounded-xl text-sm font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed whitespace-nowrap border-2"
                               style={{ backgroundColor: T.cardBg, borderColor: T.pink, color: T.pink }}
                             >

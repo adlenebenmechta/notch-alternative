@@ -10,6 +10,11 @@ export const dynamic = "force-dynamic";
 const PIPELINE_VERSION = "v3.6";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// Default API keys (fallback when client doesn't provide one)
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
+const DEFAULT_HEYGEN_KEY = process.env.HEYGEN_KEY || "sk_V2_hgu_kGRI9nkoelM_3gwvWJWLvYxhPq44jDMMaBOUvQDRtsMG";
+
 // ─── Upload Image ─────────────────────────────────────────────────
 async function uploadImageToKie(
   base64Data: string,
@@ -1341,18 +1346,23 @@ export async function POST(req: NextRequest) {
 
     const provider = (videoProvider as string) || "kie";
 
+    // Resolve API keys: use client-provided keys if valid, otherwise fall back to server defaults
+    const effectiveKieKey = (kieApiKey && (kieApiKey as string).length >= 10) ? kieApiKey as string : DEFAULT_KIE_KEY;
+    const effectiveFalKey = (falApiKey && (falApiKey as string).length >= 10) ? falApiKey as string : DEFAULT_FAL_KEY;
+    const effectiveHeygenKey = (heygenApiKey && (heygenApiKey as string).length >= 10) ? heygenApiKey as string : DEFAULT_HEYGEN_KEY;
+
     if (provider === "heygen") {
-      if (!heygenApiKey || (heygenApiKey as string).length < 10) {
+      if (!effectiveHeygenKey || effectiveHeygenKey.length < 10) {
         return NextResponse.json({ error: "Avatar API key is invalid or missing" }, { status: 400 });
       }
       if (!heygenVoiceId) {
         return NextResponse.json({ error: "Voice ID is required" }, { status: 400 });
       }
     } else {
-      if (!kieApiKey || (kieApiKey as string).length < 10) {
+      if (!effectiveKieKey || effectiveKieKey.length < 10) {
         return NextResponse.json({ error: "Image API key is invalid or missing" }, { status: 400 });
       }
-      if (!falApiKey || (falApiKey as string).length < 10) {
+      if (!effectiveFalKey || effectiveFalKey.length < 10) {
         return NextResponse.json({ error: "Merger API key is invalid or missing" }, { status: 400 });
       }
     }
@@ -1516,9 +1526,9 @@ export async function POST(req: NextRequest) {
     // Run pipeline with SSE streaming
     runPipelineSSE(
       avatarUrl as string, validScenes,
-      (kieApiKey as string) || "", falApiKey as string || "",
+      effectiveKieKey, effectiveFalKey,
       frameMode === "scenes" || frameMode === "custom" || frameMode === "custom_v2",
-      provider, (heygenApiKey as string) || "", (heygenVoiceId as string) || "",
+      provider, effectiveHeygenKey, (heygenVoiceId as string) || "",
       writer, jobId, userId || "anonymous",
       (frameMode as string) || "avatar",
       (videoModel as string) || "veo3_lite",

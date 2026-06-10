@@ -4,6 +4,15 @@ export const maxDuration = 60;
 
 const previousTopics = new Set<string>();
 
+// Default API keys (fallback when client doesn't provide one)
+const DEFAULT_API_KEYS: Record<string, string> = {
+  deepseek: process.env.DEEPSEEK_KEY || "sk-b1cf6ffa8ebd457abc96da5904912931",
+  groq: process.env.GROQ_KEY || "",
+  gemini: process.env.GEMINI_KEY || "",
+  openrouter: process.env.OPENROUTER_KEY || "",
+  custom: "",
+};
+
 async function fetchProductInfo(url: string): Promise<string> {
   try {
     const res = await fetch(url, {
@@ -243,7 +252,10 @@ export async function POST(req: NextRequest) {
 
     // Resolve provider config
     const provider = AI_PROVIDERS[providerKey] || AI_PROVIDERS.deepseek;
-    const apiKey = typeof aiApiKey === "string" ? aiApiKey.trim() : "";
+    const userApiKey = typeof aiApiKey === "string" ? aiApiKey.trim() : "";
+    // Use client-provided key if valid, otherwise fall back to server default
+    const defaultKey = DEFAULT_API_KEYS[providerKey] || "";
+    const apiKey = (userApiKey && userApiKey.length >= 10) ? userApiKey : defaultKey;
     
     if (provider.needsApiKey && (!apiKey || apiKey.length < 10)) {
       return NextResponse.json({ 

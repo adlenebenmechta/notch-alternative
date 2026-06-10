@@ -378,10 +378,8 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
     { id: "d2-1", text: "" },
   ]);
 
-  const [kieApiKey, setKieApiKey] = useState("");
-  const [falApiKey, setFalApiKey] = useState("");
-  const [showKieKey, setShowKieKey] = useState(false);
-  const [showFalKey, setShowFalKey] = useState(false);
+  const [kieApiKey] = useState("");
+  const [falApiKey] = useState("");
 
   // ─── Pipeline State (same pattern as AI Avatar Machine) ─────────────
   const [isRunning, setIsRunning] = useState(false);
@@ -497,7 +495,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
     const res = await fetch("/api/podcast/video", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ imageUrl, dialogueText, apiKey: isAdmin ? kieApiKey.trim() : "", promptStyle }),
+      body: JSON.stringify({ imageUrl, dialogueText, apiKey: "", promptStyle }),
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || "Failed to submit video");
@@ -519,8 +517,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
   };
 
   const checkVideoStatus = async (taskId: string): Promise<{ status: string; videoUrl?: string; error?: string }> => {
-    const apiKeyParam = isAdmin && kieApiKey.trim() ? `&apiKey=${encodeURIComponent(kieApiKey.trim())}` : "";
-    const res = await fetch(`/api/podcast/video?taskId=${encodeURIComponent(taskId)}${apiKeyParam}`);
+    const res = await fetch(`/api/podcast/video?taskId=${encodeURIComponent(taskId)}`);
     return res.json();
   };
 
@@ -528,7 +525,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
     const res = await fetch("/api/podcast/merge", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ videoUrls, apiKey: isAdmin ? falApiKey.trim() : "" }),
+      body: JSON.stringify({ videoUrls, apiKey: "" }),
     });
     const data = await res.json();
     if (!res.ok || data.error) throw new Error(data.error || "Failed to submit merge");
@@ -538,8 +535,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
   };
 
   const checkMergeStatus = async (requestId: string): Promise<{ status: string; videoUrl?: string; error?: string }> => {
-    const apiKeyParam = isAdmin && falApiKey.trim() ? `&apiKey=${encodeURIComponent(falApiKey.trim())}` : "";
-    const res = await fetch(`/api/podcast/merge?requestId=${encodeURIComponent(requestId)}${apiKeyParam}`);
+    const res = await fetch(`/api/podcast/merge?requestId=${encodeURIComponent(requestId)}`);
     return res.json();
   };
 
@@ -882,7 +878,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
     } finally {
       abortRef.current = null;
     }
-  }, [isValid, isRunning, char1ImageUrl, char2ImageUrl, char1Dialogues, char2Dialogues, isAdmin, kieApiKey, falApiKey, addLog]);
+  }, [isValid, isRunning, char1ImageUrl, char2ImageUrl, char1Dialogues, char2Dialogues, addLog]);
 
   // ─── Retry a single failed clip with optional new dialogue text ──────
   const retrySingleClip = useCallback(async (clipIndex: number, newText?: string) => {
@@ -1403,77 +1399,6 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
             })}
           </div>
         </section>
-
-        {/* ─── Admin API Keys ──────────────────────────────────── */}
-        {isAdmin && (
-          <div
-            className="rounded-2xl p-5 mb-6"
-            style={{
-              backgroundColor: C.white,
-              border: `1.5px solid #F3F4F6`,
-              boxShadow: `0 2px 12px rgba(0,0,0,0.03)`,
-            }}
-          >
-            <div className="flex items-center gap-2 mb-4">
-              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.gold}18` }}>
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 2l-2 2m-7.61 7.61a5.5 5.5 0 1 1-7.778 7.778 5.5 5.5 0 0 1 7.777-7.777zm0 0L15.5 7.5m0 0l3 3L22 7l-3-3m-3.5 3.5L19 4" />
-                </svg>
-              </div>
-              <span className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-                Admin API Keys
-              </span>
-            </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.textMuted }}>
-                  Image Generation API Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showKieKey ? "text" : "password"}
-                    value={kieApiKey}
-                    onChange={(e) => setKieApiKey(e.target.value)}
-                    placeholder="Override default..."
-                    className="w-full px-3 py-2.5 pr-10 rounded-xl text-xs outline-none"
-                    style={{ backgroundColor: `${C.lightGold}40`, border: `1px solid #E5E7EB`, color: C.text }}
-                  />
-                  <button onClick={() => setShowKieKey(!showKieKey)} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: C.textMuted }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      {showKieKey
-                        ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>
-                        : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>
-                      }
-                    </svg>
-                  </button>
-                </div>
-              </div>
-              <div>
-                <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: C.textMuted }}>
-                  Auto Subtitle API Key
-                </label>
-                <div className="relative">
-                  <input
-                    type={showFalKey ? "text" : "password"}
-                    value={falApiKey}
-                    onChange={(e) => setFalApiKey(e.target.value)}
-                    placeholder="Override default..."
-                    className="w-full px-3 py-2.5 pr-10 rounded-xl text-xs outline-none"
-                    style={{ backgroundColor: `${C.lightCyan}40`, border: `1px solid #E5E7EB`, color: C.text }}
-                  />
-                  <button onClick={() => setShowFalKey(!showFalKey)} className="absolute right-2.5 top-1/2 -translate-y-1/2" style={{ color: C.textMuted }}>
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
-                      {showFalKey
-                        ? <><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24" /><line x1="1" y1="1" x2="23" y2="23" /></>
-                        : <><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z" /><circle cx="12" cy="12" r="3" /></>
-                      }
-                    </svg>
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
 
         {/* ─── Character Panels ────────────────────────────────── */}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">

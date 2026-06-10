@@ -4,6 +4,8 @@ import { getAuthUser } from "@/lib/auth-server";
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
 
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── Poll for image generation result ────────────────────────────────────────
@@ -71,9 +73,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Please provide a detailed prompt (at least 5 characters)" }, { status: 400 });
     }
 
-    if (!apiKey || apiKey.length < 10) {
-      return NextResponse.json({ error: "API key is required" }, { status: 400 });
-    }
+    const effectiveApiKey = (apiKey && apiKey.length >= 10) ? apiKey : DEFAULT_KIE_KEY;
 
     // Map aspect ratio to pixel dimensions for each model
     // nano-banana-2 uses pixel dimensions, nano-banana-edit uses ratio format
@@ -109,7 +109,7 @@ export async function POST(req: NextRequest) {
     const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        Authorization: `Bearer ${effectiveApiKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify(requestBody),
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Poll for result
-    const imageUrl = await pollImageResult(taskId, apiKey);
+    const imageUrl = await pollImageResult(taskId, effectiveApiKey);
 
     return NextResponse.json({
       success: true,

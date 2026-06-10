@@ -72,9 +72,7 @@ interface ClaymotionVideosMachineProps {
 }
 
 export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMachineProps) {
-  // ── API Keys (same as AI Avatar Machine) ──
-  const kieApiKey = "aaf0ea1db84a074fb1ed0ba386bbf615";
-  const falApiKey = "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
+  // ── API Keys removed from frontend — backend uses default keys ──
 
   // ── Video Model Selection ──
   const [videoModel, setVideoModel] = useState<"veo3_lite" | "veo3_fast" | "grok-imagine">("veo3_lite");
@@ -196,12 +194,11 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
   }, [updateSceneImage]);
 
   // ── Upload single image to server ──
-  const uploadImage = useCallback(async (imageDataUrl: string, kieKey: string): Promise<string> => {
+  const uploadImage = useCallback(async (imageDataUrl: string): Promise<string> => {
     const res = await fetch(imageDataUrl);
     const blob = await res.blob();
     const formData = new FormData();
     formData.append("avatar", blob, "scene.jpg");
-    formData.append("kieApiKey", kieKey);
 
     const uploadRes = await fetch("/api/upload-avatar", {
       method: "POST",
@@ -283,7 +280,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
             uploadedUrls.push(scenes[i].uploadedUrl);
             addLog(`Scene ${i + 1} already uploaded, reusing URL.`);
           } else if (scenes[i].imageUrl) {
-            const url = await uploadImage(scenes[i].imageUrl, kieApiKey);
+            const url = await uploadImage(scenes[i].imageUrl);
             uploadedUrls.push(url);
             setScenes((prev) =>
               prev.map((s, idx) => (idx === i ? { ...s, uploadedUrl: url } : s))
@@ -319,8 +316,6 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
         body: JSON.stringify({
           sceneImageUrls: uploadedUrls,
           videoPrompts: scenes.slice(0, -1).map((s) => s.videoPrompt),
-          kieApiKey,
-          falApiKey,
           videoModel,
           // Send already-completed video URLs so server can skip them
           existingVideoUrls: isRetry && existingCompletedVideos.length > 0 ? existingCompletedVideos : undefined,
@@ -516,7 +511,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
       isRunningRef.current = false;
       abortRef.current = null;
     }
-  }, [canGenerate, scenes, kieApiKey, falApiKey, videoModel, uploadImage, addLog]);
+  }, [canGenerate, scenes, videoModel, uploadImage, addLog]);
 
   // Keep ref updated
   runGenerationRef.current = startGeneration;
@@ -571,8 +566,6 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
           startFrameUrl: startScene.uploadedUrl,
           endFrameUrl: endScene.uploadedUrl,
           prompt,
-          kieApiKey,
-          falApiKey,
           videoModel,
         }),
       });
@@ -664,7 +657,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
       );
       addLog(`Video ${videoIndex + 1} retry ERROR: ${msg}`);
     }
-  }, [videoStatuses, scenes, kieApiKey, falApiKey, videoModel, addLog]);
+  }, [videoStatuses, scenes, videoModel, addLog]);
 
   // ── Merge Videos ──
   const mergeVideos = useCallback(async () => {
@@ -683,7 +676,6 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
         body: JSON.stringify({
           action: "merge",
           videoUrls: doneVideos.map((v) => v.videoUrl),
-          falApiKey,
         }),
       });
 
@@ -702,7 +694,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
     } finally {
       setIsMerging(false);
     }
-  }, [videoStatuses, falApiKey, addLog]);
+  }, [videoStatuses, addLog]);
 
   // ── Reset ──
   const resetPipeline = useCallback(() => {

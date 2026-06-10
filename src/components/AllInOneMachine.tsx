@@ -2168,10 +2168,6 @@ const FORMAT_PROMPTS: Record<string, string> = {
 function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
 
-  // ─── KIE API Key ──────────────────────────────────────────────────────
-  const [kieApiKey, setKieApiKey] = useState("");
-  const [showApiKey, setShowApiKey] = useState(false);
-
   // ─── Core state ───────────────────────────────────────────────────────
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState("blank");
@@ -2226,7 +2222,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
 
   // ─── localStorage helpers ─────────────────────────────────────────────
   const LS = {
-    apikey: "viewmax_adgen_apikey",
     product: "viewmax_adgen_products",
     avatar: "viewmax_adgen_avatar",
     voices: "viewmax_adgen_voices",
@@ -2243,10 +2238,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
 
   // ─── Load persisted state on mount ────────────────────────────────────
   useEffect(() => {
-    const savedKey = loadLS<string>(LS.apikey);
-    if (savedKey) setKieApiKey(savedKey);
-    else setKieApiKey("2127fc6b287847ec6b8cbf88308e6f45");
-
     const savedProduct = loadLS<{ preview: string; url: string }>(LS.product);
     if (savedProduct) { setProductPreview(savedProduct.preview || ""); setProductImageUrl(savedProduct.url || ""); }
 
@@ -2264,7 +2255,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   }, []);
 
   // ─── Persist on change ────────────────────────────────────────────────
-  useEffect(() => { saveLS(LS.apikey, kieApiKey); }, [kieApiKey]);
   useEffect(() => { saveLS(LS.product, { preview: productPreview, url: productImageUrl }); }, [productPreview, productImageUrl]);
   useEffect(() => { saveLS(LS.avatar, { preview: customAvatarPreview, url: customAvatarUrl, selectedAvatar }); }, [customAvatarPreview, customAvatarUrl, selectedAvatar]);
   useEffect(() => { saveLS(LS.voices, { selectedVoice, audioUrl: voiceAudioUrl }); }, [selectedVoice, voiceAudioUrl]);
@@ -2294,7 +2284,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const uploadImageToKIE = async (file: File): Promise<string | null> => {
     const formData = new FormData();
     formData.append("avatar", file);
-    formData.append("kieApiKey", kieApiKey || "2127fc6b287847ec6b8cbf88308e6f45");
     const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
     const data = await res.json();
     if (data.avatarUrl) return data.avatarUrl;
@@ -2348,7 +2337,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
     try {
       const formData = new FormData();
       formData.append("audio", file);
-      formData.append("kieApiKey", kieApiKey || "2127fc6b287847ec6b8cbf88308e6f45");
       const res = await fetch("/api/allinone/upload-voice", { method: "POST", body: formData });
       const data = await res.json();
       if (data.url) setVoiceAudioUrl(data.url);
@@ -2403,7 +2391,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
           selectedVoice: selectedVoice || undefined,
           voiceAudioUrl: voiceAudioUrl || undefined,
           referenceImageUrls: refUrls.length > 0 ? refUrls : undefined,
-          kieApiKey: kieApiKey || undefined,
         }),
       });
       const data = await res.json();
@@ -2453,25 +2440,6 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   return (
     <div className="max-w-[1060px] mx-auto px-3 sm:px-6 py-4">
       <h1 className="text-2xl font-bold mb-4" style={{ color: D.textPrimary }}>AI Ad Generator</h1>
-
-      {/* ─── KIE API Key ──────────────────────────────────────────────── */}
-      <div className="mb-4 rounded-xl p-4" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.inputBorder}` }}>
-        <div className="flex items-center justify-between mb-2">
-          <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: D.textMuted }}>KIE.AI API Key</p>
-          <button onClick={() => setShowApiKey(!showApiKey)} className="text-xs font-semibold" style={{ color: D.purple }}>
-            {showApiKey ? "Hide" : "Show"}
-          </button>
-        </div>
-        <input
-          type={showApiKey ? "text" : "password"}
-          value={kieApiKey}
-          onChange={(e) => setKieApiKey(e.target.value)}
-          placeholder="Enter your KIE.AI API key…"
-          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
-          style={{ backgroundColor: D.white, border: `1px solid ${D.inputBorder}`, color: D.textPrimary }}
-        />
-        <p className="text-[11px] mt-1.5" style={{ color: D.textDim }}>Default key provided. Enter your own key to use your KIE.AI account credits.</p>
-      </div>
 
       {/* ─── Tabs ─────────────────────────────────────────────────────── */}
       <div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>

@@ -4,6 +4,9 @@ import { getAuthUser } from "@/lib/auth-server";
 export const maxDuration = 600; // 10 minutes for long pipelines
 export const dynamic = "force-dynamic";
 
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
+
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // ─── SSE Helper ────────────────────────────────────────────────────────
@@ -450,13 +453,16 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  // Resolve API keys: use client-provided keys if valid, otherwise fall back to server defaults
+  const effectiveKieKey = (kieApiKey && kieApiKey.length >= 10) ? kieApiKey : DEFAULT_KIE_KEY;
+  const effectiveFalKey = (falApiKey && falApiKey.length >= 10) ? falApiKey : DEFAULT_FAL_KEY;
+
   // ── Action: Merge Videos Only ──
   if (action === "merge_only") {
     if (!mergeVideoUrls || mergeVideoUrls.length < 2) return NextResponse.json({ error: "At least 2 video URLs are required" }, { status: 400 });
-    if (!falApiKey) return NextResponse.json({ error: "Fal.ai API key is required for merging" }, { status: 400 });
 
     try {
-      const mergedUrl = await mergeVideos(mergeVideoUrls, falApiKey);
+      const mergedUrl = await mergeVideos(mergeVideoUrls, effectiveFalKey);
       return NextResponse.json({ videoUrl: mergedUrl });
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -468,7 +474,7 @@ export async function POST(req: NextRequest) {
   if (action === "regenerate_frame") {
     if (regenerateSceneIndex === undefined || regenerateSceneIndex === null) return NextResponse.json({ error: "regenerateSceneIndex is required" }, { status: 400 });
     if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
-    if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+    if (!effectiveKieKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
     if (!characterImageUrl && !existingFrameUrls?.[0]) return NextResponse.json({ error: "Character image URL or Scene 1 frame URL is required" }, { status: 400 });
 
     const sceneIdx = regenerateSceneIndex;
@@ -518,7 +524,7 @@ export async function POST(req: NextRequest) {
 
             const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
               method: "POST",
-              headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
+              headers: { Authorization: `Bearer ${effectiveKieKey}`, "Content-Type": "application/json" },
               body: JSON.stringify({ model: "google/nano-banana-edit", input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "9:16", output_format: "png", strength: 0.35 } }),
             });
 
@@ -531,7 +537,7 @@ export async function POST(req: NextRequest) {
             for (let p = 0; p < 120; p++) {
               if (p % 2 === 0) sseSend(sw, { type: "frame_progress", sceneIndex: sceneIdx, pct: 0, message: `Regenerating frame ${sceneIdx + 1}... (${p * 3}s)` });
               try {
-                const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${kieApiKey}` } });
+                const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${effectiveKieKey}` } });
                 const pollJson = await pollRes.json();
                 if (pollJson.code === 200) {
                   const d = pollJson.data;
@@ -552,7 +558,7 @@ export async function POST(req: NextRequest) {
             }
             if (!rawFrameUrl) throw new Error("Frame generation timed out");
 
-            frameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `regen_frame_${sceneIdx}`);
+            frameUrl = await downloadAndReupload(rawFrameUrl, effectiveKieKey, `regen_frame_${sceneIdx}`);
             lastError = "";
             break;
           } catch (err) {
@@ -587,7 +593,7 @@ export async function POST(req: NextRequest) {
   // ── Action: Videos Only (frames already generated, just generate videos + merge) ──
   if (action === "videos_only") {
     if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
-    if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+    if (!effectiveKieKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
     if (!existingFrameUrls || existingFrameUrls.filter(Boolean).length === 0) return NextResponse.json({ error: "Frame URLs are required for video generation" }, { status: 400 });
 
     const totalScenes = requestScenes.length;
@@ -624,7 +630,7 @@ export async function POST(req: NextRequest) {
 
             try {
               videoUrl = await generateVideo(
-                frameUrls[i], scene.script, kieApiKey, model,
+                frameUrls[i], scene.script, effectiveKieKey, model,
                 (elapsed, pollCount) => {
                   sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed)` });
                 }
@@ -658,10 +664,10 @@ export async function POST(req: NextRequest) {
         }
 
         // Merge if multiple videos
-        if (successfulVideos.length > 1 && falApiKey) {
+        if (successfulVideos.length > 1) {
           sseSend(sw, { type: "step_change", step: "merge", message: "Merging videos..." });
           try {
-            const mergedUrl = await mergeVideos(successfulVideos, falApiKey);
+            const mergedUrl = await mergeVideos(successfulVideos, effectiveFalKey);
             sseSend(sw, { type: "done", videoUrl: mergedUrl, videoUrls: successfulVideos });
           } catch (err) {
             const msg = err instanceof Error ? err.message : String(err);
@@ -689,7 +695,7 @@ export async function POST(req: NextRequest) {
   if (!skipFrames && !avatarOnly && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required" }, { status: 400 });
   if (avatarOnly && !characterImageUrl) return NextResponse.json({ error: "Character image URL is required for avatar-only mode" }, { status: 400 });
   if (!requestScenes || requestScenes.length === 0) return NextResponse.json({ error: "Scenes are required" }, { status: 400 });
-  if (!kieApiKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
+  if (!effectiveKieKey) return NextResponse.json({ error: "KIE API key is required" }, { status: 400 });
   if (skipFrames && !avatarOnly && (!preUploadedFrameUrls || preUploadedFrameUrls.length === 0)) {
     return NextResponse.json({ error: "Pre-uploaded frame URLs are required when skipFrames is true" }, { status: 400 });
   }
@@ -847,7 +853,7 @@ export async function POST(req: NextRequest) {
 
               const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
                 method: "POST",
-                headers: { Authorization: `Bearer ${kieApiKey}`, "Content-Type": "application/json" },
+                headers: { Authorization: `Bearer ${effectiveKieKey}`, "Content-Type": "application/json" },
                 body: JSON.stringify({
                   model: "google/nano-banana-edit",
                   input: { prompt: imgPrompt, image_urls: imageUrls, image_size: "9:16", output_format: "png", strength: 0.35 },
@@ -872,7 +878,7 @@ export async function POST(req: NextRequest) {
                 }
                 try {
                   const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
-                    headers: { Authorization: `Bearer ${kieApiKey}` },
+                    headers: { Authorization: `Bearer ${effectiveKieKey}` },
                   });
                   const pollJson = await pollRes.json();
                   if (pollJson.code === 200) {
@@ -895,7 +901,7 @@ export async function POST(req: NextRequest) {
               }
               if (!rawFrameUrl) throw new Error("Frame generation timed out after 6 minutes");
 
-              const kieFrameUrl = await downloadAndReupload(rawFrameUrl, kieApiKey, `chain_frame_${i}`);
+              const kieFrameUrl = await downloadAndReupload(rawFrameUrl, effectiveKieKey, `chain_frame_${i}`);
               frameUrl = kieFrameUrl;
               lastFrameError = "";
               break; // Success
@@ -1001,7 +1007,7 @@ export async function POST(req: NextRequest) {
 
           try {
             videoUrl = await generateVideo(
-              frameUrls[i], scene.script, kieApiKey, model,
+              frameUrls[i], scene.script, effectiveKieKey, model,
               (elapsed, pollCount) => {
                 // Send SSE progress update every ~10s during video polling
                 sseSend(sw, {
@@ -1058,11 +1064,11 @@ export async function POST(req: NextRequest) {
       }
 
       // ── STEP 3: Merge ──
-      if (successfulVideos.length > 1 && falApiKey) {
+      if (successfulVideos.length > 1) {
         sseSend(sw, { type: "step_change", step: "merge", message: "Merging videos..." });
 
         try {
-          const mergedUrl = await mergeVideos(successfulVideos, falApiKey);
+          const mergedUrl = await mergeVideos(successfulVideos, effectiveFalKey);
           sseSend(sw, { type: "done", videoUrl: mergedUrl, videoUrls: successfulVideos, frameUrls, message: "Auto Chain complete! Merged video ready." });
         } catch (err) {
           const msg = err instanceof Error ? err.message : String(err);

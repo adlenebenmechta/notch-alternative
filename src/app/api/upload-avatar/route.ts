@@ -3,6 +3,8 @@ import sharp from "sharp";
 
 export const maxDuration = 60;
 
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+
 async function compressAvatar(buffer: Buffer): Promise<Buffer> {
   const img = sharp(buffer);
   const metadata = await img.metadata();
@@ -22,13 +24,10 @@ export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const avatarFile = formData.get("avatar") as File | null;
-    const kieApiKey = formData.get("kieApiKey") as string | null;
+    const kieApiKey = (formData.get("kieApiKey") as string | null) || DEFAULT_KIE_KEY;
 
     if (!avatarFile) {
       return NextResponse.json({ success: false, error: "No avatar file provided" }, { status: 400 });
-    }
-    if (!kieApiKey || kieApiKey.length < 10) {
-      return NextResponse.json({ success: false, error: "Image API key is required" }, { status: 400 });
     }
 
     if (avatarFile.size > 5 * 1024 * 1024) {

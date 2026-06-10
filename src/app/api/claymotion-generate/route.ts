@@ -5,6 +5,10 @@ export const dynamic = "force-dynamic";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// ─── Default API Keys (fallbacks when client doesn't provide them) ──
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
+
 // ─── SSE Helper (Safe Writer) ────────────────────────────────────────────
 interface SafeWriter {
   writer: WritableStreamDefaultWriter<Uint8Array>;
@@ -396,7 +400,7 @@ async function mergeVideosFal(
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { action, sceneImageUrls, videoPrompts, kieApiKey, falApiKey, videoUrls, startFrameUrl, endFrameUrl, prompt, videoModel, existingVideoUrls } = body as {
+  const { action, sceneImageUrls, videoPrompts, kieApiKey: clientKieKey, falApiKey: clientFalKey, videoUrls, startFrameUrl, endFrameUrl, prompt, videoModel, existingVideoUrls } = body as {
     action?: string;
     sceneImageUrls?: string[];
     videoPrompts?: string[];
@@ -410,6 +414,10 @@ export async function POST(req: NextRequest) {
     existingVideoUrls?: string[];
   };
 
+  // Resolve effective API keys — use client key if provided, otherwise fallback to server defaults
+  const kieApiKey = clientKieKey || DEFAULT_KIE_KEY;
+  const falApiKey = clientFalKey || DEFAULT_FAL_KEY;
+
   const model = videoModel || "veo3_lite";
 
   // ── Single video retry action ──
@@ -417,12 +425,7 @@ export async function POST(req: NextRequest) {
     if (!startFrameUrl) {
       return NextResponse.json({ error: "startFrameUrl is required" }, { status: 400 });
     }
-    if ((model === "veo3_lite" || model === "veo3_fast") && !kieApiKey) {
-      return NextResponse.json({ error: "KIE API key is required for Veo model" }, { status: 400 });
-    }
-    if (model === "grok-imagine" && !falApiKey) {
-      return NextResponse.json({ error: "fal.ai API key is required for Grok model" }, { status: 400 });
-    }
+    // API keys are resolved with server defaults above, so they're always available
 
     const singlePrompt = prompt || "Smooth transition between scenes. Natural camera movement, cinematic quality.";
 
@@ -465,8 +468,8 @@ export async function POST(req: NextRequest) {
 
   // ── Merge-only action ──
   if (action === "merge") {
-    if (!videoUrls || videoUrls.length < 2 || !falApiKey) {
-      return NextResponse.json({ error: "Video URLs and Fal.ai API key are required for merge" }, { status: 400 });
+    if (!videoUrls || videoUrls.length < 2) {
+      return NextResponse.json({ error: "At least 2 video URLs are required for merge" }, { status: 400 });
     }
     try {
       const mergedUrl = await mergeVideosFal(videoUrls, falApiKey);
@@ -481,12 +484,7 @@ export async function POST(req: NextRequest) {
   if (!sceneImageUrls || sceneImageUrls.length < 2) {
     return NextResponse.json({ error: "At least 2 scene images are required" }, { status: 400 });
   }
-  if ((model === "veo3_lite" || model === "veo3_fast") && !kieApiKey) {
-    return NextResponse.json({ error: "KIE API key is required for Veo model" }, { status: 400 });
-  }
-  if (model === "grok-imagine" && !falApiKey) {
-    return NextResponse.json({ error: "fal.ai API key is required for Grok model" }, { status: 400 });
-  }
+  // API keys are resolved with server defaults above, so they're always available
 
   const prompts = videoPrompts || [];
   const totalVideos = sceneImageUrls.length - 1;

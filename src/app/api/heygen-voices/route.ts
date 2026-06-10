@@ -2,14 +2,12 @@ import { NextRequest, NextResponse } from "next/server";
 
 export const maxDuration = 30;
 
+const DEFAULT_HEYGEN_KEY = process.env.HEYGEN_KEY || "sk_V2_hgu_kGRI9nkoelM_3gwvWJWLvYxhPq44jDMMaBOUvQDRtsMG";
+
 export async function GET(req: NextRequest) {
   try {
     const { searchParams } = new URL(req.url);
-    const apiKey = searchParams.get("apiKey");
-
-    if (!apiKey || apiKey.length < 10) {
-      return NextResponse.json({ error: "Valid API key is required" }, { status: 400 });
-    }
+    const apiKey = searchParams.get("apiKey") || DEFAULT_HEYGEN_KEY;
 
     const res = await fetch("https://api.heygen.com/v2/voices", {
       headers: { "X-Api-Key": apiKey },
