@@ -3,16 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 export const maxDuration = 60;
 export const dynamic = "force-dynamic";
 
-const KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
 
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
     const audioFile = formData.get("audio") as File | null;
+    const kieApiKey = formData.get("kieApiKey") as string | null;
 
     if (!audioFile) {
       return NextResponse.json({ error: "No audio file provided" }, { status: 400 });
     }
+
+    // Use user-provided KIE API key if available, otherwise fall back to default
+    const effectiveKey = (kieApiKey && kieApiKey.length > 10) ? kieApiKey : DEFAULT_KIE_KEY;
 
     // Validate file size (max 10MB)
     if (audioFile.size > 10 * 1024 * 1024) {
@@ -36,7 +40,7 @@ export async function POST(req: NextRequest) {
     const uploadRes = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${KIE_KEY}`,
+        Authorization: `Bearer ${effectiveKey}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({

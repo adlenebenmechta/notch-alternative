@@ -4,7 +4,7 @@ export const maxDuration = 300;
 export const dynamic = "force-dynamic";
 
 const FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
-const KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Aspect ratio to image_size mapping for KIE API
@@ -28,6 +28,8 @@ export async function POST(req: NextRequest) {
       avatarImageUrl,
       selectedVoice,
       voiceAudioUrl,
+      referenceImageUrls,
+      kieApiKey,
     } = body;
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -56,15 +58,26 @@ export async function POST(req: NextRequest) {
       imageUrls.push(avatarImageUrl);
       enhancedPrompt += "\n\n[Creator/Avatar reference image is provided - the person in the video should resemble this avatar.]";
     }
+    if (Array.isArray(referenceImageUrls)) {
+      for (const refUrl of referenceImageUrls) {
+        if (typeof refUrl === "string" && refUrl.startsWith("http")) {
+          imageUrls.push(refUrl);
+          enhancedPrompt += "\n\n[Additional reference image provided for visual context.]";
+        }
+      }
+    }
+
+    // Use user-provided KIE API key if available, otherwise fall back to default
+    const effectiveKieKey = (typeof kieApiKey === "string" && kieApiKey.length > 10) ? kieApiKey : DEFAULT_KIE_KEY;
 
     // Route to appropriate API based on model
     if (model === "veo3_lite" || model === "veo3_fast" || model === "seedance") {
-      return await generateAdViaKIE(enhancedPrompt, model, dur, aspect, imageUrls, voiceAudioUrl);
+      return await generateAdViaKIE(enhancedPrompt, model, dur, aspect, imageUrls, voiceAudioUrl, effectiveKieKey);
     }
 
     // For Grok Imagine - route through KIE as well
     if (model === "grok_imagine") {
-      return await generateAdViaKIE(enhancedPrompt, "seedance", dur, aspect, imageUrls, voiceAudioUrl);
+      return await generateAdViaKIE(enhancedPrompt, "seedance", dur, aspect, imageUrls, voiceAudioUrl, effectiveKieKey);
     }
 
     // Default: kling3.0 via fal.ai
@@ -85,7 +98,9 @@ async function generateAdViaKIE(
   aspectRatio: string,
   imageUrls: string[] = [],
   voiceAudioUrl?: string,
+  kieKey?: string,
 ): Promise<NextResponse> {
+  const effectiveKey = kieKey || DEFAULT_KIE_KEY;
   const imageSize = ASPECT_SIZE_MAP[aspectRatio] || "768x1344";
 
   const inputBody: Record<string, unknown> = {
@@ -119,7 +134,7 @@ async function generateAdViaKIE(
   const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
     method: "POST",
     headers: {
-      Authorization: `Bearer ${KIE_KEY}`,
+      Authorization: `Bearer ${effectiveKey}`,
       "Content-Type": "application/json",
     },
     body: JSON.stringify(submitBody),
@@ -150,7 +165,7 @@ async function generateAdViaKIE(
     await sleep(5000);
     try {
       const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, {
-        headers: { Authorization: `Bearer ${KIE_KEY}` },
+        headers: { Authorization: `Bearer ${effectiveKey}` },
       });
       const pollJson = await pollRes.json();
 

@@ -2167,33 +2167,33 @@ const FORMAT_PROMPTS: Record<string, string> = {
 
 function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const { user } = useAuth();
-  // Core state
+
+  // ─── KIE API Key ──────────────────────────────────────────────────────
+  const [kieApiKey, setKieApiKey] = useState("");
+  const [showApiKey, setShowApiKey] = useState(false);
+
+  // ─── Core state ───────────────────────────────────────────────────────
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState("blank");
   const [model, setModel] = useState("seedance");
   const [duration, setDuration] = useState(8);
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [resolution, setResolution] = useState("720p");
-  const [activeTab, setActiveTab] = useState<"generate" | "history">("generate");
+  const [activeTab, setActiveTab] = useState<"generate" | "history" | "library">("generate");
 
-  // Dialog visibility
+  // ─── Dialog visibility ────────────────────────────────────────────────
   const [showFormatDialog, setShowFormatDialog] = useState(false);
   const [showModelPicker, setShowModelPicker] = useState(false);
   const [showDurationPicker, setShowDurationPicker] = useState(false);
-  const [showProductDialog, setShowProductDialog] = useState(false);
   const [showAvatarDialog, setShowAvatarDialog] = useState(false);
   const [showVoiceDialog, setShowVoiceDialog] = useState(false);
 
-  // Product state
-  const [productTab, setProductTab] = useState<"product" | "app">("product");
-  const [productUrl, setProductUrl] = useState("");
+  // ─── Product state ────────────────────────────────────────────────────
   const [productImageUrl, setProductImageUrl] = useState("");
   const [productPreview, setProductPreview] = useState("");
   const [productUploading, setProductUploading] = useState(false);
-  const [selectedProduct, setSelectedProduct] = useState("");
-  const [savedProducts] = useState<{name: string; imageUrl: string; id: string}[]>([]);
 
-  // Avatar state
+  // ─── Avatar state ─────────────────────────────────────────────────────
   const [avatarGender, setAvatarGender] = useState<"All" | "Female" | "Male">("All");
   const [avatarAge, setAvatarAge] = useState("All");
   const [selectedAvatar, setSelectedAvatar] = useState("");
@@ -2201,23 +2201,86 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const [customAvatarUploading, setCustomAvatarUploading] = useState(false);
   const [customAvatarUrl, setCustomAvatarUrl] = useState("");
 
-  // Voice state
+  // ─── Voice state ──────────────────────────────────────────────────────
   const [selectedVoice, setSelectedVoice] = useState("");
-  const [voiceFile, setVoiceFile] = useState<File | null>(null);
   const [voicePreview, setVoicePreview] = useState("");
   const [voiceUploading, setVoiceUploading] = useState(false);
   const [voiceAudioUrl, setVoiceAudioUrl] = useState("");
 
-  // Result
+  // ─── Reference images ─────────────────────────────────────────────────
+  const [referenceImages, setReferenceImages] = useState<{ id: string; preview: string; url: string }[]>([]);
+  const [refUploading, setRefUploading] = useState(false);
+
+  // ─── Library ──────────────────────────────────────────────────────────
+  const [library, setLibrary] = useState<{ id: string; url: string; type: "image" | "video"; timestamp: number; prompt: string; model: string }[]>([]);
+
+  // ─── Result ───────────────────────────────────────────────────────────
   const [result, setResult] = useState<ToolResult>({ loading: false, error: null });
   const [feed, setFeed] = useState<{ url: string; prompt: string; model: string; format: string; id: string }[]>([]);
 
-  // Refs
+  // ─── Refs ─────────────────────────────────────────────────────────────
   const productInputRef = useRef<HTMLInputElement>(null);
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const voiceInputRef = useRef<HTMLInputElement>(null);
+  const refInputRef = useRef<HTMLInputElement>(null);
 
-  // Filter avatars
+  // ─── localStorage helpers ─────────────────────────────────────────────
+  const LS = {
+    apikey: "viewmax_adgen_apikey",
+    product: "viewmax_adgen_products",
+    avatar: "viewmax_adgen_avatar",
+    voices: "viewmax_adgen_voices",
+    references: "viewmax_adgen_references",
+    results: "viewmax_adgen_results",
+  };
+
+  const saveLS = (key: string, value: unknown) => {
+    try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
+  };
+  const loadLS = <T,>(key: string): T | null => {
+    try { const v = localStorage.getItem(key); return v ? JSON.parse(v) : null; } catch { return null; }
+  };
+
+  // ─── Load persisted state on mount ────────────────────────────────────
+  useEffect(() => {
+    const savedKey = loadLS<string>(LS.apikey);
+    if (savedKey) setKieApiKey(savedKey);
+    else setKieApiKey("2127fc6b287847ec6b8cbf88308e6f45");
+
+    const savedProduct = loadLS<{ preview: string; url: string }>(LS.product);
+    if (savedProduct) { setProductPreview(savedProduct.preview || ""); setProductImageUrl(savedProduct.url || ""); }
+
+    const savedAvatar = loadLS<{ preview: string; url: string; selectedAvatar: string }>(LS.avatar);
+    if (savedAvatar) { setCustomAvatarPreview(savedAvatar.preview || ""); setCustomAvatarUrl(savedAvatar.url || ""); setSelectedAvatar(savedAvatar.selectedAvatar || ""); }
+
+    const savedVoices = loadLS<{ selectedVoice: string; audioUrl: string }>(LS.voices);
+    if (savedVoices) { setSelectedVoice(savedVoices.selectedVoice || ""); setVoiceAudioUrl(savedVoices.audioUrl || ""); }
+
+    const savedRefs = loadLS<{ id: string; preview: string; url: string }[]>(LS.references);
+    if (savedRefs) setReferenceImages(savedRefs);
+
+    const savedResults = loadLS<{ id: string; url: string; type: "image" | "video"; timestamp: number; prompt: string; model: string }[]>(LS.results);
+    if (savedResults) setLibrary(savedResults);
+  }, []);
+
+  // ─── Persist on change ────────────────────────────────────────────────
+  useEffect(() => { saveLS(LS.apikey, kieApiKey); }, [kieApiKey]);
+  useEffect(() => { saveLS(LS.product, { preview: productPreview, url: productImageUrl }); }, [productPreview, productImageUrl]);
+  useEffect(() => { saveLS(LS.avatar, { preview: customAvatarPreview, url: customAvatarUrl, selectedAvatar }); }, [customAvatarPreview, customAvatarUrl, selectedAvatar]);
+  useEffect(() => { saveLS(LS.voices, { selectedVoice, audioUrl: voiceAudioUrl }); }, [selectedVoice, voiceAudioUrl]);
+  useEffect(() => { saveLS(LS.references, referenceImages); }, [referenceImages]);
+  useEffect(() => { saveLS(LS.results, library); }, [library]);
+
+  // ─── File → base64 helper ────────────────────────────────────────────
+  const fileToBase64 = (file: File): Promise<string> =>
+    new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result as string);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+  // ─── Filter avatars ──────────────────────────────────────────────────
   const filteredAvatars = AD_AVATARS.filter((a) => {
     if (avatarGender !== "All" && a.gender !== avatarGender.toLowerCase()) return false;
     if (avatarAge !== "All" && a.age !== avatarAge.replace("s", "")) return false;
@@ -2227,42 +2290,65 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const isVoiceAvailable = model === "seedance" || model === "seedance_fast";
   const canGenerate = prompt.trim().length > 0;
 
-  // Product upload
+  // ─── Upload image to KIE via /api/upload-avatar ──────────────────────
+  const uploadImageToKIE = async (file: File): Promise<string | null> => {
+    const formData = new FormData();
+    formData.append("avatar", file);
+    formData.append("kieApiKey", kieApiKey || "2127fc6b287847ec6b8cbf88308e6f45");
+    const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
+    const data = await res.json();
+    if (data.avatarUrl) return data.avatarUrl;
+    throw new Error(data.error || "Image upload failed");
+  };
+
+  // ─── Product upload ──────────────────────────────────────────────────
   const handleProductImageUpload = async (file: File) => {
     setProductUploading(true);
-    setProductPreview(URL.createObjectURL(file));
+    const base64Preview = await fileToBase64(file);
+    setProductPreview(base64Preview);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.avatarUrl) setProductImageUrl(data.avatarUrl);
+      const url = await uploadImageToKIE(file);
+      if (url) setProductImageUrl(url);
     } catch (err) { console.error("Product upload failed:", err); }
     finally { setProductUploading(false); }
   };
 
-  // Avatar upload
+  // ─── Avatar upload ───────────────────────────────────────────────────
   const handleAvatarUpload = async (file: File) => {
-    setCustomAvatarPreview(URL.createObjectURL(file));
     setCustomAvatarUploading(true);
+    const base64Preview = await fileToBase64(file);
+    setCustomAvatarPreview(base64Preview);
     try {
-      const formData = new FormData();
-      formData.append("file", file);
-      const res = await fetch("/api/upload-avatar", { method: "POST", body: formData });
-      const data = await res.json();
-      if (data.avatarUrl) { setCustomAvatarUrl(data.avatarUrl); setSelectedAvatar(""); }
+      const url = await uploadImageToKIE(file);
+      if (url) { setCustomAvatarUrl(url); setSelectedAvatar(""); }
     } catch (err) { console.error("Avatar upload failed:", err); }
     finally { setCustomAvatarUploading(false); }
   };
 
-  // Voice upload
+  // ─── Reference image upload ──────────────────────────────────────────
+  const handleRefImageUpload = async (file: File) => {
+    setRefUploading(true);
+    const base64Preview = await fileToBase64(file);
+    const id = `ref_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`;
+    const newRef = { id, preview: base64Preview, url: "" };
+    setReferenceImages((prev) => [...prev, newRef]);
+    try {
+      const url = await uploadImageToKIE(file);
+      if (url) {
+        setReferenceImages((prev) => prev.map((r) => (r.id === id ? { ...r, url } : r)));
+      }
+    } catch (err) { console.error("Reference upload failed:", err); }
+    finally { setRefUploading(false); }
+  };
+
+  // ─── Voice upload ────────────────────────────────────────────────────
   const handleVoiceUpload = async (file: File) => {
-    setVoiceFile(file);
     setVoicePreview(URL.createObjectURL(file));
     setVoiceUploading(true);
     try {
       const formData = new FormData();
       formData.append("audio", file);
+      formData.append("kieApiKey", kieApiKey || "2127fc6b287847ec6b8cbf88308e6f45");
       const res = await fetch("/api/allinone/upload-voice", { method: "POST", body: formData });
       const data = await res.json();
       if (data.url) setVoiceAudioUrl(data.url);
@@ -2270,102 +2356,712 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
     finally { setVoiceUploading(false); }
   };
 
-  // Build prompt
+  // ─── Build prompt ────────────────────────────────────────────────────
   const buildFullPrompt = (): string => {
     const formatPrefix = FORMAT_PROMPTS[format] || "";
     let fullPrompt = formatPrefix + prompt.trim();
-    if (productImageUrl || selectedProduct) fullPrompt += " [Product image reference provided]";
+    if (productImageUrl) fullPrompt += " [Product image reference provided]";
     if (selectedAvatar || customAvatarUrl) fullPrompt += " [Creator/Avatar reference provided]";
-    if (selectedVoice) { const voice = AD_VOICES.find((v) => v.value === selectedVoice); if (voice) fullPrompt += ` [Voice style: ${voice.label}, ${voice.gender}]`; }
+    if (selectedVoice) {
+      const voice = AD_VOICES.find((v) => v.value === selectedVoice);
+      if (voice) fullPrompt += ` [Voice style: ${voice.label}, ${voice.gender}]`;
+    }
     if (voiceAudioUrl) fullPrompt += " [Voice audio reference provided]";
+    if (referenceImages.length > 0) fullPrompt += ` [${referenceImages.length} additional reference image(s) provided]`;
     return fullPrompt;
   };
 
   const mapModel = (m: string): string => {
-    switch (m) { case "seedance": case "seedance_fast": return "seedance"; case "veo3_fast": return "veo3_fast"; case "veo3": return "veo3_lite"; case "grok_imagine": return "seedance"; default: return "seedance"; }
+    switch (m) {
+      case "seedance": case "seedance_fast": return "seedance";
+      case "veo3_fast": return "veo3_fast";
+      case "veo3": return "veo3_lite";
+      case "grok_imagine": return "seedance";
+      default: return "seedance";
+    }
   };
 
-  // Generate
+  // ─── Generate ────────────────────────────────────────────────────────
   const handleGenerate = async () => {
     if (!prompt.trim()) return;
     setResult({ loading: true, error: null });
     try {
       const fullPrompt = buildFullPrompt();
+      const refUrls = referenceImages.filter((r) => r.url).map((r) => r.url);
       const res = await fetch("/api/allinone/ad-generate", {
-        method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ prompt: fullPrompt, format, model: mapModel(model), duration, aspectRatio, resolution, productImageUrl: productImageUrl || undefined, avatarImageUrl: customAvatarUrl || undefined, selectedVoice: selectedVoice || undefined, voiceAudioUrl: voiceAudioUrl || undefined }),
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: fullPrompt,
+          format,
+          model: mapModel(model),
+          duration,
+          aspectRatio,
+          resolution,
+          productImageUrl: productImageUrl || undefined,
+          avatarImageUrl: customAvatarUrl || undefined,
+          selectedVoice: selectedVoice || undefined,
+          voiceAudioUrl: voiceAudioUrl || undefined,
+          referenceImageUrls: refUrls.length > 0 ? refUrls : undefined,
+          kieApiKey: kieApiKey || undefined,
+        }),
       });
       const data = await res.json();
-      if (!res.ok || data.error) { setResult({ loading: false, error: data.error || "Ad generation failed" }); return; }
+      if (!res.ok || data.error) {
+        setResult({ loading: false, error: data.error || "Ad generation failed" });
+        return;
+      }
       setResult({ loading: false, error: null, url: data.videoUrl });
-      if (data.videoUrl) setFeed((prev) => [{ url: data.videoUrl, prompt: prompt.trim(), model: AD_MODELS.find((m) => m.value === model)?.label || model, format: AD_FORMATS.find((f) => f.value === format)?.label || format, id: Date.now().toString() }, ...prev]);
-    } catch (err) { setResult({ loading: false, error: err instanceof Error ? err.message : "Failed to generate ad" }); }
+      if (data.videoUrl) {
+        const feedItem = {
+          url: data.videoUrl,
+          prompt: prompt.trim(),
+          model: AD_MODELS.find((m) => m.value === model)?.label || model,
+          format: AD_FORMATS.find((f) => f.value === format)?.label || format,
+          id: Date.now().toString(),
+        };
+        setFeed((prev) => [feedItem, ...prev]);
+        // Save to library
+        const libItem = {
+          id: feedItem.id,
+          url: data.videoUrl,
+          type: "video" as const,
+          timestamp: Date.now(),
+          prompt: prompt.trim(),
+          model: AD_MODELS.find((m) => m.value === model)?.label || model,
+        };
+        setLibrary((prev) => [libItem, ...prev]);
+      }
+    } catch (err) {
+      setResult({ loading: false, error: err instanceof Error ? err.message : "Failed to generate ad" });
+    }
+  };
+
+  // ─── Download helper ─────────────────────────────────────────────────
+  const downloadFile = async (url: string, filename: string) => {
+    try {
+      const res = await fetch(url);
+      const blob = await res.blob();
+      const a = document.createElement("a");
+      a.href = URL.createObjectURL(blob);
+      a.download = filename;
+      a.click();
+      URL.revokeObjectURL(a.href);
+    } catch {}
   };
 
   return (
     <div className="max-w-[1060px] mx-auto px-3 sm:px-6 py-4">
       <h1 className="text-2xl font-bold mb-4" style={{ color: D.textPrimary }}>AI Ad Generator</h1>
 
-      {/* Tabs */}
+      {/* ─── KIE API Key ──────────────────────────────────────────────── */}
+      <div className="mb-4 rounded-xl p-4" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.inputBorder}` }}>
+        <div className="flex items-center justify-between mb-2">
+          <p className="text-xs font-semibold tracking-wide uppercase" style={{ color: D.textMuted }}>KIE.AI API Key</p>
+          <button onClick={() => setShowApiKey(!showApiKey)} className="text-xs font-semibold" style={{ color: D.purple }}>
+            {showApiKey ? "Hide" : "Show"}
+          </button>
+        </div>
+        <input
+          type={showApiKey ? "text" : "password"}
+          value={kieApiKey}
+          onChange={(e) => setKieApiKey(e.target.value)}
+          placeholder="Enter your KIE.AI API key…"
+          className="w-full rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500/20"
+          style={{ backgroundColor: D.white, border: `1px solid ${D.inputBorder}`, color: D.textPrimary }}
+        />
+        <p className="text-[11px] mt-1.5" style={{ color: D.textDim }}>Default key provided. Enter your own key to use your KIE.AI account credits.</p>
+      </div>
+
+      {/* ─── Tabs ─────────────────────────────────────────────────────── */}
       <div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>
-        {(["generate", "history"] as const).map((tab) => (
-          <button key={tab} onClick={() => setActiveTab(tab)} className="px-4 py-2 rounded-md text-sm font-medium transition-all"
-            style={{ backgroundColor: activeTab === tab ? D.white : "transparent", color: activeTab === tab ? D.textPrimary : D.textMuted, boxShadow: activeTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>
-            {tab === "generate" ? "Generate" : "History"}
+        {(["generate", "history", "library"] as const).map((tab) => (
+          <button
+            key={tab}
+            onClick={() => setActiveTab(tab)}
+            className="px-4 py-2 rounded-md text-sm font-medium transition-all"
+            style={{
+              backgroundColor: activeTab === tab ? D.white : "transparent",
+              color: activeTab === tab ? D.textPrimary : D.textMuted,
+              boxShadow: activeTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
+            }}
+          >
+            {tab === "generate" ? "Generate" : tab === "history" ? "History" : "Library"}
           </button>
         ))}
       </div>
 
-      {activeTab === "generate" ? (
+      {/* ═══════════════════════════════════════════════════════════════════
+          GENERATE TAB
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "generate" && (
         <div className="max-w-[760px]">
-          {/* Prompt + Toolbar + References + Generate all in one card */}
-          <div className="rounded-[22px] sm:rounded-[28px] border p-3 sm:p-3.5" style={{ backgroundColor: "rgba(120,120,120,0.08)", borderColor: "rgba(120,120,120,0.2)" }}>
-            <textarea value={prompt} onChange={(e) => setPrompt(e.target.value)} placeholder="Describe what happens in the ad..." rows={4}
-              className="w-full px-4 py-3 text-[15px] leading-6 font-medium placeholder-gray-400 resize-none focus:outline-none" style={{ backgroundColor: "transparent", border: "none", color: D.textPrimary, minHeight: "132px" }} />
+          {/* Prompt + Toolbar */}
+          <div
+            className="rounded-[22px] sm:rounded-[28px] border p-3 sm:p-3.5"
+            style={{ backgroundColor: "rgba(120,120,120,0.08)", borderColor: "rgba(120,120,120,0.2)" }}
+          >
+            <textarea
+              value={prompt}
+              onChange={(e) => setPrompt(e.target.value)}
+              placeholder="Describe what happens in the ad…"
+              rows={4}
+              className="w-full px-4 py-3 text-[15px] leading-6 font-medium placeholder-gray-400 resize-none focus:outline-none"
+              style={{ backgroundColor: "transparent", border: "none", color: D.textPrimary, minHeight: "132px" }}
+            />
             {/* Toolbar row */}
             <div className="flex flex-wrap items-center gap-1.5 mt-2">
               <ToolbarBtn label="Format" icon={<PlusIconSmall />} onClick={() => setShowFormatDialog(true)} />
               <div className="relative">
-                <ToolbarBtn label={AD_MODELS.find((m) => m.value === model)?.label || "Model"} icon={<span className="text-sm">{AD_MODELS.find((m) => m.value === model)?.icon}</span>} onClick={() => setShowModelPicker(!showModelPicker)} chevron />
-                {showModelPicker && <ModelPickerPopup model={model} setModel={(v) => { setModel(v); setShowModelPicker(false); }} onClose={() => setShowModelPicker(false)} />}
+                <ToolbarBtn
+                  label={AD_MODELS.find((m) => m.value === model)?.label || "Model"}
+                  icon={<span className="text-sm">{AD_MODELS.find((m) => m.value === model)?.icon}</span>}
+                  onClick={() => setShowModelPicker(!showModelPicker)}
+                  chevron
+                />
+                {showModelPicker && (
+                  <ModelPickerPopup
+                    model={model}
+                    setModel={(v) => { setModel(v); setShowModelPicker(false); }}
+                    onClose={() => setShowModelPicker(false)}
+                  />
+                )}
               </div>
               <div className="relative">
                 <ToolbarBtn label={`${duration}s`} icon={<ClockIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} />
-                {showDurationPicker && <DurationPopup duration={duration} setDuration={(v) => { setDuration(v); }} aspectRatio={aspectRatio} setAspectRatio={setAspectRatio} resolution={resolution} setResolution={setResolution} onClose={() => setShowDurationPicker(false)} />}
+                {showDurationPicker && (
+                  <DurationPopup
+                    duration={duration}
+                    setDuration={(v) => setDuration(v)}
+                    aspectRatio={aspectRatio}
+                    setAspectRatio={setAspectRatio}
+                    resolution={resolution}
+                    setResolution={setResolution}
+                    onClose={() => setShowDurationPicker(false)}
+                  />
+                )}
               </div>
-              <RefCard label="Product" preview={productPreview || selectedProduct} uploading={productUploading} icon={<PackageIcon />} onClick={() => setShowProductDialog(true)} />
-              <RefCard label="Avatar" preview={customAvatarPreview || selectedAvatar} uploading={customAvatarUploading} icon={<UserRoundIcon />} onClick={() => setShowAvatarDialog(true)} />
-              <RefCard label="Voice" preview={selectedVoice ? AD_VOICES.find((v) => v.value === selectedVoice)?.label || "" : voicePreview ? "Custom" : ""} uploading={voiceUploading} icon={<VoiceIconSmall />} onClick={() => isVoiceAvailable && setShowVoiceDialog(true)} disabled={!isVoiceAvailable} disabledLabel="Seedance only" />
+              <RefCard
+                label="Voice"
+                preview={selectedVoice ? AD_VOICES.find((v) => v.value === selectedVoice)?.label || "" : voicePreview ? "Custom" : ""}
+                uploading={voiceUploading}
+                icon={<VoiceIconSmall />}
+                onClick={() => isVoiceAvailable && setShowVoiceDialog(true)}
+                disabled={!isVoiceAvailable}
+                disabledLabel="Seedance only"
+              />
               <ToolbarBtn label="" icon={<SettingsIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} iconOnly />
             </div>
           </div>
 
-          {/* Generate button */}
-          <div className="mt-3">
-            <button onClick={handleGenerate} disabled={!canGenerate || result.loading} className="w-full py-3 rounded-[14px] text-sm font-semibold transition-all flex items-center justify-center gap-1.5 disabled:cursor-not-allowed" style={{ backgroundColor: canGenerate && !result.loading ? D.black : "rgba(120,120,120,0.16)", color: canGenerate && !result.loading ? D.white : "rgba(0,0,0,0.4)" }}>
-              {result.loading ? <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Generating...</> : <><span>Generate</span><SparklesIcon /><span className="opacity-70">20</span></>}
+          {/* ─── Product & Avatar big boxes ────────────────────────────── */}
+          <div className="grid grid-cols-2 gap-4 mt-4">
+            {/* Product box */}
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: D.textMuted }}>
+                Product Image
+              </p>
+              <div
+                className="relative rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden"
+                style={{
+                  width: "100%",
+                  minHeight: "200px",
+                  height: "200px",
+                  borderColor: productPreview ? "rgba(0,117,253,0.4)" : D.inputBorder,
+                  backgroundColor: productPreview ? "rgba(0,117,253,0.04)" : D.inputBg,
+                }}
+                onClick={() => productInputRef.current?.click()}
+              >
+                {productUploading && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+                    <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                  </div>
+                )}
+                {productPreview ? (
+                  <img src={productPreview} alt="Product" className="w-full h-full object-contain p-2" />
+                ) : (
+                  <div className="text-center p-4">
+                    <PackageIcon />
+                    <p className="text-sm font-semibold mt-2" style={{ color: D.textPrimary }}>Add Product</p>
+                    <p className="text-xs mt-1" style={{ color: D.textDim }}>Click to upload</p>
+                  </div>
+                )}
+              </div>
+              {productPreview && (
+                <button
+                  onClick={() => { setProductPreview(""); setProductImageUrl(""); }}
+                  className="mt-1.5 text-xs font-semibold"
+                  style={{ color: D.red }}
+                >
+                  Remove product
+                </button>
+              )}
+              <input
+                ref={productInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f); }}
+              />
+            </div>
+
+            {/* Avatar box */}
+            <div>
+              <p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: D.textMuted }}>
+                Avatar / Creator
+              </p>
+              <div
+                className="relative rounded-2xl border-2 border-dashed flex items-center justify-center cursor-pointer transition-all overflow-hidden"
+                style={{
+                  width: "100%",
+                  minHeight: "200px",
+                  height: "200px",
+                  borderColor: customAvatarPreview ? "rgba(0,117,253,0.4)" : D.inputBorder,
+                  backgroundColor: customAvatarPreview ? "rgba(0,117,253,0.04)" : D.inputBg,
+                }}
+                onClick={() => setShowAvatarDialog(true)}
+              >
+                {customAvatarUploading && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-10">
+                    <div className="w-6 h-6 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                  </div>
+                )}
+                {customAvatarPreview ? (
+                  <img src={customAvatarPreview} alt="Avatar" className="w-full h-full object-contain p-2" />
+                ) : selectedAvatar ? (
+                  <div className="text-center p-4">
+                    <div
+                      className="w-16 h-16 rounded-full mx-auto flex items-center justify-center text-xl font-bold"
+                      style={{ backgroundColor: "#DBEAFE", color: "#3B82F6" }}
+                    >
+                      {AD_AVATARS.find((a) => a.value === selectedAvatar)?.label.charAt(0) || "A"}
+                    </div>
+                    <p className="text-sm font-semibold mt-2" style={{ color: D.textPrimary }}>
+                      {AD_AVATARS.find((a) => a.value === selectedAvatar)?.label}
+                    </p>
+                  </div>
+                ) : (
+                  <div className="text-center p-4">
+                    <UserRoundIcon />
+                    <p className="text-sm font-semibold mt-2" style={{ color: D.textPrimary }}>Add Avatar</p>
+                    <p className="text-xs mt-1" style={{ color: D.textDim }}>Choose or upload</p>
+                  </div>
+                )}
+              </div>
+              {(customAvatarPreview || selectedAvatar) && (
+                <button
+                  onClick={() => { setCustomAvatarPreview(""); setCustomAvatarUrl(""); setSelectedAvatar(""); }}
+                  className="mt-1.5 text-xs font-semibold"
+                  style={{ color: D.red }}
+                >
+                  Remove avatar
+                </button>
+              )}
+              <input
+                ref={avatarInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }}
+              />
+            </div>
+          </div>
+
+          {/* ─── Reference Images ──────────────────────────────────────── */}
+          <div className="mt-4">
+            <p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: D.textMuted }}>
+              Reference Images (optional)
+            </p>
+            <div className="flex flex-wrap gap-3">
+              {referenceImages.map((ref) => (
+                <div
+                  key={ref.id}
+                  className="relative rounded-xl border overflow-hidden group"
+                  style={{ width: "120px", height: "120px", borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                >
+                  <img src={ref.preview} alt="Reference" className="w-full h-full object-cover" />
+                  <button
+                    onClick={() => setReferenceImages((prev) => prev.filter((r) => r.id !== ref.id))}
+                    className="absolute top-1 right-1 w-6 h-6 rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                    style={{ backgroundColor: "rgba(0,0,0,0.6)", color: D.white }}
+                  >
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
+                  </button>
+                  {!ref.url && (
+                    <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
+                      <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                    </div>
+                  )}
+                </div>
+              ))}
+              {/* Add reference button */}
+              <button
+                onClick={() => refInputRef.current?.click()}
+                disabled={refUploading}
+                className="rounded-xl border-2 border-dashed flex items-center justify-center gap-1 transition-all hover:border-purple-400"
+                style={{ width: "120px", height: "120px", borderColor: D.inputBorder, backgroundColor: D.inputBg, color: D.textMuted }}
+              >
+                {refUploading ? (
+                  <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
+                ) : (
+                  <>
+                    <PlusIconSmall />
+                    <span className="text-xs font-semibold">Add Ref</span>
+                  </>
+                )}
+              </button>
+              <input
+                ref={refInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRefImageUpload(f); }}
+              />
+            </div>
+          </div>
+
+          {/* ─── Generate button ───────────────────────────────────────── */}
+          <div className="mt-4">
+            <button
+              onClick={handleGenerate}
+              disabled={!canGenerate || result.loading}
+              className="w-full py-3 rounded-[14px] text-sm font-semibold transition-all flex items-center justify-center gap-1.5 disabled:cursor-not-allowed"
+              style={{
+                backgroundColor: canGenerate && !result.loading ? D.black : "rgba(120,120,120,0.16)",
+                color: canGenerate && !result.loading ? D.white : "rgba(0,0,0,0.4)",
+              }}
+            >
+              {result.loading ? (
+                <><div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" /> Generating…</>
+              ) : (
+                <><span>Generate</span><SparklesIcon /><span className="opacity-70">20</span></>
+              )}
             </button>
           </div>
 
           {result.error && <ErrorDisplay error={result.error} />}
-          {result.loading && (<div className="mt-4 rounded-xl p-6 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin mx-auto mb-3" /><p className="text-sm font-medium" style={{ color: D.textPrimary }}>Generating your ad...</p><p className="text-xs mt-1" style={{ color: D.textMuted }}>This may take 1-3 minutes</p></div>)}
+          {result.loading && (
+            <div className="mt-4 rounded-xl p-6 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+              <div className="w-8 h-8 rounded-full border-3 border-purple-500 border-t-transparent animate-spin mx-auto mb-3" />
+              <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Generating your ad…</p>
+              <p className="text-xs mt-1" style={{ color: D.textMuted }}>This may take 1-3 minutes</p>
+            </div>
+          )}
           {result.url && !result.loading && <VideoResult url={result.url} />}
         </div>
-      ) : (
-        <div>{feed.length === 0 ? (<div className="rounded-xl p-8 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><p className="text-sm" style={{ color: D.textMuted }}>Your generated ads will appear here</p></div>) : (<div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">{feed.map((item) => (<div key={item.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}><video src={item.url} controls className="w-full" style={{ maxHeight: "250px" }} /><div className="p-2.5 flex items-center justify-between" style={{ backgroundColor: D.inputBg }}><div className="min-w-0 flex-1"><p className="text-xs font-semibold truncate" style={{ color: D.textPrimary }}>{item.format} · {item.model}</p><p className="text-[10px] truncate" style={{ color: D.textMuted }}>{item.prompt}</p></div><button onClick={() => { setPrompt(item.prompt); setActiveTab("generate"); }} className="ml-2 px-2 py-1 rounded-md text-[10px] font-semibold shrink-0" style={{ backgroundColor: D.purpleLight, color: D.purple }}>Reuse</button></div></div>))}</div>)}</div>
       )}
 
-      {/* FORMAT DIALOG */}
-      {showFormatDialog && (<DialogOverlay onClose={() => setShowFormatDialog(false)}><div className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}><h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>What type of video do you want to create?</h2><div className="space-y-2">{AD_FORMATS.map((f) => (<button key={f.value} onClick={() => { setFormat(f.value); setShowFormatDialog(false); }} className="flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition active:scale-[0.99]" style={{ borderColor: format === f.value ? "rgba(0,117,253,0.4)" : "#E2E8F0", backgroundColor: format === f.value ? "#EAF3FF" : "#F8FAFC", color: format === f.value ? "#0075FD" : D.textPrimary }}><div className="min-w-0"><p className="text-[13px] font-black tracking-tight">{f.label}</p><p className="text-[11px] font-medium" style={{ color: "#64748B" }}>{f.desc}</p></div>{format === f.value && <CheckIcon color="#0075FD" />}</button>))}</div></div></DialogOverlay>)}
+      {/* ═══════════════════════════════════════════════════════════════════
+          HISTORY TAB
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "history" && (
+        <div>
+          {feed.length === 0 ? (
+            <div className="rounded-xl p-8 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+              <p className="text-sm" style={{ color: D.textMuted }}>Your generated ads will appear here</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {feed.map((item) => (
+                <div key={item.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}>
+                  <video src={item.url} controls className="w-full" style={{ maxHeight: "250px" }} />
+                  <div className="p-2.5 flex items-center justify-between" style={{ backgroundColor: D.inputBg }}>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-xs font-semibold truncate" style={{ color: D.textPrimary }}>{item.format} · {item.model}</p>
+                      <p className="text-[10px] truncate" style={{ color: D.textMuted }}>{item.prompt}</p>
+                    </div>
+                    <button
+                      onClick={() => { setPrompt(item.prompt); setActiveTab("generate"); }}
+                      className="ml-2 px-2 py-1 rounded-md text-[10px] font-semibold shrink-0"
+                      style={{ backgroundColor: D.purpleLight, color: D.purple }}
+                    >
+                      Reuse
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
 
-      {/* PRODUCT DIALOG */}
-      {showProductDialog && (<DialogOverlay onClose={() => setShowProductDialog(false)}><div className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}><div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>{(["product", "app"] as const).map((tab) => (<button key={tab} onClick={() => setProductTab(tab)} className="px-4 py-2 rounded-md text-sm font-medium transition-all" style={{ backgroundColor: productTab === tab ? D.white : "transparent", color: productTab === tab ? D.textPrimary : D.textMuted, boxShadow: productTab === tab ? "0 1px 3px rgba(0,0,0,0.08)" : "none" }}>{tab === "product" ? "Product" : "App"}</button>))}</div><h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>Add your {productTab}</h2>{[0, 1].map((row) => (<div key={row} className="flex gap-2 mb-3"><input type="url" placeholder="www.yourproduct.com" value={row === 0 ? productUrl : ""} onChange={(e) => row === 0 && setProductUrl(e.target.value)} className="flex-1 rounded-lg px-3 py-2.5 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500/20" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.inputBorder}`, color: D.textPrimary }} /><button onClick={() => productInputRef.current?.click()} className="px-4 py-2.5 rounded-lg text-sm font-semibold whitespace-nowrap" style={{ backgroundColor: "rgba(0,0,0,0.04)", border: `1px solid ${D.inputBorder}`, color: D.textPrimary }}>Upload image</button></div>))}<input ref={productInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleProductImageUpload(f); }} />{savedProducts.length > 0 && (<div className="mt-4"><p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: "#6B7280" }}>Saved products</p><div className="space-y-1.5">{savedProducts.map((p) => (<button key={p.id} onClick={() => { setSelectedProduct(p.name); setProductImageUrl(p.imageUrl); setShowProductDialog(false); }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-2.5 text-left transition" style={{ border: `1px solid ${selectedProduct === p.name ? "rgba(0,117,253,0.4)" : "#E2E8F0"}`, backgroundColor: selectedProduct === p.name ? "#EAF3FF" : "#F8FAFC" }}><span className="text-sm font-semibold" style={{ color: D.textPrimary }}>{p.name}</span></button>))}</div></div>)}{productPreview && (<div className="mt-3 rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}><img src={productPreview} alt="Product" className="w-full max-h-48 object-contain" /></div>)}<div className="flex gap-2 mt-4"><button onClick={() => setShowProductDialog(false)} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: D.black }}>Done</button></div></div></DialogOverlay>)}
+      {/* ═══════════════════════════════════════════════════════════════════
+          LIBRARY TAB
+         ═══════════════════════════════════════════════════════════════════ */}
+      {activeTab === "library" && (
+        <div>
+          {library.length === 0 ? (
+            <div className="rounded-xl p-8 text-center" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+              <p className="text-sm" style={{ color: D.textMuted }}>Your library is empty. Generated ads will be saved here automatically.</p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+              {library.map((item) => (
+                <div key={item.id} className="rounded-xl overflow-hidden" style={{ border: `1px solid ${D.cardBorder}` }}>
+                  {item.type === "video" ? (
+                    <video src={item.url} controls className="w-full" style={{ maxHeight: "200px" }} />
+                  ) : (
+                    <img src={item.url} alt="Generated" className="w-full object-cover" style={{ maxHeight: "200px" }} />
+                  )}
+                  <div className="p-2.5 flex items-center justify-between" style={{ backgroundColor: D.inputBg }}>
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-1.5">
+                        <span
+                          className="inline-block px-1.5 py-0.5 rounded text-[9px] font-bold uppercase"
+                          style={{
+                            backgroundColor: item.type === "video" ? D.purpleLight : D.pinkLight,
+                            color: item.type === "video" ? D.purple : D.pink,
+                          }}
+                        >
+                          {item.type}
+                        </span>
+                        <span className="text-[10px]" style={{ color: D.textDim }}>
+                          {new Date(item.timestamp).toLocaleDateString()}
+                        </span>
+                      </div>
+                      <p className="text-[10px] truncate mt-0.5" style={{ color: D.textMuted }}>{item.prompt}</p>
+                    </div>
+                    <div className="flex gap-1 ml-2 shrink-0">
+                      <button
+                        onClick={() => downloadFile(item.url, `ad_${item.id}.${item.type === "video" ? "mp4" : "png"}`)}
+                        className="px-2 py-1 rounded-md text-[10px] font-semibold"
+                        style={{ backgroundColor: D.greenLight, color: D.green }}
+                        title="Download"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" /><polyline points="7 10 12 15 17 10" /><line x1="12" x2="12" y1="15" y2="3" /></svg>
+                      </button>
+                      <button
+                        onClick={() => setLibrary((prev) => prev.filter((l) => l.id !== item.id))}
+                        className="px-2 py-1 rounded-md text-[10px] font-semibold"
+                        style={{ backgroundColor: D.redLight, color: D.red }}
+                        title="Delete"
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 6h18" /><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6" /><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2" /></svg>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ═══════════════════════════════════════════════════════════════════
+          DIALOGS
+         ═══════════════════════════════════════════════════════════════════ */}
+
+      {/* FORMAT DIALOG */}
+      {showFormatDialog && (
+        <DialogOverlay onClose={() => setShowFormatDialog(false)}>
+          <div className="w-full max-w-lg" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>What type of video do you want to create?</h2>
+            <div className="space-y-2">
+              {AD_FORMATS.map((f) => (
+                <button
+                  key={f.value}
+                  onClick={() => { setFormat(f.value); setShowFormatDialog(false); }}
+                  className="flex w-full items-center justify-between gap-3 rounded-2xl border px-4 py-3 text-left transition active:scale-[0.99]"
+                  style={{
+                    borderColor: format === f.value ? "rgba(0,117,253,0.4)" : "#E2E8F0",
+                    backgroundColor: format === f.value ? "#EAF3FF" : "#F8FAFC",
+                    color: format === f.value ? "#0075FD" : D.textPrimary,
+                  }}
+                >
+                  <div className="min-w-0">
+                    <p className="text-[13px] font-black tracking-tight">{f.label}</p>
+                    <p className="text-[11px] font-medium" style={{ color: "#64748B" }}>{f.desc}</p>
+                  </div>
+                  {format === f.value && <CheckIcon color="#0075FD" />}
+                </button>
+              ))}
+            </div>
+          </div>
+        </DialogOverlay>
+      )}
 
       {/* AVATAR DIALOG */}
-      {showAvatarDialog && (<DialogOverlay onClose={() => setShowAvatarDialog(false)}><div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}><h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>Choose Avatar</h2><div className="flex gap-1 mb-2 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>{(["All", "Female", "Male"] as const).map((g) => (<button key={g} onClick={() => setAvatarGender(g)} className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all" style={{ backgroundColor: avatarGender === g ? D.white : "transparent", color: avatarGender === g ? D.textPrimary : D.textMuted, boxShadow: avatarGender === g ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>{g}</button>))}</div><div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>{["All", "20s", "30s", "40s", "60s"].map((a) => (<button key={a} onClick={() => setAvatarAge(a)} className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all" style={{ backgroundColor: avatarAge === a ? D.white : "transparent", color: avatarAge === a ? D.textPrimary : D.textMuted, boxShadow: avatarAge === a ? "0 1px 2px rgba(0,0,0,0.08)" : "none" }}>{a === "All" ? "All ages" : a}</button>))}</div><button onClick={() => avatarInputRef.current?.click()} className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-4 mb-4 text-sm font-semibold transition hover:border-purple-400" style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg, color: D.textPrimary }}><PlusIcon /> New avatar — Generate or upload</button><input ref={avatarInputRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }} />{customAvatarUploading && (<div className="mb-4 text-center"><div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin mx-auto" /><p className="text-xs mt-1" style={{ color: D.textMuted }}>Uploading avatar...</p></div>)}<div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">{filteredAvatars.map((av) => (<button key={av.value} onClick={() => { setSelectedAvatar(av.value); setCustomAvatarUrl(""); setCustomAvatarPreview(""); setShowAvatarDialog(false); }} className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition" style={{ border: selectedAvatar === av.value ? "2px solid #0075FD" : "1px solid #E2E8F0", backgroundColor: selectedAvatar === av.value ? "#EAF3FF" : D.white }}><div className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: av.gender === "woman" ? "#FCE7F3" : "#DBEAFE", color: av.gender === "woman" ? "#EC4899" : "#3B82F6" }}>{av.label.charAt(0)}</div><p className="text-[11px] font-semibold text-center leading-tight" style={{ color: D.textPrimary }}>{av.label}</p><p className="text-[9px]" style={{ color: D.textMuted }}>{av.age} {av.gender}</p></button>))}</div><button onClick={() => setShowAvatarDialog(false)} className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white" style={{ backgroundColor: D.black }}>Done</button></div></DialogOverlay>)}
+      {showAvatarDialog && (
+        <DialogOverlay onClose={() => setShowAvatarDialog(false)}>
+          <div className="w-full max-w-2xl max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>Choose Avatar</h2>
+            <div className="flex gap-1 mb-2 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>
+              {(["All", "Female", "Male"] as const).map((g) => (
+                <button
+                  key={g}
+                  onClick={() => setAvatarGender(g)}
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+                  style={{
+                    backgroundColor: avatarGender === g ? D.white : "transparent",
+                    color: avatarGender === g ? D.textPrimary : D.textMuted,
+                    boxShadow: avatarGender === g ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                  }}
+                >
+                  {g}
+                </button>
+              ))}
+            </div>
+            <div className="flex gap-1 mb-4 p-1 rounded-lg w-fit" style={{ backgroundColor: "rgba(0,0,0,0.04)" }}>
+              {["All", "20s", "30s", "40s", "60s"].map((a) => (
+                <button
+                  key={a}
+                  onClick={() => setAvatarAge(a)}
+                  className="px-3 py-1.5 rounded-md text-xs font-semibold transition-all"
+                  style={{
+                    backgroundColor: avatarAge === a ? D.white : "transparent",
+                    color: avatarAge === a ? D.textPrimary : D.textMuted,
+                    boxShadow: avatarAge === a ? "0 1px 2px rgba(0,0,0,0.08)" : "none",
+                  }}
+                >
+                  {a === "All" ? "All ages" : a}
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => avatarInputRef.current?.click()}
+              className="w-full flex items-center justify-center gap-2 rounded-2xl border-2 border-dashed px-4 py-4 mb-4 text-sm font-semibold transition hover:border-purple-400"
+              style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg, color: D.textPrimary }}
+            >
+              <PlusIcon /> Upload custom avatar
+            </button>
+            <input
+              ref={avatarInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => { const f = e.target.files?.[0]; if (f) handleAvatarUpload(f); }}
+            />
+            {customAvatarUploading && (
+              <div className="mb-4 text-center">
+                <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin mx-auto" />
+                <p className="text-xs mt-1" style={{ color: D.textMuted }}>Uploading avatar…</p>
+              </div>
+            )}
+            <div className="grid grid-cols-3 sm:grid-cols-4 md:grid-cols-5 gap-2">
+              {filteredAvatars.map((av) => (
+                <button
+                  key={av.value}
+                  onClick={() => {
+                    setSelectedAvatar(av.value);
+                    setCustomAvatarUrl("");
+                    setCustomAvatarPreview("");
+                    setShowAvatarDialog(false);
+                  }}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl transition"
+                  style={{
+                    border: selectedAvatar === av.value ? "2px solid #0075FD" : "1px solid #E2E8F0",
+                    backgroundColor: selectedAvatar === av.value ? "#EAF3FF" : D.white,
+                  }}
+                >
+                  <div
+                    className="w-12 h-12 rounded-full flex items-center justify-center text-sm font-bold"
+                    style={{ backgroundColor: av.gender === "woman" ? "#FCE7F3" : "#DBEAFE", color: av.gender === "woman" ? "#EC4899" : "#3B82F6" }}
+                  >
+                    {av.label.charAt(0)}
+                  </div>
+                  <p className="text-[11px] font-semibold text-center leading-tight" style={{ color: D.textPrimary }}>{av.label}</p>
+                  <p className="text-[9px]" style={{ color: D.textMuted }}>{av.age} {av.gender}</p>
+                </button>
+              ))}
+            </div>
+            <button
+              onClick={() => setShowAvatarDialog(false)}
+              className="mt-4 w-full py-2.5 rounded-xl text-sm font-semibold text-white"
+              style={{ backgroundColor: D.black }}
+            >
+              Done
+            </button>
+          </div>
+        </DialogOverlay>
+      )}
 
       {/* VOICE DIALOG */}
-      {showVoiceDialog && (<DialogOverlay onClose={() => setShowVoiceDialog(false)}><div className="w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}><h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>Voice Library</h2><div className="space-y-1.5 mb-4">{AD_VOICES.map((voice) => (<button key={voice.value} onClick={() => { setSelectedVoice(selectedVoice === voice.value ? "" : voice.value); setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); }} className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition" style={{ border: selectedVoice === voice.value ? "1px solid rgba(0,117,253,0.4)" : "1px solid #E2E8F0", backgroundColor: selectedVoice === voice.value ? "#EAF3FF" : "#F8FAFC" }}><div className="flex items-center gap-3"><div className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold" style={{ backgroundColor: voice.gender === "Female" ? "#FCE7F3" : "#DBEAFE", color: voice.gender === "Female" ? "#EC4899" : "#3B82F6" }}>{voice.label.charAt(0)}</div><div><p className="text-sm font-semibold" style={{ color: selectedVoice === voice.value ? "#0075FD" : D.textPrimary }}>{voice.label}</p><p className="text-xs" style={{ color: "#64748B" }}>{voice.gender}</p></div></div>{selectedVoice === voice.value && <CheckIcon color="#0075FD" />}</button>))}</div><div className="mb-4"><p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: "#6B7280" }}>Or upload your own voice</p>{voicePreview ? (<div className="rounded-xl p-3" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}><audio src={voicePreview} controls className="w-full" style={{ height: "40px" }} /><button onClick={() => { setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); setSelectedVoice(""); }} className="mt-2 text-xs font-semibold" style={{ color: D.red }}>Remove voice</button></div>) : (<button onClick={() => voiceInputRef.current?.click()} className="w-full rounded-xl border-2 border-dashed p-6 text-center transition hover:border-purple-400" style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg }}><p className="text-sm font-medium" style={{ color: D.textPrimary }}>Upload voice audio</p><p className="text-xs mt-1" style={{ color: D.textMuted }}>.mp3, .wav up to 10 MB</p></button>)}<input ref={voiceInputRef} type="file" accept="audio/mpeg,audio/mp3,audio/wav,.mp3,.wav" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVoiceUpload(f); }} /></div><div className="flex gap-2"><button onClick={() => { setSelectedVoice(""); setVoiceFile(null); setVoicePreview(""); setVoiceAudioUrl(""); }} className="flex-1 py-2.5 rounded-xl text-sm font-semibold" style={{ backgroundColor: D.inputBg, color: D.textPrimary, border: `1px solid ${D.inputBorder}` }}>Clear Voice</button><button onClick={() => setShowVoiceDialog(false)} disabled={!selectedVoice && !voiceAudioUrl} className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40" style={{ backgroundColor: D.black }}>Attach</button></div></div></DialogOverlay>)}
+      {showVoiceDialog && (
+        <DialogOverlay onClose={() => setShowVoiceDialog(false)}>
+          <div className="w-full max-w-md max-h-[80vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-lg font-bold mb-4" style={{ color: D.textPrimary }}>Voice Library</h2>
+            <div className="space-y-1.5 mb-4">
+              {AD_VOICES.map((voice) => (
+                <button
+                  key={voice.value}
+                  onClick={() => {
+                    setSelectedVoice(selectedVoice === voice.value ? "" : voice.value);
+                    setVoicePreview("");
+                    setVoiceAudioUrl("");
+                  }}
+                  className="flex w-full items-center justify-between gap-3 rounded-xl px-3 py-3 text-left transition"
+                  style={{
+                    border: selectedVoice === voice.value ? "1px solid rgba(0,117,253,0.4)" : "1px solid #E2E8F0",
+                    backgroundColor: selectedVoice === voice.value ? "#EAF3FF" : "#F8FAFC",
+                  }}
+                >
+                  <div className="flex items-center gap-3">
+                    <div
+                      className="w-10 h-10 rounded-full flex items-center justify-center text-sm font-bold"
+                      style={{ backgroundColor: voice.gender === "Female" ? "#FCE7F3" : "#DBEAFE", color: voice.gender === "Female" ? "#EC4899" : "#3B82F6" }}
+                    >
+                      {voice.label.charAt(0)}
+                    </div>
+                    <div>
+                      <p className="text-sm font-semibold" style={{ color: selectedVoice === voice.value ? "#0075FD" : D.textPrimary }}>{voice.label}</p>
+                      <p className="text-xs" style={{ color: "#64748B" }}>{voice.gender}</p>
+                    </div>
+                  </div>
+                  {selectedVoice === voice.value && <CheckIcon color="#0075FD" />}
+                </button>
+              ))}
+            </div>
+            <div className="mb-4">
+              <p className="text-[10px] font-semibold tracking-[0.16em] uppercase mb-2" style={{ color: "#6B7280" }}>Or upload your own voice</p>
+              {voicePreview ? (
+                <div className="rounded-xl p-3" style={{ backgroundColor: D.inputBg, border: `1px solid ${D.cardBorder}` }}>
+                  <audio src={voicePreview} controls className="w-full" style={{ height: "40px" }} />
+                  <button
+                    onClick={() => { setVoicePreview(""); setVoiceAudioUrl(""); setSelectedVoice(""); }}
+                    className="mt-2 text-xs font-semibold"
+                    style={{ color: D.red }}
+                  >
+                    Remove voice
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => voiceInputRef.current?.click()}
+                  className="w-full rounded-xl border-2 border-dashed p-6 text-center transition hover:border-purple-400"
+                  style={{ borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                >
+                  <p className="text-sm font-medium" style={{ color: D.textPrimary }}>Upload voice audio</p>
+                  <p className="text-xs mt-1" style={{ color: D.textMuted }}>.mp3, .wav up to 10 MB</p>
+                </button>
+              )}
+              <input
+                ref={voiceInputRef}
+                type="file"
+                accept="audio/mpeg,audio/mp3,audio/wav,.mp3,.wav"
+                className="hidden"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleVoiceUpload(f); }}
+              />
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => { setSelectedVoice(""); setVoicePreview(""); setVoiceAudioUrl(""); }}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold"
+                style={{ backgroundColor: D.inputBg, color: D.textPrimary, border: `1px solid ${D.inputBorder}` }}
+              >
+                Clear Voice
+              </button>
+              <button
+                onClick={() => setShowVoiceDialog(false)}
+                disabled={!selectedVoice && !voiceAudioUrl}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold text-white disabled:opacity-40"
+                style={{ backgroundColor: D.black }}
+              >
+                Attach
+              </button>
+            </div>
+          </div>
+        </DialogOverlay>
+      )}
     </div>
   );
 }
