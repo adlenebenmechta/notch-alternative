@@ -70,14 +70,19 @@ export async function POST(req: NextRequest) {
     // Use user-provided KIE API key if available, otherwise fall back to default
     const effectiveKieKey = (typeof kieApiKey === "string" && kieApiKey.length > 10) ? kieApiKey : DEFAULT_KIE_KEY;
 
-    // Route to appropriate API based on model
-    if (model === "veo3_lite" || model === "veo3_fast" || model === "seedance") {
-      return await generateAdViaKIE(enhancedPrompt, model, dur, aspect, imageUrls, voiceAudioUrl, effectiveKieKey);
-    }
+    // Map frontend model names to correct KIE API model names
+    const KIE_MODEL_MAP: Record<string, string> = {
+      "seedance": "bytedance/seedance-2",
+      "seedance_fast": "bytedance/seedance-2-fast",
+      "veo3_lite": "veo3_lite",
+      "veo3_fast": "veo3_fast",
+      "grok_imagine": "bytedance/seedance-2",
+    };
+    const kieModel = KIE_MODEL_MAP[model];
 
-    // For Grok Imagine - route through KIE as well
-    if (model === "grok_imagine") {
-      return await generateAdViaKIE(enhancedPrompt, "seedance", dur, aspect, imageUrls, voiceAudioUrl, effectiveKieKey);
+    // Route to appropriate API based on model
+    if (kieModel) {
+      return await generateAdViaKIE(enhancedPrompt, kieModel, model, dur, aspect, imageUrls, voiceAudioUrl, effectiveKieKey);
     }
 
     // Default: kling3.0 via fal.ai
@@ -93,7 +98,8 @@ export async function POST(req: NextRequest) {
 
 async function generateAdViaKIE(
   prompt: string,
-  model: string,
+  kieModelName: string,
+  originalModel: string,
   duration: number,
   aspectRatio: string,
   imageUrls: string[] = [],
@@ -101,35 +107,51 @@ async function generateAdViaKIE(
   kieKey?: string,
 ): Promise<NextResponse> {
   const effectiveKey = kieKey || DEFAULT_KIE_KEY;
-  const imageSize = ASPECT_SIZE_MAP[aspectRatio] || "768x1344";
+  const isSeedance = kieModelName.startsWith("bytedance/seedance");
 
+  // Build input body with correct parameter names per model type
   const inputBody: Record<string, unknown> = {
     prompt: prompt.trim(),
-    image_size: imageSize,
-    duration: `${duration}s`,
   };
 
-  // Add the first image URL as the main reference image
-  if (imageUrls.length > 0) {
-    inputBody.image_url = imageUrls[0];
-  }
+  if (isSeedance) {
+    // Seedance 2.0 uses aspect_ratio, duration (integer), and reference images
+    inputBody.aspect_ratio = aspectRatio;
+    inputBody.duration = duration;
+    inputBody.resolution = "720p";
 
-  // Add second image URL if available (some models support multiple refs)
-  if (imageUrls.length > 1) {
-    inputBody.ref_image_url = imageUrls[1];
-  }
+    // Seedance 2.0 uses first_frame_url and reference_image_urls
+    if (imageUrls.length > 0) {
+      inputBody.first_frame_url = imageUrls[0];
+    }
+    if (imageUrls.length > 1) {
+      inputBody.reference_image_urls = imageUrls.slice(1);
+    }
 
-  // Add voice audio URL for Seedance 2.0
-  if (voiceAudioUrl && model === "seedance") {
-    inputBody.audio_url = voiceAudioUrl;
+    // Voice audio for Seedance models
+    if (voiceAudioUrl) {
+      inputBody.reference_audio_urls = [voiceAudioUrl];
+    }
+  } else {
+    // Veo models use image_size and duration string
+    const imageSize = ASPECT_SIZE_MAP[aspectRatio] || "768x1344";
+    inputBody.image_size = imageSize;
+    inputBody.duration = `${duration}s`;
+
+    if (imageUrls.length > 0) {
+      inputBody.image_url = imageUrls[0];
+    }
+    if (imageUrls.length > 1) {
+      inputBody.ref_image_url = imageUrls[1];
+    }
   }
 
   const submitBody = {
-    model,
+    model: kieModelName,
     input: inputBody,
   };
 
-  console.log(`[Ad Generate KIE] Submitting ${model} job, duration=${duration}s, images=${imageUrls.length}, voice=${!!voiceAudioUrl}`);
+  console.log(`[Ad Generate KIE] Submitting ${kieModelName} job (frontend model: ${originalModel}), duration=${duration}s, images=${imageUrls.length}, voice=${!!voiceAudioUrl}`);
 
   const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
     method: "POST",

@@ -1074,6 +1074,7 @@ function AIVideoGeneratorPage({ onBack }: { onBack: () => void }) {
                 { value: "veo3_lite", label: "Veo3 Lite" },
                 { value: "veo3_fast", label: "Veo3 Fast" },
                 { value: "seedance", label: "Seedance 2.0" },
+                { value: "seedance_fast", label: "Seedance Fast" },
               ]}
               value={model}
               onChange={setModel}
@@ -2359,12 +2360,15 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
     return fullPrompt;
   };
 
+  // Map frontend model names to backend model names
+  // Backend handles the final KIE API model name mapping
   const mapModel = (m: string): string => {
     switch (m) {
-      case "seedance": case "seedance_fast": return "seedance";
+      case "seedance": return "seedance";
+      case "seedance_fast": return "seedance_fast";
       case "veo3_fast": return "veo3_fast";
       case "veo3": return "veo3_lite";
-      case "grok_imagine": return "seedance";
+      case "grok_imagine": return "grok_imagine";
       default: return "seedance";
     }
   };

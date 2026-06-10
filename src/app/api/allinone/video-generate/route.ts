@@ -34,9 +34,18 @@ export async function POST(req: NextRequest) {
     const dur = typeof duration === "number" ? duration : 5;
     const aspect = typeof aspectRatio === "string" ? aspectRatio : "16:9";
 
+    // Map frontend model names to correct KIE API model names
+    const KIE_MODEL_MAP: Record<string, string> = {
+      "seedance": "bytedance/seedance-2",
+      "seedance_fast": "bytedance/seedance-2-fast",
+      "veo3_lite": "veo3_lite",
+      "veo3_fast": "veo3_fast",
+    };
+    const kieModel = KIE_MODEL_MAP[model];
+
     // Route to appropriate API based on model
-    if (model === "veo3_lite" || model === "veo3_fast" || model === "seedance") {
-      return await generateViaKIE(prompt, model, dur, aspect, imageUrl, seed);
+    if (kieModel) {
+      return await generateViaKIE(prompt, kieModel, model, dur, aspect, imageUrl, seed);
     }
 
     // Default: kling3.0 via fal.ai
@@ -52,22 +61,38 @@ export async function POST(req: NextRequest) {
 
 async function generateViaKIE(
   prompt: string,
-  model: string,
+  kieModelName: string,
+  originalModel: string,
   duration: number,
   aspectRatio: string,
   imageUrl?: string,
   seed?: number,
 ): Promise<NextResponse> {
-  const imageSize = ASPECT_SIZE_MAP[aspectRatio] || "1344x768";
+  const isSeedance = kieModelName.startsWith("bytedance/seedance");
 
+  // Build input body with correct parameter names per model type
   const inputBody: Record<string, unknown> = {
     prompt: prompt.trim(),
-    image_size: imageSize,
-    duration: `${duration}s`,
   };
 
-  if (imageUrl) {
-    inputBody.image_url = imageUrl;
+  if (isSeedance) {
+    // Seedance 2.0 uses aspect_ratio, duration (integer), and first_frame_url
+    inputBody.aspect_ratio = aspectRatio;
+    inputBody.duration = duration;
+    inputBody.resolution = "720p";
+
+    if (imageUrl) {
+      inputBody.first_frame_url = imageUrl;
+    }
+  } else {
+    // Veo models use image_size and duration string
+    const imageSize = ASPECT_SIZE_MAP[aspectRatio] || "1344x768";
+    inputBody.image_size = imageSize;
+    inputBody.duration = `${duration}s`;
+
+    if (imageUrl) {
+      inputBody.image_url = imageUrl;
+    }
   }
 
   if (seed) {
@@ -75,11 +100,11 @@ async function generateViaKIE(
   }
 
   const submitBody = {
-    model,
+    model: kieModelName,
     input: inputBody,
   };
 
-  console.log(`[KIE Video] Submitting ${model} job...`);
+  console.log(`[KIE Video] Submitting ${kieModelName} job (frontend model: ${originalModel})...`);
 
   const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
     method: "POST",
