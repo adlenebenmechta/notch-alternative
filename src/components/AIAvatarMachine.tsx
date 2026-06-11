@@ -1354,21 +1354,23 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       // Upload custom frame images to KIE for scenes that have them
-      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenes.length).fill(undefined);
+      // IMPORTANT: Build preUploadedFrameUrls indexed by scenesWithContent (NOT scenes),
+      // because chainScenes is derived from scenesWithContent and the backend uses the same index.
+      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenesWithContent.length).fill(undefined);
       if (someManualFrames) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s) to server...`);
         
         // Upload ALL custom frames in parallel for speed
         const uploadPromises: Promise<void>[] = [];
-        for (let i = 0; i < scenes.length; i++) {
-          const scene = scenes[i];
+        for (let ci = 0; ci < scenesWithContent.length; ci++) {
+          const scene = scenesWithContent[ci];
           if (scene.customFrameImage) {
             const uploadPromise = (async () => {
               try {
-                addLog(`  Scene ${i + 1}: Uploading custom frame...`);
+                addLog(`  Scene ${ci + 1}: Uploading custom frame...`);
                 const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
                 const formData = new FormData();
-                formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
+                formData.append("avatar", frameBlob, `scene_${ci}_frame.jpg`);
 
                 const uploadRes = await authFetch("/api/upload-avatar", {
                   method: "POST",
@@ -1378,13 +1380,18 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 if (uploadRes.ok) {
                   const uploadData = await uploadRes.json();
                   if (uploadData.avatarUrl) {
-                    preUploadedFrameUrls[i] = uploadData.avatarUrl;
-                    addLog(`  Scene ${i + 1}: Frame uploaded!`);
+                    preUploadedFrameUrls[ci] = uploadData.avatarUrl;
+                    addLog(`  Scene ${ci + 1}: Frame uploaded!`);
+                  } else {
+                    addLog(`  Scene ${ci + 1}: Frame upload returned no URL — response: ${JSON.stringify(uploadData)}`);
                   }
+                } else {
+                  const errText = await uploadRes.text().catch(() => "unknown error");
+                  addLog(`  Scene ${ci + 1}: Frame upload failed (HTTP ${uploadRes.status}) — ${errText}`);
                 }
               } catch (err) {
                 const msg = err instanceof Error ? err.message : String(err);
-                addLog(`  Scene ${i + 1}: Frame upload failed: ${msg}`);
+                addLog(`  Scene ${ci + 1}: Frame upload failed: ${msg}`);
               }
             })();
             uploadPromises.push(uploadPromise);
@@ -1392,6 +1399,12 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         }
         // Wait for all uploads to finish in parallel
         await Promise.all(uploadPromises);
+        // Verify all custom frames were uploaded successfully
+        const uploadedCount = preUploadedFrameUrls.filter((u) => u && u.length > 0).length;
+        const expectedCount = scenesWithContent.filter(s => s.customFrameImage).length;
+        if (uploadedCount < expectedCount) {
+          addLog(`⚠️ Warning: Only ${uploadedCount}/${expectedCount} custom frames uploaded successfully. Missing frames will cause "No frame uploaded" errors.`);
+        }
         addLog("Custom frame upload complete!");
       }
 
@@ -1400,14 +1413,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const scenesWithRefImages = scenesWithContent.filter((s) => s.referenceImage);
       if (scenesWithRefImages.length > 0) {
         addLog(`Uploading ${scenesWithRefImages.length} reference image(s)...`);
-        for (let i = 0; i < scenes.length; i++) {
-          const scene = scenes[i];
+        for (let ci = 0; ci < scenesWithContent.length; ci++) {
+          const scene = scenesWithContent[ci];
           if (scene.referenceImage) {
             try {
-              addLog(`  Scene ${i + 1}: Uploading reference image...`);
+              addLog(`  Scene ${ci + 1}: Uploading reference image...`);
               const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
               const formData = new FormData();
-              formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
+              formData.append("avatar", refBlob, `scene_${ci}_ref.jpg`);
 
               const uploadRes = await authFetch("/api/upload-avatar", {
                 method: "POST",
@@ -1417,13 +1430,13 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
               if (uploadRes.ok) {
                 const uploadData = await uploadRes.json();
                 if (uploadData.avatarUrl) {
-                  customReferenceImageUrls[i] = uploadData.avatarUrl;
-                  addLog(`  Scene ${i + 1}: Reference image uploaded!`);
+                  customReferenceImageUrls[ci] = uploadData.avatarUrl;
+                  addLog(`  Scene ${ci + 1}: Reference image uploaded!`);
                 }
               }
             } catch (err) {
               const msg = err instanceof Error ? err.message : String(err);
-              addLog(`  Scene ${i + 1}: Reference upload failed: ${msg}`);
+              addLog(`  Scene ${ci + 1}: Reference upload failed: ${msg}`);
             }
           }
         }
@@ -1782,32 +1795,42 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       // Upload custom frame images
-      const scenesWithCustomFrames = scenes.filter(s => s.customFrameImage);
-      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenes.length).fill(undefined);
+      // IMPORTANT: Build preUploadedFrameUrls indexed by scenesWithContent (NOT scenes),
+      // because chainScenes is derived from scenesWithContent and the backend uses the same index.
+      const scenesWithCustomFrames = scenesWithContent.filter(s => s.customFrameImage);
+      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenesWithContent.length).fill(undefined);
       if (scenesWithCustomFrames.length > 0) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s)...`);
         
         // Upload ALL custom frames in parallel for speed
         const uploadPromises: Promise<void>[] = [];
-        for (let i = 0; i < scenes.length; i++) {
-          const scene = scenes[i];
+        for (let ci = 0; ci < scenesWithContent.length; ci++) {
+          const scene = scenesWithContent[ci];
           if (scene.customFrameImage) {
             const uploadPromise = (async () => {
               try {
-                addLog(`  Scene ${i + 1}: Uploading custom frame...`);
+                addLog(`  Scene ${ci + 1}: Uploading custom frame...`);
                 const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
                 const formData = new FormData();
-                formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
+                formData.append("avatar", frameBlob, `scene_${ci}_frame.jpg`);
 
                 const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
                 if (uploadRes.ok) {
                   const uploadData = await uploadRes.json();
                   if (uploadData.avatarUrl) {
-                    preUploadedFrameUrls[i] = uploadData.avatarUrl;
-                    addLog(`  Scene ${i + 1}: Frame uploaded!`);
+                    preUploadedFrameUrls[ci] = uploadData.avatarUrl;
+                    addLog(`  Scene ${ci + 1}: Frame uploaded!`);
+                  } else {
+                    addLog(`  Scene ${ci + 1}: Frame upload returned no URL — response: ${JSON.stringify(uploadData)}`);
                   }
+                } else {
+                  const errText = await uploadRes.text().catch(() => "unknown error");
+                  addLog(`  Scene ${ci + 1}: Frame upload failed (HTTP ${uploadRes.status}) — ${errText}`);
                 }
-              } catch (err) { addLog(`  Scene ${i + 1}: Frame upload failed`); }
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                addLog(`  Scene ${ci + 1}: Frame upload failed: ${msg}`);
+              }
             })();
             uploadPromises.push(uploadPromise);
           }
@@ -1820,20 +1843,20 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       const scenesWithRefImages = scenesWithContent.filter(s => s.referenceImage);
       if (scenesWithRefImages.length > 0) {
         addLog(`Uploading ${scenesWithRefImages.length} reference image(s)...`);
-        for (let i = 0; i < scenes.length; i++) {
-          const scene = scenes[i];
+        for (let ci = 0; ci < scenesWithContent.length; ci++) {
+          const scene = scenesWithContent[ci];
           if (scene.referenceImage) {
             try {
               const refBlob = await fetch(scene.referenceImage).then(r => r.blob());
               const formData = new FormData();
-              formData.append("avatar", refBlob, `scene_${i}_ref.jpg`);
+              formData.append("avatar", refBlob, `scene_${ci}_ref.jpg`);
 
               const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
               if (uploadRes.ok) {
                 const uploadData = await uploadRes.json();
-                if (uploadData.avatarUrl) customReferenceImageUrls[i] = uploadData.avatarUrl;
+                if (uploadData.avatarUrl) customReferenceImageUrls[ci] = uploadData.avatarUrl;
               }
-            } catch (err) { addLog(`  Scene ${i + 1}: Reference upload failed`); }
+            } catch (err) { addLog(`  Scene ${ci + 1}: Reference upload failed`); }
           }
         }
       }
