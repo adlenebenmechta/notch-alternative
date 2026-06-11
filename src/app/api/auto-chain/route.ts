@@ -742,30 +742,144 @@ export async function POST(req: NextRequest) {
         }
       } else if (skipFrames && preUploadedFrameUrls) {
         // User already has frames — skip generation, use pre-uploaded URLs directly
-        sseSend(sw, { type: "step_change", step: "frames", message: "Using pre-set frames (skipping generation)..." });
-        for (let i = 0; i < totalScenes; i++) {
-          const frameUrl = preUploadedFrameUrls[i] || "";
-          frameUrls.push(frameUrl);
-          if (frameUrl) {
-            const isSameUrl = preUploadedFrameUrls.every((u: string) => u === preUploadedFrameUrls[0]);
-            sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl, message: `Frame ${i + 1}/${totalScenes}: ${isSameUrl ? "Using avatar image" : "Using uploaded frame"}` });
-          } else {
-            sseSend(sw, { type: "frame_error", sceneIndex: i, error: "No frame uploaded", message: `Frame ${i + 1}: No uploaded frame` });
+        // NOTE: preUploadedFrameUrls may have undefined entries for scenes without custom frames
+        // We need to handle gaps: scenes with URLs use them, scenes without need AI generation
+        const hasAllFrames = preUploadedFrameUrls.filter((u: string | undefined) => u && u.length > 0).length === totalScenes;
+        
+        if (hasAllFrames) {
+          // All scenes have uploaded frames — skip generation entirely
+          sseSend(sw, { type: "step_change", step: "frames", message: "Using pre-set frames (skipping generation)..." });
+          for (let i = 0; i < totalScenes; i++) {
+            const frameUrl = preUploadedFrameUrls[i] || "";
+            frameUrls.push(frameUrl);
+            if (frameUrl) {
+              const isSameUrl = preUploadedFrameUrls.every((u: string | undefined) => u === preUploadedFrameUrls[0]);
+              sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl, message: `Frame ${i + 1}/${totalScenes}: ${isSameUrl ? "Using avatar image" : "Using uploaded frame"}` });
+            } else {
+              sseSend(sw, { type: "frame_error", sceneIndex: i, error: "No frame uploaded", message: `Frame ${i + 1}: No uploaded frame` });
+            }
           }
-        }
-        const successfulFrames = frameUrls.filter(Boolean);
-        const isAvatarOnly = preUploadedFrameUrls.length > 0 && preUploadedFrameUrls.every((u: string) => u === preUploadedFrameUrls[0]);
-        sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready (${isAvatarOnly ? "avatar image" : "uploaded"})` });
+          const successfulFrames = frameUrls.filter(Boolean);
+          const isAvatarOnly = preUploadedFrameUrls.length > 0 && preUploadedFrameUrls.every((u: string | undefined) => u === preUploadedFrameUrls[0]);
+          sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready (${isAvatarOnly ? "avatar image" : "uploaded"})` });
 
-        if (successfulFrames.length === 0) {
-          sseSend(sw, { type: "error", message: "No uploaded frames were provided" });
-          return;
-        }
+          if (successfulFrames.length === 0) {
+            sseSend(sw, { type: "error", message: "No uploaded frames were provided" });
+            return;
+          }
 
-        // ── Frames-only mode: stop here, let user review before generating videos ──
-        if (framesOnly) {
-          sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames ready! Review and then generate videos." });
-          return;
+          // ── Frames-only mode: stop here, let user review before generating videos ──
+          if (framesOnly) {
+            sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames ready! Review and then generate videos." });
+            return;
+          }
+        } else {
+          // MIXED MODE: Some scenes have custom frames, others need AI generation
+          // Pre-fill the uploaded frame URLs, then generate missing ones
+          sseSend(sw, { type: "step_change", step: "frames", message: "Using uploaded frames + generating missing ones..." });
+          
+          const uploadedCount = preUploadedFrameUrls.filter((u: string | undefined) => u && u.length > 0).length;
+          const missingCount = totalScenes - uploadedCount;
+          addLog(`[Auto Chain] ${uploadedCount} scenes have custom frames, ${missingCount} need AI generation`);
+          
+          // Pre-fill uploaded frame URLs
+          for (let i = 0; i < totalScenes; i++) {
+            const url = preUploadedFrameUrls[i];
+            if (url && url.length > 0) {
+              frameUrls.push(url);
+              sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl: url, message: `Frame ${i + 1}/${totalScenes}: Using uploaded frame` });
+            } else {
+              frameUrls.push(""); // Placeholder — will be filled by AI generation
+            }
+          }
+          
+          // Now generate frames for scenes that don't have one (using character image as reference)
+          if (missingCount > 0 && characterImageUrl) {
+            sseSend(sw, { type: "frame_progress", sceneIndex: -1, pct: 0, message: `Generating ${missingCount} missing frame(s) using character reference...` });
+            
+            const MAX_FRAME_RETRIES = 3;
+            let scene1FrameUrl = frameUrls[0] || ""; // If Scene 1 has a custom frame, use it as reference for others
+            
+            for (let i = 0; i < totalScenes; i++) {
+              if (frameUrls[i]) continue; // Already has uploaded frame — skip
+              
+              let frameUrl = "";
+              let lastFrameError = "";
+              for (let attempt = 1; attempt <= MAX_FRAME_RETRIES; attempt++) {
+                const refUrl = i === 0 ? characterImageUrl : (scene1FrameUrl || characterImageUrl);
+                const refDesc = i === 0 ? "character image" : (scene1FrameUrl ? "Scene 1 frame" : "character image");
+                sseSend(sw, { type: "frame_progress", sceneIndex: i, pct: 0, message: attempt === 1 ? `Frame ${i + 1}/${totalScenes}: Generating with ${refDesc}...` : `Frame ${i + 1} retry ${attempt}: ${lastFrameError.slice(0, 60)}` });
+                
+                try {
+                  const imgPrompt = (requestScenes[i]?.framePrompt || requestScenes[i]?.description || "").trim();
+                  const prompt = imgPrompt + ". Keep the EXACT SAME person from the reference image — same face, same facial features, same hair, same skin tone. Photorealistic, high quality. Fixed tripod shot, looking at camera.";
+                  
+                  const customRefImage = customReferenceImages?.[i];
+                  const imageUrls: string[] = [];
+                  if (customRefImage && i > 0) {
+                    imageUrls.push(customRefImage);
+                    if (scene1FrameUrl) imageUrls.push(scene1FrameUrl);
+                  } else {
+                    imageUrls.push(refUrl);
+                  }
+                  
+                  const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+                    method: "POST",
+                    headers: { Authorization: `Bearer ${effectiveKieKey}`, "Content-Type": "application/json" },
+                    body: JSON.stringify({ model: "google/nano-banana-edit", input: { prompt, image_urls: imageUrls, image_size: "9:16", output_format: "png", strength: 0.35 } }),
+                  });
+                  const submitJson = await submitRes.json();
+                  if (submitJson.code !== 200) throw new Error("Frame submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
+                  const taskId = submitJson.data?.taskId;
+                  if (!taskId) throw new Error("No taskId for frame generation");
+                  
+                  // Poll for frame result
+                  for (let p = 0; p < 72; p++) {
+                    await sleep(5000);
+                    try {
+                      const pollRes = await fetch(`https://api.kie.ai/api/v1/jobs/recordInfo?taskId=${taskId}`, { headers: { Authorization: `Bearer ${effectiveKieKey}` } });
+                      const pollJson = await pollRes.json();
+                      if (pollJson.code === 200 && pollJson.data?.state === "success") {
+                        let result = pollJson.data.resultJson;
+                        if (typeof result === "string") try { result = JSON.parse(result); } catch {}
+                        const rawUrl = result?.resultUrls?.[0] || result?.url || "";
+                        if (rawUrl) {
+                          frameUrl = await downloadAndReupload(rawUrl, effectiveKieKey, `frame_${i}`);
+                          if (i === 0 && !scene1FrameUrl) scene1FrameUrl = frameUrl;
+                        }
+                        break;
+                      }
+                      if (pollJson.data?.state === "fail") throw new Error(pollJson.data?.failMsg || "Frame generation failed");
+                    } catch (pollErr) { if (p === 71) throw pollErr; }
+                  }
+                  
+                  if (frameUrl) { frameUrls[i] = frameUrl; break; }
+                } catch (err) {
+                  lastFrameError = err instanceof Error ? err.message : String(err);
+                  if (attempt === MAX_FRAME_RETRIES) {
+                    sseSend(sw, { type: "frame_error", sceneIndex: i, error: lastFrameError });
+                  }
+                }
+              }
+              
+              if (frameUrl) {
+                sseSend(sw, { type: "frame_done", sceneIndex: i, frameUrl });
+              }
+            }
+          }
+          
+          const successfulFrames = frameUrls.filter(Boolean);
+          sseSend(sw, { type: "frames_complete", frameUrls, successCount: successfulFrames.length, message: `${successfulFrames.length}/${totalScenes} frames ready` });
+          
+          if (successfulFrames.length === 0) {
+            sseSend(sw, { type: "error", message: "No frames could be generated or uploaded" });
+            return;
+          }
+          
+          if (framesOnly) {
+            sseSend(sw, { type: "done", frameUrls, framesOnly: true, message: "Frames ready! Review and then generate videos." });
+            return;
+          }
         }
       } else {
         // Generate frames using AI (Scene 1 uses character ref, Scenes 2+ use Scene 1 frame as ref) — with per-frame retry

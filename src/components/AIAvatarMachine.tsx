@@ -1354,36 +1354,44 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
 
       // Upload custom frame images to KIE for scenes that have them
-      let preUploadedFrameUrls: string[] = [];
+      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenes.length).fill(undefined);
       if (someManualFrames) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s) to server...`);
+        
+        // Upload ALL custom frames in parallel for speed
+        const uploadPromises: Promise<void>[] = [];
         for (let i = 0; i < scenes.length; i++) {
           const scene = scenes[i];
           if (scene.customFrameImage) {
-            try {
-              addLog(`  Scene ${i + 1}: Uploading custom frame...`);
-              const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
-              const formData = new FormData();
-              formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
+            const uploadPromise = (async () => {
+              try {
+                addLog(`  Scene ${i + 1}: Uploading custom frame...`);
+                const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
+                const formData = new FormData();
+                formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
 
-              const uploadRes = await authFetch("/api/upload-avatar", {
-                method: "POST",
-                body: formData,
-                signal: controller.signal,
-              });
-              if (uploadRes.ok) {
-                const uploadData = await uploadRes.json();
-                if (uploadData.avatarUrl) {
-                  preUploadedFrameUrls[i] = uploadData.avatarUrl;
-                  addLog(`  Scene ${i + 1}: Frame uploaded!`);
+                const uploadRes = await authFetch("/api/upload-avatar", {
+                  method: "POST",
+                  body: formData,
+                  signal: controller.signal,
+                });
+                if (uploadRes.ok) {
+                  const uploadData = await uploadRes.json();
+                  if (uploadData.avatarUrl) {
+                    preUploadedFrameUrls[i] = uploadData.avatarUrl;
+                    addLog(`  Scene ${i + 1}: Frame uploaded!`);
+                  }
                 }
+              } catch (err) {
+                const msg = err instanceof Error ? err.message : String(err);
+                addLog(`  Scene ${i + 1}: Frame upload failed: ${msg}`);
               }
-            } catch (err) {
-              const msg = err instanceof Error ? err.message : String(err);
-              addLog(`  Scene ${i + 1}: Frame upload failed: ${msg}`);
-            }
+            })();
+            uploadPromises.push(uploadPromise);
           }
         }
+        // Wait for all uploads to finish in parallel
+        await Promise.all(uploadPromises);
         addLog("Custom frame upload complete!");
       }
 
@@ -1775,25 +1783,36 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
       // Upload custom frame images
       const scenesWithCustomFrames = scenes.filter(s => s.customFrameImage);
-      let preUploadedFrameUrls: string[] = [];
+      let preUploadedFrameUrls: (string | undefined)[] = new Array(scenes.length).fill(undefined);
       if (scenesWithCustomFrames.length > 0) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s)...`);
+        
+        // Upload ALL custom frames in parallel for speed
+        const uploadPromises: Promise<void>[] = [];
         for (let i = 0; i < scenes.length; i++) {
           const scene = scenes[i];
           if (scene.customFrameImage) {
-            try {
-              const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
-              const formData = new FormData();
-              formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
+            const uploadPromise = (async () => {
+              try {
+                addLog(`  Scene ${i + 1}: Uploading custom frame...`);
+                const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
+                const formData = new FormData();
+                formData.append("avatar", frameBlob, `scene_${i}_frame.jpg`);
 
-              const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
-              if (uploadRes.ok) {
-                const uploadData = await uploadRes.json();
-                if (uploadData.avatarUrl) preUploadedFrameUrls[i] = uploadData.avatarUrl;
-              }
-            } catch (err) { addLog(`  Scene ${i + 1}: Frame upload failed`); }
+                const uploadRes = await authFetch("/api/upload-avatar", { method: "POST", body: formData, signal: controller.signal });
+                if (uploadRes.ok) {
+                  const uploadData = await uploadRes.json();
+                  if (uploadData.avatarUrl) {
+                    preUploadedFrameUrls[i] = uploadData.avatarUrl;
+                    addLog(`  Scene ${i + 1}: Frame uploaded!`);
+                  }
+                }
+              } catch (err) { addLog(`  Scene ${i + 1}: Frame upload failed`); }
+            })();
+            uploadPromises.push(uploadPromise);
           }
         }
+        await Promise.all(uploadPromises);
       }
 
       // Upload per-scene reference images
