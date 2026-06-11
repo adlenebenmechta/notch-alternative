@@ -780,7 +780,7 @@ export async function POST(req: NextRequest) {
           
           const uploadedCount = preUploadedFrameUrls.filter((u: string | undefined) => u && u.length > 0).length;
           const missingCount = totalScenes - uploadedCount;
-          addLog(`[Auto Chain] ${uploadedCount} scenes have custom frames, ${missingCount} need AI generation`);
+          sseSend(sw, { type: "log", message: `[Auto Chain] ${uploadedCount} scenes have custom frames, ${missingCount} need AI generation` });
           
           // Pre-fill uploaded frame URLs
           for (let i = 0; i < totalScenes; i++) {
