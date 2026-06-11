@@ -20,6 +20,8 @@ async function compressAvatar(buffer: Buffer): Promise<Buffer> {
   return img.jpeg({ quality: 92 }).toBuffer();
 }
 
+const MAX_UPLOAD_RETRIES = 3;
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData();
@@ -40,18 +42,40 @@ export async function POST(req: NextRequest) {
 
     const fileName = `avatar_${Date.now()}_${Math.random().toString(36).slice(2, 8)}.jpg`;
 
-    const uploadRes = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
-      method: "POST",
-      headers: {
-        "Authorization": `Bearer ${kieApiKey}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({ base64Data: base64, fileName, uploadPath: "images" }),
-    });
+    // Retry upload to KIE AI — their API sometimes returns 500 under load
+    let json: any = null;
+    let lastError = "";
+    for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES; attempt++) {
+      try {
+        const uploadRes = await fetch("https://kieai.redpandaai.co/api/file-base64-upload", {
+          method: "POST",
+          headers: {
+            "Authorization": `Bearer ${kieApiKey}`,
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ base64Data: base64, fileName, uploadPath: "images" }),
+        });
 
-    const json = await uploadRes.json();
-    if (!json.success) {
-      return NextResponse.json({ success: false, error: "Image upload failed: " + (json.msg || "unknown") }, { status: 500 });
+        json = await uploadRes.json();
+        if (json.success && json.data?.downloadUrl) {
+          break; // Success — exit retry loop
+        }
+
+        lastError = json.msg || json.error || `HTTP ${uploadRes.status}`;
+        if (attempt < MAX_UPLOAD_RETRIES) {
+          // Wait before retry: 1s, 2s, ...
+          await new Promise(r => setTimeout(r, attempt * 1000));
+        }
+      } catch (fetchErr) {
+        lastError = fetchErr instanceof Error ? fetchErr.message : String(fetchErr);
+        if (attempt < MAX_UPLOAD_RETRIES) {
+          await new Promise(r => setTimeout(r, attempt * 1000));
+        }
+      }
+    }
+
+    if (!json?.success) {
+      return NextResponse.json({ success: false, error: `Image upload failed after ${MAX_UPLOAD_RETRIES} attempts: ${lastError || "unknown"}` }, { status: 500 });
     }
 
     const downloadUrl = json.data?.downloadUrl;

@@ -1360,14 +1360,16 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (someManualFrames) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s) to server...`);
         
-        // Upload ALL custom frames in parallel for speed
-        const uploadPromises: Promise<void>[] = [];
+        // Upload frames SEQUENTIALLY (not in parallel) to avoid overloading the KIE API
+        // which returns 500 errors when too many uploads happen at once
+        const MAX_UPLOAD_RETRIES = 3;
         for (let ci = 0; ci < scenesWithContent.length; ci++) {
           const scene = scenesWithContent[ci];
           if (scene.customFrameImage) {
-            const uploadPromise = (async () => {
+            let uploaded = false;
+            for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES && !uploaded; attempt++) {
               try {
-                addLog(`  Scene ${ci + 1}: Uploading custom frame...`);
+                addLog(`  Scene ${ci + 1}: Uploading custom frame${attempt > 1 ? ` (retry ${attempt})` : ''}...`);
                 const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
                 const formData = new FormData();
                 formData.append("avatar", frameBlob, `scene_${ci}_frame.jpg`);
@@ -1382,6 +1384,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   if (uploadData.avatarUrl) {
                     preUploadedFrameUrls[ci] = uploadData.avatarUrl;
                     addLog(`  Scene ${ci + 1}: Frame uploaded!`);
+                    uploaded = true;
                   } else {
                     addLog(`  Scene ${ci + 1}: Frame upload returned no URL — response: ${JSON.stringify(uploadData)}`);
                   }
@@ -1393,12 +1396,16 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 const msg = err instanceof Error ? err.message : String(err);
                 addLog(`  Scene ${ci + 1}: Frame upload failed: ${msg}`);
               }
-            })();
-            uploadPromises.push(uploadPromise);
+              // Wait before retry
+              if (!uploaded && attempt < MAX_UPLOAD_RETRIES) {
+                await new Promise(r => setTimeout(r, attempt * 1500));
+              }
+            }
+            if (!uploaded) {
+              addLog(`  Scene ${ci + 1}: FAILED to upload frame after ${MAX_UPLOAD_RETRIES} attempts`);
+            }
           }
         }
-        // Wait for all uploads to finish in parallel
-        await Promise.all(uploadPromises);
         // Verify all custom frames were uploaded successfully
         const uploadedCount = preUploadedFrameUrls.filter((u) => u && u.length > 0).length;
         const expectedCount = scenesWithContent.filter(s => s.customFrameImage).length;
@@ -1802,14 +1809,16 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (scenesWithCustomFrames.length > 0) {
         addLog(`Uploading ${scenesWithCustomFrames.length} custom frame image(s)...`);
         
-        // Upload ALL custom frames in parallel for speed
-        const uploadPromises: Promise<void>[] = [];
+        // Upload frames SEQUENTIALLY (not in parallel) to avoid overloading the KIE API
+        // which returns 500 errors when too many uploads happen at once
+        const MAX_UPLOAD_RETRIES = 3;
         for (let ci = 0; ci < scenesWithContent.length; ci++) {
           const scene = scenesWithContent[ci];
           if (scene.customFrameImage) {
-            const uploadPromise = (async () => {
+            let uploaded = false;
+            for (let attempt = 1; attempt <= MAX_UPLOAD_RETRIES && !uploaded; attempt++) {
               try {
-                addLog(`  Scene ${ci + 1}: Uploading custom frame...`);
+                addLog(`  Scene ${ci + 1}: Uploading custom frame${attempt > 1 ? ` (retry ${attempt})` : ''}...`);
                 const frameBlob = await fetch(scene.customFrameImage).then(r => r.blob());
                 const formData = new FormData();
                 formData.append("avatar", frameBlob, `scene_${ci}_frame.jpg`);
@@ -1820,6 +1829,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   if (uploadData.avatarUrl) {
                     preUploadedFrameUrls[ci] = uploadData.avatarUrl;
                     addLog(`  Scene ${ci + 1}: Frame uploaded!`);
+                    uploaded = true;
                   } else {
                     addLog(`  Scene ${ci + 1}: Frame upload returned no URL — response: ${JSON.stringify(uploadData)}`);
                   }
@@ -1831,11 +1841,16 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                 const msg = err instanceof Error ? err.message : String(err);
                 addLog(`  Scene ${ci + 1}: Frame upload failed: ${msg}`);
               }
-            })();
-            uploadPromises.push(uploadPromise);
+              // Wait before retry
+              if (!uploaded && attempt < MAX_UPLOAD_RETRIES) {
+                await new Promise(r => setTimeout(r, attempt * 1500));
+              }
+            }
+            if (!uploaded) {
+              addLog(`  Scene ${ci + 1}: FAILED to upload frame after ${MAX_UPLOAD_RETRIES} attempts`);
+            }
           }
         }
-        await Promise.all(uploadPromises);
       }
 
       // Upload per-scene reference images
