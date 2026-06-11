@@ -27,6 +27,7 @@ interface Scene {
   videoUrl: string;
   customFrameImage: string | null;
   referenceImage: string | null; // Optional per-scene reference image for AI generation
+  videoPromptSuffix: string; // Optional text appended to the video generation prompt for this scene
   label?: string; // NEW: scene label (HOOK, PAIN+DISCOVERY, PROOF, CTA)
 }
 
@@ -570,6 +571,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       expression: "",
       framePrompt: "",
       videoPrompt: "",
+      videoPromptSuffix: "",
       frameProgress: 0,
       frameDone: false,
       videoProgress: 0,
@@ -1077,6 +1079,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       expression: "",
       framePrompt: "",
       videoPrompt: "",
+      videoPromptSuffix: "",
       frameProgress: 0,
       frameDone: false,
       videoProgress: 0,
@@ -1155,6 +1158,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           expression: "",
           framePrompt: s.framePrompt || "",
           videoPrompt: "",
+      videoPromptSuffix: "",
           frameProgress: 0,
           frameDone: false,
           videoProgress: 0,
@@ -1456,6 +1460,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}. Photorealistic.`,
         description: s.description.trim() || `Scene ${i + 1}`,
         label: s.label || `Scene ${i + 1}`,
+        videoPromptSuffix: s.videoPromptSuffix?.trim() || "",
       }));
 
       setAutoChainScenes(chainScenes);
@@ -1882,6 +1887,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}. Photorealistic.`,
         description: s.description.trim() || `Scene ${i + 1}`,
         label: s.label || `Scene ${i + 1}`,
+        videoPromptSuffix: s.videoPromptSuffix?.trim() || "",
       }));
       setAutoChainScenes(chainScenes);
       setAutoChainProgress(5);
@@ -2088,6 +2094,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}.`,
         description: s.description.trim() || `Scene ${i + 1}`,
         label: s.label || `Scene ${i + 1}`,
+        videoPromptSuffix: s.videoPromptSuffix?.trim() || "",
       }));
 
       const pipelineRes = await authFetch("/api/auto-chain", {
@@ -2462,6 +2469,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           videoUrl: "",
           framePrompt: "",
           videoPrompt: "",
+      videoPromptSuffix: "",
         }))
       );
     }
@@ -2499,6 +2507,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           expression: s.expression || undefined,
           customFrameImage: s.customFrameImage || undefined,
           framePrompt: s.framePrompt || undefined,
+          videoPromptSuffix: s.videoPromptSuffix || undefined,
         })),
         heygenVoiceId,
         videoModel,
@@ -2917,6 +2926,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         videoUrl: "",
         framePrompt: "",
         videoPrompt: "",
+      videoPromptSuffix: "",
       }))
     );
   }, []);
@@ -2960,6 +2970,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         expression: "",
         framePrompt: "",
         videoPrompt: "",
+      videoPromptSuffix: "",
         frameProgress: 0,
         frameDone: false,
         videoProgress: 0,
@@ -2987,6 +2998,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         expression: "",
         framePrompt: "",
         videoPrompt: "",
+      videoPromptSuffix: "",
         frameProgress: 0,
         frameDone: false,
         videoProgress: 0,
@@ -4536,6 +4548,24 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                                 disabled={isRunning}
                                 className="w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 outline-none border-2 focus:border-current"
                                 style={{ backgroundColor: T.inputBg, borderColor: scene.expression ? T.cyan : T.cardBorder, color: T.text, caretColor: T.pink }}
+                              />
+                            </div>
+                          )}
+
+                          {/* Video Prompt Suffix — extra instructions appended to video generation prompt */}
+                          {frameMode === "custom" && (
+                            <div>
+                              <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: T.textMuted }}>
+                                🎬 Video Prompt Extra <span className="font-normal lowercase tracking-normal opacity-60">(optional)</span>
+                              </label>
+                              <textarea
+                                value={scene.videoPromptSuffix}
+                                onChange={(e) => updateScene(scene.id, "videoPromptSuffix", e.target.value)}
+                                placeholder="Extra instructions for video generation, e.g. 'person leans forward excitedly', 'slow zoom on face', 'dramatic pause at the end'..."
+                                disabled={isRunning}
+                                rows={2}
+                                className="w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 resize-none outline-none border-2 focus:border-current"
+                                style={{ backgroundColor: T.inputBg, borderColor: scene.videoPromptSuffix ? T.lime : T.cardBorder, color: T.text, caretColor: T.pink }}
                               />
                             </div>
                           )}

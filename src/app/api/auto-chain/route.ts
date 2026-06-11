@@ -223,7 +223,8 @@ async function generateVideo(
   script: string,
   apiKey: string,
   videoModel: string = "veo3_lite",
-  onProgress?: (elapsed: number, pollCount: number) => void
+  onProgress?: (elapsed: number, pollCount: number) => void,
+  videoPromptSuffix?: string
 ): Promise<string> {
   const videoPrompt =
     `IMPORTANT: This is a RAW UNCUT CONTINUOUS SHOT — NOT an edited video. You must NOT apply ANY post-production effects, transitions, or editing. Output must look like raw footage from a single locked camera — like a webcam recording. No editing, no effects, no transitions at all. ` +
@@ -235,7 +236,8 @@ async function generateVideo(
     `5. LIGHTING CONSISTENCY: Lighting must remain EXACTLY as shown in the reference image — NO changes, NO flickering, NO color shifts, NO brightness changes. ` +
     `6. SCRIPT BOUNDARY — SILENCE AFTER LAST WORD: The person must say ONLY the exact words in the dialogue and NOTHING ELSE. After the last word: mouth CLOSED, gentle smile, hands come to rest naturally, steady eye contact. ZERO extra words, ZERO filler sounds, ZERO lip movement after script ends. ` +
     `REFERENCE IMAGE: This is a talking-head video with expressive hand gestures and body language. The reference image is the ONLY source of truth for the person's appearance. Output must look like a raw, unedited, continuous webcam recording of an engaging speaker who uses natural hand gestures, head movements, and facial expressions while speaking. CRITICAL REMINDERS: NO fade-in at start. NO fade-out at end. NO transitions whatsoever. NO cuts. Camera stays STATIC (locked tripod). RAW FOOTAGE ONLY. INSTANT start, INSTANT end. Full brightness at all times. The person should use hand gestures, natural head movement, and expressive body language that MATCHES the dialogue content. Dialogue: "${script}" ` +
-    `AUDIO RULES: MUTE ALL BACKGROUND AUDIO COMPLETELY. ZERO music — no background music, no instrumental music, no ambient music, no soundtrack, no beat, no melody, no jingle, no BGM of any kind. ZERO ambient sounds — no wind, no birds, no traffic, no footsteps, no nature sounds, no room tone, no echo, no reverb, no environmental audio whatsoever. The ONLY audio allowed is the person's own voice: a clear, warm, natural speaking voice with confident tone and friendly delivery. The audio track must contain ONLY clean, dry voice — no music intro, no music outro, no music transitions between scenes, no background score at any point. Absolutely no sound effects, no whoosh, no ding, no transition sounds. This is critical: the final audio must be 100% voice-only with zero musical or ambient elements.`;
+    `AUDIO RULES: MUTE ALL BACKGROUND AUDIO COMPLETELY. ZERO music — no background music, no instrumental music, no ambient music, no soundtrack, no beat, no melody, no jingle, no BGM of any kind. ZERO ambient sounds — no wind, no birds, no traffic, no footsteps, no nature sounds, no room tone, no echo, no reverb, no environmental audio whatsoever. The ONLY audio allowed is the person's own voice: a clear, warm, natural speaking voice with confident tone and friendly delivery. The audio track must contain ONLY clean, dry voice — no music intro, no music outro, no music transitions between scenes, no background score at any point. Absolutely no sound effects, no whoosh, no ding, no transition sounds. This is critical: the final audio must be 100% voice-only with zero musical or ambient elements.`
+    + (videoPromptSuffix?.trim() ? ` ADDITIONAL INSTRUCTIONS: ${videoPromptSuffix.trim()}` : "");
 
   // ── Route to correct API based on model ──
   const isVeoModel = videoModel.startsWith("veo");
@@ -424,7 +426,7 @@ export async function POST(req: NextRequest) {
     aiApiKey?: string;
     aiProvider?: string;
     characterImageUrl?: string;
-    scenes?: Array<{ script: string; framePrompt: string; description: string; label: string }>;
+    scenes?: Array<{ script: string; framePrompt: string; description: string; label: string; videoPromptSuffix?: string }>;
     kieApiKey?: string;
     falApiKey?: string;
     videoModel?: string;
@@ -633,7 +635,8 @@ export async function POST(req: NextRequest) {
                 frameUrls[i], scene.script, effectiveKieKey, model,
                 (elapsed, pollCount) => {
                   sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed)` });
-                }
+                },
+                scene.videoPromptSuffix
               );
               lastVideoError = "";
               break;
@@ -1130,7 +1133,8 @@ export async function POST(req: NextRequest) {
                   pct,
                   message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed, poll #${pollCount})`,
                 });
-              }
+              },
+              scene.videoPromptSuffix
             );
             lastError = "";
             break; // Success — exit retry loop
