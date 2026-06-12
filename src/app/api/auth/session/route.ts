@@ -1,17 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { verifyIdToken } from "@/lib/firebase-admin";
 import { db } from "@/lib/db";
-
-// VIP emails matching the client-side list
-const VIP_EMAILS = new Set([
-  "adlenbenmechta3@gmail.com",
-  "hello@fullynutrition.com",
-  "novaamz@gmail.com",
-  "mecifmouhaned@gmail.com",
-  "workdr2026@gmail.com",
-  "aasslesh.k@gmail.com",
-  "sivakuria@gmail.com",
-]);
+import { isVIP } from "@/lib/auth-server";
 
 export async function POST(request: NextRequest) {
   try {
@@ -46,7 +36,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const isVip = VIP_EMAILS.has(email);
+    const isVip = isVIP(email);
 
     // Try to look up user in database (non-blocking — don't fail if DB is down)
     let dbUser: {
