@@ -2108,6 +2108,8 @@ const AD_FORMATS = [
 ];
 
 const AD_MODELS = [
+  { value: "seedance_fast_atlas", label: "Seedance 2 Fast (Atlas)", icon: "⚡", badge: "New" },
+  { value: "seedance_atlas", label: "Seedance 2 (Atlas)", icon: "🎬" },
   { value: "seedance", label: "Seedance 2", icon: "🎬" },
   { value: "seedance_fast", label: "Seedance 2 Fast", icon: "⚡" },
   { value: "veo3_fast", label: "Veo 3.1 Fast", icon: "🚀" },
@@ -2172,7 +2174,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   // ─── Core state ───────────────────────────────────────────────────────
   const [prompt, setPrompt] = useState("");
   const [format, setFormat] = useState("blank");
-  const [model, setModel] = useState("seedance");
+  const [model, setModel] = useState("seedance_fast_atlas");
   const [duration, setDuration] = useState(8);
   const [aspectRatio, setAspectRatio] = useState("9:16");
   const [resolution, setResolution] = useState("720p");
@@ -2278,7 +2280,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
     return true;
   });
 
-  const isVoiceAvailable = model === "seedance" || model === "seedance_fast";
+  const isVoiceAvailable = model === "seedance" || model === "seedance_fast" || model === "seedance_fast_atlas" || model === "seedance_atlas";
   const canGenerate = prompt.trim().length > 0;
 
   // ─── Upload image to KIE via /api/upload-avatar ──────────────────────
@@ -2361,15 +2363,17 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   };
 
   // Map frontend model names to backend model names
-  // Backend handles the final KIE API model name mapping
+  // Backend handles the final API model name mapping (KIE, Atlas, or Fal)
   const mapModel = (m: string): string => {
     switch (m) {
       case "seedance": return "seedance";
       case "seedance_fast": return "seedance_fast";
+      case "seedance_fast_atlas": return "seedance_fast_atlas";
+      case "seedance_atlas": return "seedance_atlas";
       case "veo3_fast": return "veo3_fast";
       case "veo3": return "veo3_lite";
       case "grok_imagine": return "grok_imagine";
-      default: return "seedance";
+      default: return "seedance_fast_atlas";
     }
   };
 
@@ -2520,7 +2524,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
                 icon={<VoiceIconSmall />}
                 onClick={() => isVoiceAvailable && setShowVoiceDialog(true)}
                 disabled={!isVoiceAvailable}
-                disabledLabel="Seedance only"
+                disabledLabel="Video models only"
               />
               <ToolbarBtn label="" icon={<SettingsIcon />} onClick={() => setShowDurationPicker(!showDurationPicker)} iconOnly />
             </div>
@@ -3051,7 +3055,7 @@ function ToolbarBtn({ label, icon, onClick, chevron, iconOnly }: { label: string
 function ModelPickerPopup({ model, setModel, onClose }: { model: string; setModel: (v: string) => void; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   useEffect(() => { const h = (e: MouseEvent) => { if (ref.current && !ref.current.contains(e.target as Node)) onClose(); }; document.addEventListener("mousedown", h); return () => document.removeEventListener("mousedown", h); }, [onClose]);
-  return (<div ref={ref} className="absolute top-full left-0 mt-2 w-[280px] rounded-2xl p-1.5 z-50" style={{ backgroundColor: "rgba(0,0,0,0.03)", border: "1px solid #EEF0F4", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>{AD_MODELS.map((m) => (<button key={m.value} onClick={() => setModel(m.value)} className="flex w-full min-h-12 items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left transition" style={{ border: model === m.value ? "1px solid rgba(0,117,253,0.35)" : "1px solid transparent", backgroundColor: model === m.value ? "#EAF3FF" : "transparent", color: model === m.value ? "#0075FD" : D.textPrimary }}><span className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: model === m.value ? "#D9EAFF" : D.white }}><span className="text-base">{m.icon}</span></span><span className="text-[13px] font-semibold">{m.label}</span></span>{model === m.value && <CheckIcon color="#0075FD" />}</button>))}</div>);
+  return (<div ref={ref} className="absolute top-full left-0 mt-2 w-[280px] rounded-2xl p-1.5 z-50" style={{ backgroundColor: "rgba(0,0,0,0.03)", border: "1px solid #EEF0F4", boxShadow: "0 8px 32px rgba(0,0,0,0.12)" }}>{AD_MODELS.map((m) => (<button key={m.value} onClick={() => setModel(m.value)} className="flex w-full min-h-12 items-center justify-between gap-3 rounded-xl px-2.5 py-2.5 text-left transition" style={{ border: model === m.value ? "1px solid rgba(0,117,253,0.35)" : "1px solid transparent", backgroundColor: model === m.value ? "#EAF3FF" : "transparent", color: model === m.value ? "#0075FD" : D.textPrimary }}><span className="flex items-center gap-2.5"><span className="grid size-8 shrink-0 place-items-center rounded-xl" style={{ backgroundColor: model === m.value ? "#D9EAFF" : D.white }}><span className="text-base">{m.icon}</span></span><span className="text-[13px] font-semibold">{m.label}</span>{"badge" in m && m.badge && <span className="ml-1 px-1.5 py-0.5 rounded-md text-[9px] font-bold uppercase tracking-wider" style={{ backgroundColor: "#7C3AED", color: "#fff" }}>{m.badge}</span>}</span>{model === m.value && <CheckIcon color="#0075FD" />}</button>))}</div>);
 }
 
 function DurationPopup({ duration, setDuration, aspectRatio, setAspectRatio, resolution, setResolution, onClose }: { duration: number; setDuration: (v: number) => void; aspectRatio: string; setAspectRatio: (v: string) => void; resolution: string; setResolution: (v: string) => void; onClose: () => void }) {

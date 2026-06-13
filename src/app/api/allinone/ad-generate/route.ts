@@ -5,6 +5,7 @@ export const dynamic = "force-dynamic";
 
 const FAL_KEY = process.env.FAL_KEY || "c8b8a13a-d358-4a8c-b4a0-a6aee1da0bc5:c5c823fe4dad5a72691a9ab8eac5ef2c";
 const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
+const DEFAULT_ATLAS_KEY = process.env.ATLAS_KEY || "apikey-6dd210593293428fa38064aa6d655b03";
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 // Aspect ratio to image_size mapping for KIE API
@@ -30,6 +31,7 @@ export async function POST(req: NextRequest) {
       voiceAudioUrl,
       referenceImageUrls,
       kieApiKey,
+      atlasApiKey,
     } = body;
 
     if (!prompt || typeof prompt !== "string" || prompt.trim().length === 0) {
@@ -67,6 +69,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
+    // ─── Route to Atlas Cloud API for seedance_fast_atlas ─────────────
+    const ATLAS_MODEL_MAP: Record<string, string> = {
+      "seedance_fast_atlas": "bytedance/seedance-2.0-fast",
+      "seedance_atlas": "bytedance/seedance-2.0",
+    };
+    const atlasModel = ATLAS_MODEL_MAP[model];
+    if (atlasModel) {
+      const effectiveAtlasKey = (typeof atlasApiKey === "string" && atlasApiKey.length > 10) ? atlasApiKey : DEFAULT_ATLAS_KEY;
+      return await generateAdViaAtlas(enhancedPrompt, atlasModel, model, dur, aspect, resolution, imageUrls, voiceAudioUrl, effectiveAtlasKey);
+    }
+
     // Use user-provided KIE API key if available, otherwise fall back to default
     const effectiveKieKey = (typeof kieApiKey === "string" && kieApiKey.length > 10) ? kieApiKey : DEFAULT_KIE_KEY;
 
@@ -92,6 +105,166 @@ export async function POST(req: NextRequest) {
     console.error("[Ad Generate] Error:", msg);
     return NextResponse.json({ error: "Ad generation failed: " + msg }, { status: 500 });
   }
+}
+
+// ─── Atlas Cloud API (Seedance 2.0 / Seedance 2.0 Fast) ──────────────
+
+async function generateAdViaAtlas(
+  prompt: string,
+  atlasModelName: string,
+  originalModel: string,
+  duration: number,
+  aspectRatio: string,
+  resolution: string,
+  imageUrls: string[] = [],
+  voiceAudioUrl?: string,
+  atlasKey?: string,
+): Promise<NextResponse> {
+  const effectiveKey = atlasKey || DEFAULT_ATLAS_KEY;
+  const isFast = atlasModelName.includes("fast");
+
+  // Choose the appropriate Atlas sub-model based on whether we have images
+  let subModel: string;
+  if (imageUrls.length > 0 || voiceAudioUrl) {
+    // If we have reference images or audio, use reference-to-video
+    subModel = `${atlasModelName}/reference-to-video`;
+  } else {
+    // Text-only: use text-to-video
+    subModel = `${atlasModelName}/text-to-video`;
+  }
+
+  // Build the request body
+  const data: Record<string, unknown> = {
+    model: subModel,
+    prompt: prompt.trim(),
+    duration: duration,
+    resolution: resolution || "720p",
+    ratio: aspectRatio,
+    watermark: false,
+    return_last_frame: false,
+    generate_audio: false,
+  };
+
+  // Add reference images if available
+  if (imageUrls.length > 0) {
+    if (subModel.includes("reference-to-video")) {
+      // reference-to-video uses reference_images array
+      data.reference_images = imageUrls;
+    } else if (subModel.includes("image-to-video")) {
+      // image-to-video uses image (first frame)
+      data.image = imageUrls[0];
+      if (imageUrls.length > 1) {
+        data.last_image = imageUrls[imageUrls.length - 1];
+      }
+    } else {
+      // text-to-video with image fallback → switch to image-to-video
+      data.model = `${atlasModelName}/image-to-video`;
+      data.image = imageUrls[0];
+    }
+  }
+
+  // Add reference audio if available
+  if (voiceAudioUrl) {
+    data.reference_audios = [voiceAudioUrl];
+    data.generate_audio = true;
+  }
+
+  console.log(`[Ad Generate Atlas] Submitting ${subModel} job (frontend model: ${originalModel}), duration=${duration}s, images=${imageUrls.length}, voice=${!!voiceAudioUrl}`);
+
+  // Step 1: Submit generation request
+  const submitRes = await fetch("https://api.atlascloud.ai/api/v1/model/generateVideo", {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${effectiveKey}`,
+    },
+    body: JSON.stringify(data),
+  });
+
+  const submitJson = await submitRes.json();
+
+  if (!submitRes.ok || submitJson.code !== 200) {
+    const errMsg = submitJson?.msg || submitJson?.error || submitJson?.message || JSON.stringify(submitJson).slice(0, 300);
+    console.error("[Ad Generate Atlas] Submit failed:", errMsg);
+    return NextResponse.json(
+      { error: `Atlas submit failed: ${errMsg}` },
+      { status: 500 }
+    );
+  }
+
+  const predictionId = submitJson.data?.id;
+  if (!predictionId) {
+    return NextResponse.json(
+      { error: "No prediction ID returned from Atlas API", rawResponse: JSON.stringify(submitJson).slice(0, 500) },
+      { status: 500 }
+    );
+  }
+
+  console.log(`[Ad Generate Atlas] Prediction ID: ${predictionId}, polling for result...`);
+
+  // Step 2: Poll for result
+  const pollUrl = `https://api.atlascloud.ai/api/v1/model/prediction/${predictionId}`;
+
+  for (let i = 0; i < 120; i++) {
+    await sleep(5000);
+    try {
+      const pollRes = await fetch(pollUrl, {
+        headers: { "Authorization": `Bearer ${effectiveKey}` },
+      });
+      const pollJson = await pollRes.json();
+
+      if (pollJson.code === 200 || pollJson.data) {
+        const resultData = pollJson.data;
+        const status = resultData?.status;
+
+        if (status === "completed" || status === "succeeded") {
+          // Atlas returns outputs array with video URLs
+          const outputs = resultData?.outputs;
+          let videoUrl = "";
+
+          if (Array.isArray(outputs) && outputs.length > 0) {
+            videoUrl = outputs[0];
+          } else if (typeof outputs === "string") {
+            videoUrl = outputs;
+          } else if (resultData?.output) {
+            videoUrl = resultData.output;
+          } else if (resultData?.url) {
+            videoUrl = resultData.url;
+          } else if (resultData?.video_url) {
+            videoUrl = resultData.video_url;
+          }
+
+          if (videoUrl) {
+            console.log(`[Ad Generate Atlas] Success! URL: ${videoUrl.slice(0, 100)}...`);
+            return NextResponse.json({ videoUrl, status: "completed" });
+          }
+          return NextResponse.json(
+            { error: "Video completed but no URL found", rawResult: JSON.stringify(resultData).slice(0, 500) },
+            { status: 500 }
+          );
+        }
+
+        if (status === "failed" || status === "error") {
+          const failMsg = resultData?.error || resultData?.message || "unknown error";
+          console.error("[Ad Generate Atlas] Task failed:", failMsg);
+          return NextResponse.json(
+            { error: "Ad generation failed: " + failMsg },
+            { status: 500 }
+          );
+        }
+
+        // Still processing — continue polling
+        if (i % 6 === 0) {
+          console.log(`[Ad Generate Atlas] Still processing... (attempt ${i + 1}, status: ${status})`);
+        }
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.warn(`[Ad Generate Atlas poll ${i}] ${msg}`);
+    }
+  }
+
+  return NextResponse.json({ error: "Ad generation timed out after 10 minutes" }, { status: 500 });
 }
 
 // ─── KIE.ai API (Veo3, Seedance, etc.) ─────────────────────────
