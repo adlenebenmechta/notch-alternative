@@ -2207,7 +2207,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   const [voiceAudioUrl, setVoiceAudioUrl] = useState("");
 
   // ─── Reference images ─────────────────────────────────────────────────
-  const [referenceImages, setReferenceImages] = useState<{ id: string; preview: string; url: string }[]>([]);
+  const [referenceImages, setReferenceImages] = useState<{ id: string; preview: string; url: string; error?: string }[]>([]);
   const [refUploading, setRefUploading] = useState(false);
 
   // ─── Library ──────────────────────────────────────────────────────────
@@ -2261,7 +2261,11 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
   useEffect(() => { saveLS(LS.product, { preview: productPreview, url: productImageUrl }); }, [productPreview, productImageUrl]);
   useEffect(() => { saveLS(LS.avatar, { preview: customAvatarPreview, url: customAvatarUrl, selectedAvatar }); }, [customAvatarPreview, customAvatarUrl, selectedAvatar]);
   useEffect(() => { saveLS(LS.voices, { selectedVoice, audioUrl: voiceAudioUrl }); }, [selectedVoice, voiceAudioUrl]);
-  useEffect(() => { saveLS(LS.references, referenceImages); }, [referenceImages]);
+  useEffect(() => {
+    // Only persist reference images that uploaded successfully (have URL and no error)
+    const validRefs = referenceImages.filter((r) => r.url && !r.error).map(({ id, preview, url }) => ({ id, preview, url }));
+    saveLS(LS.references, validRefs);
+  }, [referenceImages]);
   useEffect(() => { saveLS(LS.results, library); }, [library]);
 
   // ─── File → base64 helper ────────────────────────────────────────────
@@ -2325,11 +2329,24 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
     const newRef = { id, preview: base64Preview, url: "" };
     setReferenceImages((prev) => [...prev, newRef]);
     try {
-      const url = await uploadImageToKIE(file);
+      // Add a 30-second timeout to prevent infinite loading
+      const uploadPromise = uploadImageToKIE(file);
+      const timeoutPromise = new Promise<never>((_, reject) =>
+        setTimeout(() => reject(new Error("Upload timed out after 30 seconds")), 30000)
+      );
+      const url = await Promise.race([uploadPromise, timeoutPromise]);
       if (url) {
         setReferenceImages((prev) => prev.map((r) => (r.id === id ? { ...r, url } : r)));
+      } else {
+        // Upload returned null - mark as failed
+        setReferenceImages((prev) => prev.map((r) => (r.id === id ? { ...r, url: "", error: "Upload returned no URL" } : r)));
       }
-    } catch (err) { console.error("Reference upload failed:", err); }
+    } catch (err) {
+      console.error("Reference upload failed:", err);
+      // Mark the reference as failed instead of leaving it spinning forever
+      const errMsg = err instanceof Error ? err.message : "Upload failed";
+      setReferenceImages((prev) => prev.map((r) => (r.id === id ? { ...r, url: "", error: errMsg } : r)));
+    }
     finally { setRefUploading(false); }
   };
 
@@ -2653,7 +2670,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
                 <div
                   key={ref.id}
                   className="relative rounded-xl border overflow-hidden group"
-                  style={{ width: "120px", height: "120px", borderColor: D.inputBorder, backgroundColor: D.inputBg }}
+                  style={{ width: "120px", height: "120px", borderColor: ref.error ? "rgba(239,68,68,0.5)" : D.inputBorder, backgroundColor: D.inputBg }}
                 >
                   <img src={ref.preview} alt="Reference" className="w-full h-full object-cover" />
                   <button
@@ -2663,11 +2680,16 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
                   >
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 6 6 18" /><path d="m6 6 12 12" /></svg>
                   </button>
-                  {!ref.url && (
+                  {ref.error ? (
+                    <div className="absolute inset-0 bg-red-500/70 flex flex-col items-center justify-center gap-1 px-1" onClick={() => setReferenceImages((prev) => prev.filter((r) => r.id !== ref.id))}>
+                      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10" /><path d="m15 9-6 6" /><path d="m9 9 6 6" /></svg>
+                      <span className="text-[9px] text-white text-center leading-tight font-medium">Upload failed</span>
+                    </div>
+                  ) : !ref.url ? (
                     <div className="absolute inset-0 bg-white/50 flex items-center justify-center">
                       <div className="w-5 h-5 rounded-full border-2 border-purple-500 border-t-transparent animate-spin" />
                     </div>
-                  )}
+                  ) : null}
                 </div>
               ))}
               {/* Add reference button */}
@@ -2691,7 +2713,7 @@ function AIAdGeneratorPage({ onBack }: { onBack: () => void }) {
                 type="file"
                 accept="image/*"
                 className="hidden"
-                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRefImageUpload(f); }}
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) handleRefImageUpload(f); e.target.value = ""; }}
               />
             </div>
           </div>
