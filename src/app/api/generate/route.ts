@@ -1544,6 +1544,11 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-cache, no-transform",
         "Connection": "keep-alive",
         "X-Accel-Buffering": "no",
+        // Prevent proxy timeouts: tell proxies this is a long-lived stream
+        "Proxy-Connection": "keep-alive",
+        "Transfer-Encoding": "chunked",
+        // Allow the stream to stay open for up to 15 minutes
+        "Keep-Alive": "timeout=900, max=10000",
       },
     });
   } catch (err: unknown) {

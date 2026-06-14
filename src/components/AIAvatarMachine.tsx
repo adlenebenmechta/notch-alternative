@@ -2819,7 +2819,34 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         clearInterval(inactivityTimerRef.current as unknown as number);
         inactivityTimerRef.current = null;
       }
-      // Clean up polling
+
+      // ──── KEY FIX: If status polling is active, let it handle the rest. ────
+      // When Railway's proxy kills the SSE connection after ~5 minutes,
+      // the pipeline is STILL RUNNING on the server and updating job-store.
+      // Status polling (started on "started" event) will track progress and
+      // detect completion. We should NOT kill polling or auto-retry here.
+      const isNetworkError =
+        (err instanceof Error && (
+          err.message.includes("network") ||
+          err.message.includes("Network") ||
+          err.message.includes("fetch") ||
+          err.message.includes("Failed to fetch") ||
+          err.message.includes("connection") ||
+          err.message.includes("timeout") ||
+          err.message.includes("Timeout") ||
+          err.name === "AbortError"
+        ));
+
+      if (isNetworkError && pollIntervalRef.current && currentJobIdRef.current) {
+        // SSE connection died (normal for long pipelines), but polling is active.
+        // The server pipeline continues running. Polling will detect completion.
+        addLog("SSE connection lost — pipeline continues on server. Tracking progress via polling...");
+        // Do NOT kill polling, do NOT retry, do NOT set isRunning=false
+        // Just stop the inactivity timer and let polling do its job
+        return;
+      }
+
+      // Clean up polling ONLY if we're not going to rely on it
       if (pollIntervalRef.current) {
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
