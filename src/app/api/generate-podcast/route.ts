@@ -513,6 +513,7 @@ export async function POST(req: NextRequest) {
         "Cache-Control": "no-cache, no-store, no-transform, must-revalidate",
         "X-Accel-Buffering": "no",
         Connection: "keep-alive",
+        "Keep-Alive": "timeout=900, max=10000",
       },
     });
   } catch (error: unknown) {

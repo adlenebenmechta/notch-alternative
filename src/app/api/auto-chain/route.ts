@@ -589,7 +589,7 @@ export async function POST(req: NextRequest) {
       }
     })();
 
-    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no", "Keep-Alive": "timeout=900, max=10000" } });
   }
 
   // ── Action: Videos Only (frames already generated, just generate videos + merge) ──
@@ -689,7 +689,7 @@ export async function POST(req: NextRequest) {
       }
     })();
 
-    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" } });
+    return new Response(stream.readable, { headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no", "Keep-Alive": "timeout=900, max=10000" } });
   }
 
   // ── Action: Full Auto Chain Pipeline ──
@@ -1208,6 +1208,6 @@ export async function POST(req: NextRequest) {
   })();
 
   return new Response(stream.readable, {
-    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache", Connection: "keep-alive" },
+    headers: { "Content-Type": "text/event-stream", "Cache-Control": "no-cache, no-transform", Connection: "keep-alive", "X-Accel-Buffering": "no", "Keep-Alive": "timeout=900, max=10000" },
   });
 }

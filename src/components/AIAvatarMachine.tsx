@@ -2172,7 +2172,37 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      if (msg !== "aborted") { addLog(`Video generation ERROR: ${msg}`); setAutoChainError(msg); setPipelinePhase("reviewing_frames"); }
+      if (msg !== "aborted") {
+        // Check if this is a network error — if so, auto-retry with exponential backoff
+        const isNetworkError = msg.includes("network") || msg.includes("Network") || msg.includes("fetch") || msg.includes("Failed to fetch") || msg.includes("connection") || msg.includes("timeout") || msg.includes("Timeout");
+
+        if (isNetworkError) {
+          // Network errors are transient — the server pipeline is likely still running.
+          // Auto-retry with backoff instead of giving up.
+          autoRetryCountRef.current += 1;
+          const delay = Math.min(10000 + (autoRetryCountRef.current * 3000), 30000); // 10s base, +3s per retry, max 30s
+
+          if (autoRetryCountRef.current <= 10) { // Up to 10 retries for network errors
+            addLog(`Network error — server may still be processing. Auto-retrying (attempt ${autoRetryCountRef.current}) in ${delay/1000}s... Videos already completed will be preserved.`);
+            setIsAutoChainRunning(false);
+            setIsRunning(false);
+            abortRef.current = null;
+            await new Promise(r => setTimeout(r, delay));
+            // Retry: call startAutoChain again — existing frame/video URLs are preserved in refs
+            startAutoChain();
+            return;
+          } else {
+            addLog(`❌ Network error persisted after ${autoRetryCountRef.current} retries. Your videos may still be processing on the server.`);
+          }
+        } else {
+          // Non-network error: reset retry counter
+          autoRetryCountRef.current = 0;
+        }
+
+        addLog(`Video generation ERROR: ${msg}`);
+        setAutoChainError(msg);
+        setPipelinePhase("reviewing_frames");
+      }
     } finally {
       setIsAutoChainRunning(false);
       setIsRunning(false);

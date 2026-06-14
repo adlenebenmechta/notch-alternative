@@ -460,8 +460,10 @@ export async function POST(req: NextRequest) {
     return new Response(stream.readable, {
       headers: {
         "Content-Type": "text/event-stream",
-        "Cache-Control": "no-cache",
+        "Cache-Control": "no-cache, no-transform",
+        "X-Accel-Buffering": "no",
         Connection: "keep-alive",
+        "Keep-Alive": "timeout=900, max=10000",
       },
     });
   }
@@ -603,8 +605,10 @@ export async function POST(req: NextRequest) {
   return new Response(stream.readable, {
     headers: {
       "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
+      "Cache-Control": "no-cache, no-transform",
+      "X-Accel-Buffering": "no",
       Connection: "keep-alive",
+      "Keep-Alive": "timeout=900, max=10000",
     },
   });
 }
