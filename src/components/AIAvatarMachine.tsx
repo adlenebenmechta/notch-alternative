@@ -28,6 +28,7 @@ interface Scene {
   customFrameImage: string | null;
   referenceImage: string | null; // Optional per-scene reference image for AI generation
   videoPromptSuffix: string; // Optional text appended to the video generation prompt for this scene
+  customPrompt: string; // NEW: when frameMode === "custom_prompt", user's own video generation prompt (bypasses standard wrapper)
   label?: string; // NEW: scene label (HOOK, PAIN+DISCOVERY, PROOF, CTA)
 }
 
@@ -572,6 +573,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       framePrompt: "",
       videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
       frameProgress: 0,
       frameDone: false,
       videoProgress: 0,
@@ -590,7 +592,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
 
   // ── Mode State ──
   const [mode, setMode] = useState<"ai" | "manual">("ai");
-  const [frameMode, setFrameMode] = useState<"avatar" | "avatar_v2" | "scenes" | "custom">("avatar_v2");
+  const [frameMode, setFrameMode] = useState<"avatar" | "avatar_v2" | "scenes" | "custom" | "custom_prompt">("avatar_v2");
   const [customPromptStyle, setCustomPromptStyle] = useState<"v1" | "v2">("v1");
   // Auto chain is now automatic: when character selected + script generated in Custom Frames
   const [aiTopic, setAiTopic] = useState("");
@@ -782,7 +784,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       if (checkpoint.scenes && checkpoint.scenes.length > 0) {
         setScenes(checkpoint.scenes);
       }
-      if (checkpoint.frameMode) setFrameMode(checkpoint.frameMode as "avatar" | "avatar_v2" | "scenes" | "custom");
+      if (checkpoint.frameMode) setFrameMode(checkpoint.frameMode as "avatar" | "avatar_v2" | "scenes" | "custom" | "custom_prompt");
       if (checkpoint.videoProvider) setVideoProvider(checkpoint.videoProvider as "kie" | "heygen");
       if (checkpoint.videoModel) setVideoModel(checkpoint.videoModel as "veo3_lite" | "veo3_fast" | "grok-imagine-video-1.5");
       if (checkpoint.heygenVoiceId) setHeygenVoiceId(checkpoint.heygenVoiceId);
@@ -1080,6 +1082,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       framePrompt: "",
       videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
       frameProgress: 0,
       frameDone: false,
       videoProgress: 0,
@@ -1159,6 +1162,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           framePrompt: s.framePrompt || "",
           videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
           frameProgress: 0,
           frameDone: false,
           videoProgress: 0,
@@ -1763,15 +1767,24 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     }
   }, [pendingAutoChain, isAutoChainRunning, isGeneratingScript, isRunning, startAutoChain]);
 
-  // ─── Two-Phase: Generate Frames Only (Custom Frames mode) ──
+  // ─── Two-Phase: Generate Frames Only (Custom Frames / Custom Prompt mode) ──
   const startFramesOnly = useCallback(async () => {
-    if (!avatarImage && !scenes.some(s => s.customFrameImage)) {
+    if (frameMode === "custom_prompt") {
+      // Custom Prompt mode: every scene must have BOTH a custom prompt AND an image
+      const scenesWithContent = scenes.filter((s) => s.customPrompt.trim() && s.customFrameImage);
+      if (scenesWithContent.length === 0) {
+        alert("Please add at least one scene with a custom prompt AND an uploaded image.");
+        return;
+      }
+    } else if (!avatarImage && !scenes.some(s => s.customFrameImage)) {
       alert("Please select a character from the Character Library or upload frames for all scenes.");
       return;
     }
 
-    const scenesWithContent = scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage);
-    if (scenesWithContent.length === 0) { alert("Please add scenes with scripts."); return; }
+    const scenesWithContent = frameMode === "custom_prompt"
+      ? scenes.filter((s) => s.customPrompt.trim() && s.customFrameImage)
+      : scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage);
+    if (scenesWithContent.length === 0) { alert("Please add scenes with content."); return; }
 
     // Reset pipeline state
     setPipelinePhase("generating_frames");
@@ -1888,6 +1901,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         description: s.description.trim() || `Scene ${i + 1}`,
         label: s.label || `Scene ${i + 1}`,
         videoPromptSuffix: s.videoPromptSuffix?.trim() || "",
+        customPrompt: s.customPrompt?.trim() || "",
       }));
       setAutoChainScenes(chainScenes);
       setAutoChainProgress(5);
@@ -1973,7 +1987,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       setIsRunning(false);
       abortRef.current = null;
     }
-  }, [avatarImage, scenes, kieApiKey, falApiKey, videoModel, addLog, authFetch, uploadAvatarToServer]);
+  }, [avatarImage, scenes, frameMode, kieApiKey, falApiKey, videoModel, addLog, authFetch, uploadAvatarToServer]);
 
   // ─── Two-Phase: Regenerate a single scene's frame ──
   const regenerateSceneFrame = useCallback(async (sceneIndex: number) => {
@@ -2089,12 +2103,13 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
     try {
       addLog("🎬 Generating videos from approved frames...");
 
-      const chainScenes = autoChainScenes.length > 0 ? autoChainScenes : scenes.filter(s => s.script.trim() || s.framePrompt.trim()).map((s, i) => ({
+      const chainScenes = autoChainScenes.length > 0 ? autoChainScenes : scenes.filter(s => s.script.trim() || s.framePrompt.trim() || s.customPrompt.trim()).map((s, i) => ({
         script: s.script.trim(),
         framePrompt: s.framePrompt.trim() || s.description.trim() || `Person looking at camera, scene ${i + 1}.`,
         description: s.description.trim() || `Scene ${i + 1}`,
         label: s.label || `Scene ${i + 1}`,
         videoPromptSuffix: s.videoPromptSuffix?.trim() || "",
+        customPrompt: s.customPrompt?.trim() || "",
       }));
 
       const pipelineRes = await authFetch("/api/auto-chain", {
@@ -2441,14 +2456,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       return;
     }
 
-    // In custom frames mode, avatar is not required
-    if (frameMode !== "custom" && !avatarImage) {
+    // In custom frames / custom prompt mode, avatar is not required
+    if (frameMode !== "custom" && frameMode !== "custom_prompt" && !avatarImage) {
       alert("Please upload an avatar image first.");
       return;
     }
 
     // Validate based on provider
-    let validScenes: Array<{ description: string; script: string; customFrameImage?: string | null; expression?: string; framePrompt?: string }>;
+    let validScenes: Array<{ description: string; script: string; customFrameImage?: string | null; expression?: string; framePrompt?: string; videoPromptSuffix?: string; customPrompt?: string }>;
 
     if (videoProvider === "heygen") {
       if (!heygenScript.trim()) {
@@ -2500,6 +2515,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           framePrompt: "",
           videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
         }))
       );
     }
@@ -2513,7 +2529,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
       // On retry/resume, skip re-upload if we already have a valid avatarUrl
       let uploadedUrl = avatarUrl || "";
       const skipAvatarUpload = isRetry && uploadedUrl && uploadedUrl.startsWith("http");
-      if (frameMode !== "custom" && avatarImage && !skipAvatarUpload) {
+      if (frameMode !== "custom" && frameMode !== "custom_prompt" && avatarImage && !skipAvatarUpload) {
         addLog("Uploading avatar to server...");
         uploadedUrl = await uploadAvatarToServer(avatarImage, abortController.signal);
         setAvatarUrl(uploadedUrl);
@@ -2538,6 +2554,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
           customFrameImage: s.customFrameImage || undefined,
           framePrompt: s.framePrompt || undefined,
           videoPromptSuffix: s.videoPromptSuffix || undefined,
+          customPrompt: s.customPrompt || undefined,
         })),
         heygenVoiceId,
         videoModel,
@@ -2984,6 +3001,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: "",
         videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
       }))
     );
   }, []);
@@ -3028,6 +3046,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: "",
         videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
         frameProgress: 0,
         frameDone: false,
         videoProgress: 0,
@@ -3056,6 +3075,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
         framePrompt: "",
         videoPrompt: "",
       videoPromptSuffix: "",
+      customPrompt: "",
         frameProgress: 0,
         frameDone: false,
         videoProgress: 0,
@@ -3857,12 +3877,13 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                     <label className="block text-xs font-bold uppercase tracking-wider mb-2" style={{ color: T.textMuted }}>
                       Frame Mode
                     </label>
-                    <div className={isSuperAdmin ? "grid grid-cols-4 gap-2" : "grid grid-cols-2 gap-2"}>
+                    <div className={isSuperAdmin ? "grid grid-cols-3 sm:grid-cols-5 gap-2" : "grid grid-cols-1 sm:grid-cols-3 gap-2"}>
                       {([
                         ...(isSuperAdmin ? [{ value: "avatar" as const, label: "Avatar Only", emoji: "👤", desc: "Static, no gestures" }] : []),
                         { value: "avatar_v2" as const, label: "Avatar Only v2", emoji: "🤚", desc: "Hand gestures & body language" },
                         ...(isSuperAdmin ? [{ value: "scenes" as const, label: "Scene Frames", emoji: "🖼️", desc: "Unique backgrounds per scene" }] : []),
                         { value: "custom" as const, label: "Custom Frames", emoji: "📸", desc: "Upload image per scene" },
+                        { value: "custom_prompt" as const, label: "Custom Prompt", emoji: "✍️", desc: "Write your own prompt + image per scene" },
                       ]).map((fm) => (
                         <button
                           key={fm.value}
@@ -3943,6 +3964,24 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                           }
                         </p>
                       </div>
+                    </div>
+                  )}
+
+                  {/* ── Custom Prompt Mode Info ── */}
+                  {frameMode === "custom_prompt" && (
+                    <div className="mt-3 rounded-xl p-3 animate-fade-in" style={{ backgroundColor: `${T.cyan}08`, border: `1px solid ${T.cyan}30` }}>
+                      <div className="flex items-center gap-1.5 flex-wrap text-[10px] mb-2">
+                        <span className="px-2 py-1 rounded-lg font-bold" style={{ backgroundColor: `${T.cyan}15`, color: T.cyan }}>✍️ Custom Prompt</span>
+                        <span style={{ color: T.textMuted }}>—</span>
+                        <span className="px-2 py-1 rounded-lg font-bold" style={{ backgroundColor: `${T.cyan}15`, color: T.cyan }}>📸 Image + Prompt</span>
+                        <span style={{ color: T.textMuted }}>→</span>
+                        <span className="px-2 py-1 rounded-lg font-bold" style={{ backgroundColor: `${T.cyan}15`, color: T.cyan }}>🎬 Videos</span>
+                        <span style={{ color: T.textMuted }}>→</span>
+                        <span className="px-2 py-1 rounded-lg font-bold" style={{ backgroundColor: `${T.lime}15`, color: T.lime }}>🔗 Merged</span>
+                      </div>
+                      <p className="text-[9px] leading-relaxed" style={{ color: T.textMuted }}>
+                        🎬 For each scene, upload an image AND write your own custom video generation prompt. Your prompt is sent directly to the AI video engine — no standard background prompt or script wrapper is added. Videos auto-merge at the end into one final video. Perfect for full creative control over each scene.
+                      </p>
                     </div>
                   )}
 
@@ -4095,6 +4134,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                       </span>
                     </h2>
                     <div className="flex items-center gap-2">
+                      {frameMode !== "custom_prompt" && (
                       <div className="flex rounded-xl border-2 overflow-hidden" style={{ borderColor: T.cardBorder }}>
                         <button
                           onClick={() => setMode("ai")}
@@ -4109,13 +4149,19 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                           style={{ backgroundColor: mode === "manual" ? T.dark : T.cardBg, color: mode === "manual" ? T.white : T.textMuted }}
                         >✋ Manual</button>
                       </div>
+                      )}
+                      {frameMode === "custom_prompt" && (
+                        <span className="px-3 py-1.5 text-[10px] font-bold uppercase tracking-wide rounded-xl" style={{ backgroundColor: `${T.cyan}15`, color: T.cyan }}>
+                          ✍️ Custom Prompt Mode
+                        </span>
+                      )}
                       <button onClick={fillSampleData} disabled={isRunning} className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-2" style={{ backgroundColor: T.cardBg, borderColor: T.cardBorder, color: T.textMuted }}>🎲 Sample</button>
                       <button onClick={addScene} disabled={isRunning} className="px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wide transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed border-2" style={{ backgroundColor: T.lightPink, borderColor: T.pink, color: T.pink }}>+ Scene</button>
                     </div>
                   </div>
 
-                  {/* AI Mode: Topic & Duration */}
-                  {mode === "ai" && (
+                  {/* AI Mode: Topic & Duration — HIDDEN in Custom Prompt mode (user provides their own prompts) */}
+                  {mode === "ai" && frameMode !== "custom_prompt" && (
                     <div className="rounded-2xl border-2 p-4 mb-4 animate-fade-in" style={{ borderColor: T.cardBorder, backgroundColor: T.inputBg }}>
                       <div className="space-y-3">
                         {/* AI Provider Toggle */}
@@ -4500,6 +4546,76 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                             </div>
                           )}
 
+                          {/* ═══ Custom Prompt Mode: Image Upload + Custom Prompt Textarea ═══ */}
+                          {frameMode === "custom_prompt" && (
+                            <>
+                              {/* Image Upload (required) */}
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: scene.customFrameImage ? T.cyan : T.textMuted }}>
+                                  📸 Scene Image <span className="font-normal lowercase tracking-normal opacity-60">(required)</span>
+                                </label>
+                                {scene.customFrameImage ? (
+                                  <div className="relative rounded-xl overflow-hidden border-2 w-32 mx-auto" style={{ borderColor: T.cyan }}>
+                                    <img
+                                      src={scene.customFrameImage}
+                                      alt={`Scene ${i + 1} image`}
+                                      className="w-full aspect-[9/16] object-contain"
+                                      style={{ backgroundColor: isDark ? "#111" : "#F9FAFB" }}
+                                    />
+                                    <button
+                                      onClick={() => removeSceneFrame(scene.id)}
+                                      disabled={isRunning}
+                                      className="absolute top-2 right-2 w-7 h-7 rounded-lg flex items-center justify-center transition-all cursor-pointer disabled:opacity-50"
+                                      style={{ backgroundColor: "rgba(239,68,68,0.9)", color: "#fff" }}
+                                      title="Remove image"
+                                    >
+                                      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={3}>
+                                        <path strokeLinecap="round" strokeLinejoin="round" d="M6 18L18 6M6 6l12 12" />
+                                      </svg>
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <label
+                                    className="flex flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed aspect-[9/16] w-32 mx-auto cursor-pointer transition-all hover:border-current"
+                                    style={{ borderColor: T.cardBorder, backgroundColor: T.cardBg, color: T.textMuted }}
+                                  >
+                                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={1.5}>
+                                      <path strokeLinecap="round" strokeLinejoin="round" d="M2.25 15.75l5.159-5.159a2.25 2.25 0 013.182 0l5.159 5.159m-1.5-1.5l1.409-1.409a2.25 2.25 0 013.182 0l2.909 2.909M3.75 21h16.5A2.25 2.25 0 0022.5 18.75V5.25A2.25 2.25 0 0020.25 3H3.75A2.25 2.25 0 001.5 5.25v13.5A2.25 2.25 0 003.75 21z" />
+                                    </svg>
+                                    <span className="text-xs font-semibold">Upload image</span>
+                                    <span className="text-[10px] opacity-60">9:16 Vertical</span>
+                                    <input
+                                      type="file"
+                                      accept="image/*"
+                                      onChange={(e) => handleSceneFrameUpload(scene.id, e)}
+                                      disabled={isRunning}
+                                      className="hidden"
+                                    />
+                                  </label>
+                                )}
+                              </div>
+
+                              {/* Custom Prompt Textarea (required) — replaces standard background prompt */}
+                              <div>
+                                <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: scene.customPrompt ? T.cyan : T.textMuted }}>
+                                  ✍️ Custom Video Prompt <span className="font-normal lowercase tracking-normal opacity-60">(required — sent directly to AI video engine)</span>
+                                </label>
+                                <textarea
+                                  value={scene.customPrompt}
+                                  onChange={(e) => updateScene(scene.id, "customPrompt", e.target.value)}
+                                  placeholder="Write your own video generation prompt here. This prompt is sent AS-IS to the AI video engine — no standard background prompt or script wrapper is added. Example: 'A woman in a red dress walks confidently through a sunny park, smiling at the camera, cinematic close-up shot, warm golden hour lighting, slow motion...'"
+                                  disabled={isRunning}
+                                  rows={5}
+                                  className="w-full px-3 py-2.5 rounded-xl text-sm font-medium transition-all disabled:opacity-50 resize-none outline-none border-2 focus:border-current"
+                                  style={{ backgroundColor: T.inputBg, borderColor: scene.customPrompt ? T.cyan : T.cardBorder, color: T.text, caretColor: T.cyan }}
+                                />
+                                <p className="text-[9px] mt-1 leading-relaxed" style={{ color: T.textMuted }}>
+                                  💡 Your prompt replaces the standard background prompt entirely. The uploaded image is sent as the reference frame. No dialogue script wrapper is added.
+                                </p>
+                              </div>
+                            </>
+                          )}
+
                           {/* Scene Description - HIDDEN when frameMode === "avatar" */}
                           {frameMode === "scenes" && (
                             <div>
@@ -4518,7 +4634,8 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                             </div>
                           )}
 
-                          {/* Script */}
+                          {/* Script - HIDDEN in Custom Prompt mode (replaced by customPrompt) */}
+                          {frameMode !== "custom_prompt" && (
                           <div>
                             <label className="block text-[10px] font-bold uppercase tracking-widest mb-1" style={{ color: T.textMuted }}>
                               💬 Script
@@ -4533,7 +4650,11 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                               style={{ backgroundColor: T.inputBg, borderColor: T.cardBorder, color: T.text, caretColor: T.pink }}
                             />
                           </div>
+                          )}
 
+                          {/* Frame Prompt - HIDDEN in Custom Prompt mode (replaced by customPrompt) */}
+                          {frameMode !== "custom_prompt" && (
+                          <>
                           {/* Frame Prompt - Editable in Custom Frames, read-only in other modes */}
                           {frameMode === "custom" ? (
                             <div>
@@ -4565,6 +4686,8 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                                 </p>
                               </details>
                             )
+                          )}
+                          </>
                           )}
 
                           {/* Regenerate Frame Button - only in Custom Frames when a frame exists */}
@@ -4777,8 +4900,15 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
             {!isRunning && pipelineStep === 0 && !isAutoChainRunning && !framesReviewReady && (
               <>
                 <button
-                  onClick={frameMode === "custom" ? startFramesOnly : startAutoChain}
-                  disabled={frameMode === "custom" ? (() => {
+                  onClick={(frameMode === "custom" || frameMode === "custom_prompt") ? startFramesOnly : startAutoChain}
+                  disabled={(frameMode === "custom" || frameMode === "custom_prompt") ? (() => {
+                    if (frameMode === "custom_prompt") {
+                      // Custom Prompt mode: every scene must have an image AND a custom prompt
+                      const hasAnyFrames = scenes.some(s => s.customFrameImage);
+                      const hasContent = scenes.filter((s) => s.customPrompt.trim() && s.customFrameImage).length > 0;
+                      return !hasAnyFrames || !hasContent;
+                    }
+                    // Custom Frames mode
                     const hasAnyFrames = scenes.some(s => s.customFrameImage);
                     const hasAvatar = !!avatarImage;
                     const hasContent = scenes.filter((s) => s.script.trim() || s.framePrompt.trim() || s.customFrameImage).length > 0;
@@ -4788,14 +4918,14 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                   style={{
                     backgroundColor: T.pink,
                     color: T.white,
-                    boxShadow: (frameMode === "custom" || avatarImage) ? `0 8px 30px ${T.pink}40` : "none",
+                    boxShadow: ((frameMode === "custom" || frameMode === "custom_prompt") || avatarImage) ? `0 8px 30px ${T.pink}40` : "none",
                   }}
                 >
-                  {frameMode === "custom" ? "🖼️ Generate Frames" : "🚀 Generate Video"}
+                  {(frameMode === "custom" || frameMode === "custom_prompt") ? "🖼️ Generate Frames" : "🚀 Generate Video"}
                 </button>
 
                 {/* Delete Button — only shown when there are scenes/scripts with content */}
-                {(scenes.some((s) => s.description.trim() || s.script.trim() || s.customFrameImage) || heygenScript.trim()) && (
+                {(scenes.some((s) => s.description.trim() || s.script.trim() || s.customFrameImage || s.customPrompt.trim()) || heygenScript.trim()) && (
                   <button
                     onClick={() => {
                       if (confirm("Are you sure you want to delete all scenes and scripts? This cannot be undone.")) {

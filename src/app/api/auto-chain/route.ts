@@ -224,10 +224,15 @@ async function generateVideo(
   apiKey: string,
   videoModel: string = "veo3_lite",
   onProgress?: (elapsed: number, pollCount: number) => void,
-  videoPromptSuffix?: string
+  videoPromptSuffix?: string,
+  customPrompt?: string
 ): Promise<string> {
-  const videoPrompt =
-    `IMPORTANT: This is a RAW UNCUT CONTINUOUS SHOT — NOT an edited video. You must NOT apply ANY post-production effects, transitions, or editing. Output must look like raw footage from a single locked camera — like a webcam recording. No editing, no effects, no transitions at all. ` +
+  // ── Custom Prompt mode: user's prompt is sent AS-IS — no standard background prompt wrapper ──
+  // The user has full creative control; we only append their optional suffix.
+  const videoPrompt = customPrompt?.trim()
+    ? customPrompt.trim() + (videoPromptSuffix?.trim() ? ` ADDITIONAL INSTRUCTIONS: ${videoPromptSuffix.trim()}` : "")
+    :
+    (`IMPORTANT: This is a RAW UNCUT CONTINUOUS SHOT — NOT an edited video. You must NOT apply ANY post-production effects, transitions, or editing. Output must look like raw footage from a single locked camera — like a webcam recording. No editing, no effects, no transitions at all. ` +
     `1. ABSOLUTE BAN ON ALL TRANSITIONS (ZERO TOLERANCE): Do NOT add ANY visual transitions at ANY point — beginning, middle, or end of the video. BANNED transitions (ALL of these are FORBIDDEN): fade-in from black, fade-out to black, fade-in from white, fade-out to white, cross-dissolve, cross-fade, wipe, flash, glitch, jump cut, whip pan, blur transition, iris wipe, slide transition, zoom transition, dip to color, soft wipe, hard cut, morph transition, ink wipe, clock wipe, star wipe, any fade effect, any dissolve effect, any color flash. The video must START INSTANTLY at full brightness — NO fade-in. The video must END INSTANTLY at full brightness — NO fade-out. There must be ZERO cuts, ZERO edits, ZERO transition effects of ANY kind at ANY timestamp in the video. Every single frame from 0:00 to the end must maintain full, consistent visibility with NO opacity changes, NO color shifts, NO brightness changes. ` +
     `2. STATIC CAMERA (LOCKED TRIPOD): The camera angle, framing, and composition MUST remain IDENTICAL to the reference image for the ENTIRE duration. NO zooming, NO panning, NO tilting, NO tracking, NO dolly, NO camera shake, NO floating camera movement. The camera must be 100% locked and static — no movement whatsoever. ` +
     `3. OBJECT LOCK: Do NOT add, remove, modify, or animate ANY objects that were not in the reference image. NO floating text, NO graphics, NO subtitles, NO overlays, NO particles, NO sparkles, NO light rays, NO lens flare, NO bokeh. The background must remain EXACTLY as shown in the reference image — no changes. ` +
@@ -237,7 +242,7 @@ async function generateVideo(
     `6. SCRIPT BOUNDARY — SILENCE AFTER LAST WORD: The person must say ONLY the exact words in the dialogue and NOTHING ELSE. After the last word: mouth CLOSED, gentle smile, hands come to rest naturally, steady eye contact. ZERO extra words, ZERO filler sounds, ZERO lip movement after script ends. ` +
     `REFERENCE IMAGE: This is a talking-head video with expressive hand gestures and body language. The reference image is the ONLY source of truth for the person's appearance. Output must look like a raw, unedited, continuous webcam recording of an engaging speaker who uses natural hand gestures, head movements, and facial expressions while speaking. CRITICAL REMINDERS: NO fade-in at start. NO fade-out at end. NO transitions whatsoever. NO cuts. Camera stays STATIC (locked tripod). RAW FOOTAGE ONLY. INSTANT start, INSTANT end. Full brightness at all times. The person should use hand gestures, natural head movement, and expressive body language that MATCHES the dialogue content. Dialogue: "${script}" ` +
     `AUDIO RULES: MUTE ALL BACKGROUND AUDIO COMPLETELY. ZERO music — no background music, no instrumental music, no ambient music, no soundtrack, no beat, no melody, no jingle, no BGM of any kind. ZERO ambient sounds — no wind, no birds, no traffic, no footsteps, no nature sounds, no room tone, no echo, no reverb, no environmental audio whatsoever. The ONLY audio allowed is the person's own voice: a clear, warm, natural speaking voice with confident tone and friendly delivery. The audio track must contain ONLY clean, dry voice — no music intro, no music outro, no music transitions between scenes, no background score at any point. Absolutely no sound effects, no whoosh, no ding, no transition sounds. This is critical: the final audio must be 100% voice-only with zero musical or ambient elements.`
-    + (videoPromptSuffix?.trim() ? ` ADDITIONAL INSTRUCTIONS: ${videoPromptSuffix.trim()}` : "");
+    + (videoPromptSuffix?.trim() ? ` ADDITIONAL INSTRUCTIONS: ${videoPromptSuffix.trim()}` : ""));
 
   // ── Route to correct API based on model ──
   const isVeoModel = videoModel.startsWith("veo");
@@ -426,7 +431,7 @@ export async function POST(req: NextRequest) {
     aiApiKey?: string;
     aiProvider?: string;
     characterImageUrl?: string;
-    scenes?: Array<{ script: string; framePrompt: string; description: string; label: string; videoPromptSuffix?: string }>;
+    scenes?: Array<{ script: string; framePrompt: string; description: string; label: string; videoPromptSuffix?: string; customPrompt?: string }>;
     kieApiKey?: string;
     falApiKey?: string;
     videoModel?: string;
@@ -636,7 +641,8 @@ export async function POST(req: NextRequest) {
                 (elapsed, pollCount) => {
                   sseSend(sw, { type: "video_progress", sceneIndex: i, pct, message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed)` });
                 },
-                scene.videoPromptSuffix
+                scene.videoPromptSuffix,
+                scene.customPrompt
               );
               lastVideoError = "";
               break;
@@ -1134,7 +1140,8 @@ export async function POST(req: NextRequest) {
                   message: `Video ${i + 1}/${totalScenes}: Generating... (${elapsed}s elapsed, poll #${pollCount})`,
                 });
               },
-              scene.videoPromptSuffix
+              scene.videoPromptSuffix,
+              scene.customPrompt
             );
             lastError = "";
             break; // Success — exit retry loop

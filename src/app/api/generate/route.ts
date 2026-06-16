@@ -413,7 +413,8 @@ async function generateVideo(
  frameMode: string,
   sw: SafeWriter | null,
   videoModel: string = "veo3_lite",
-  expression?: string
+  expression?: string,
+  customPrompt?: string
 ): Promise<string> {
   const MAX_RETRIES = 5;
 
@@ -462,7 +463,10 @@ async function generateVideo(
           addJobLog(jobId, `Video ${sceneIndex + 1}: submitting NEW task (previous taskId ${existingTaskId.slice(0, 8)}... failed permanently)`);
         }
         let videoPrompt: string;
-        if (frameMode === "avatar_v2" || frameMode === "custom_v2") {
+        if (customPrompt && customPrompt.trim()) {
+          // ── Custom Prompt mode: user's prompt is sent AS-IS — no standard background prompt wrapper ──
+          videoPrompt = customPrompt.trim();
+        } else if (frameMode === "avatar_v2" || frameMode === "custom_v2") {
           const expressionPrompt = expression?.trim()
             ? `\n\nSPECIFIC EXPRESSION & GESTURE INSTRUCTIONS FOR THIS SCENE: ${expression.trim()}. The person MUST perform these specific gestures and expressions while speaking this scene's dialogue.`
             : "";
@@ -1005,7 +1009,7 @@ async function startHeartbeat(
 // ─── Pipeline Runner with SSE Streaming (Vercel-compatible) ──────────
 async function runPipelineSSE(
   avatarUrl: string,
-  validScenes: Array<{ description: string; script: string; customFrameImage?: string; expression?: string; framePrompt?: string }>,
+  validScenes: Array<{ description: string; script: string; customFrameImage?: string; expression?: string; framePrompt?: string; customPrompt?: string }>,
   kieApiKey: string,
   falApiKey: string,
   useSceneFrames: boolean,
@@ -1239,7 +1243,8 @@ async function runPipelineSSE(
           frameMode,
           sw,
           videoModel,
-          scene.expression
+          scene.expression,
+          scene.customPrompt
         );
         videoUrls[index] = videoUrl;
         // Send scene-level completion event so the client always has accurate state for resume
@@ -1324,22 +1329,25 @@ export async function POST(req: NextRequest) {
 
     const { avatarUrl, scenes, kieApiKey, falApiKey, frameMode, videoProvider, videoModel, heygenApiKey, heygenVoiceId, resumeFrom, resumeJobId } = body;
     // In custom frames mode, avatar is not required — each scene has its own image
-    if (frameMode !== "custom" && frameMode !== "custom_v2") {
+    if (frameMode !== "custom" && frameMode !== "custom_v2" && frameMode !== "custom_prompt") {
       if (!avatarUrl || typeof avatarUrl !== "string" || !avatarUrl.startsWith("http")) {
         return NextResponse.json({ error: "avatarUrl is required. Please upload your avatar first." }, { status: 400 });
       }
     }
 
-    const validScenes = (scenes as Array<{ description: string; script: string; customFrameImage?: string; expression?: string; framePrompt?: string }>).filter(s => s.description?.trim() || s.script?.trim() || s.customFrameImage);
+    const validScenes = (scenes as Array<{ description: string; script: string; customFrameImage?: string; expression?: string; framePrompt?: string; customPrompt?: string }>).filter(s => s.description?.trim() || s.script?.trim() || s.customFrameImage || s.customPrompt?.trim());
     if (validScenes.length === 0) {
       return NextResponse.json({ error: "No valid scenes provided" }, { status: 400 });
     }
 
-    // Validate custom frames
-    if (frameMode === "custom" || frameMode === "custom_v2") {
+    // Validate custom frames / custom prompt mode
+    if (frameMode === "custom" || frameMode === "custom_v2" || frameMode === "custom_prompt") {
       for (let i = 0; i < validScenes.length; i++) {
         if (!validScenes[i].customFrameImage) {
           return NextResponse.json({ error: `Scene ${i + 1} is missing a custom frame image. Please upload an image for each scene.` }, { status: 400 });
+        }
+        if (frameMode === "custom_prompt" && !validScenes[i].customPrompt?.trim()) {
+          return NextResponse.json({ error: `Scene ${i + 1} is missing a custom prompt. Please write a prompt for each scene.` }, { status: 400 });
         }
       }
     }
@@ -1527,7 +1535,7 @@ export async function POST(req: NextRequest) {
     runPipelineSSE(
       avatarUrl as string, validScenes,
       effectiveKieKey, effectiveFalKey,
-      frameMode === "scenes" || frameMode === "custom" || frameMode === "custom_v2",
+      frameMode === "scenes" || frameMode === "custom" || frameMode === "custom_v2" || frameMode === "custom_prompt",
       provider, effectiveHeygenKey, (heygenVoiceId as string) || "",
       writer, jobId, userId || "anonymous",
       (frameMode as string) || "avatar",
