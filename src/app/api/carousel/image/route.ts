@@ -71,22 +71,8 @@ async function pollKieImage(taskId: string, apiKey: string): Promise<string> {
   throw new Error("Image generation timed out after 6 minutes");
 }
 
-// ─── Download an image and convert to base64 ────────────────────────────────
-async function downloadImageAsBase64(imageUrl: string): Promise<string> {
-  console.log(`[Carousel/Image] Downloading reference image from: ${imageUrl.slice(0, 100)}...`);
-  const res = await fetch(imageUrl);
-  if (!res.ok) {
-    throw new Error(`Failed to download reference image: ${res.status} ${res.statusText}`);
-  }
-  const contentType = res.headers.get("content-type") || "image/png";
-  const arrayBuffer = await res.arrayBuffer();
-  const base64 = Buffer.from(arrayBuffer).toString("base64");
-  console.log(`[Carousel/Image] Downloaded reference image (${(base64.length / 1024).toFixed(0)}KB base64)`);
-  return `data:${contentType};base64,${base64}`;
-}
-
 // ─── Generate image via KIE.ai (GPT Image model) ────────────────────────────
-async function generateWithKie(prompt: string, referenceImageUrl?: string | null): Promise<string> {
+async function generateWithKie(prompt: string, referenceImageBase64?: string | null): Promise<string> {
   const enhancedPrompt = enforcePhotorealisticPrompt(prompt);
 
   // Build the input payload
@@ -95,18 +81,10 @@ async function generateWithKie(prompt: string, referenceImageUrl?: string | null
     size: "1024x1792",
   };
 
-  // If a reference image is provided, download it and include it
-  if (referenceImageUrl) {
-    try {
-      const base64Image = await downloadImageAsBase64(referenceImageUrl);
-      // GPT Image supports reference images via the "images" parameter
-      // The image should be provided as a base64 data URI or URL
-      inputPayload.images = [base64Image];
-      console.log(`[Carousel/Image] Including reference image in GPT Image request`);
-    } catch (dlErr) {
-      const msg = dlErr instanceof Error ? dlErr.message : String(dlErr);
-      console.warn(`[Carousel/Image] Failed to download reference image, generating without it: ${msg}`);
-    }
+  // If a reference image is provided (base64 data URI), include it
+  if (referenceImageBase64) {
+    inputPayload.images = [referenceImageBase64];
+    console.log(`[Carousel/Image] Including reference image in GPT Image request (${(referenceImageBase64.length / 1024).toFixed(0)}KB)`);
   }
 
   // Submit task to KIE.ai
@@ -141,7 +119,7 @@ async function generateWithKie(prompt: string, referenceImageUrl?: string | null
     throw new Error("No taskId returned from KIE.ai");
   }
 
-  console.log(`[Carousel/Image] KIE.ai task ${taskId} submitted (reference: ${!!referenceImageUrl}), polling...`);
+  console.log(`[Carousel/Image] KIE.ai task ${taskId} submitted (reference: ${!!referenceImageBase64}), polling...`);
   const imageUrl = await pollKieImage(taskId as string, KIE_API_KEY);
   console.log(`[Carousel/Image] KIE.ai image ready!`);
   return imageUrl;
@@ -186,7 +164,7 @@ export async function POST(request: NextRequest) {
     console.log(`[Carousel/Image] Authenticated: ${user.email}`);
 
     const body = await request.json();
-    const { image_prompt, reference_image_url } = body;
+    const { image_prompt, reference_image_base64 } = body;
 
     if (!image_prompt || typeof image_prompt !== 'string' || image_prompt.trim().length === 0) {
       return NextResponse.json(
@@ -195,14 +173,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const hasRef = !!reference_image_url && typeof reference_image_url === 'string' && reference_image_url.trim().length > 0;
-    console.log(`[Carousel/Image] Generating image for prompt: "${image_prompt.slice(0, 100)}..."${hasRef ? ` with reference image` : ""}`);
+    const hasRef = !!reference_image_base64 && typeof reference_image_base64 === 'string' && reference_image_base64.length > 0;
+    console.log(`[Carousel/Image] Generating image for prompt: "${image_prompt.slice(0, 100)}..."${hasRef ? ` with reference image (${(reference_image_base64.length / 1024).toFixed(0)}KB)` : ""}`);
 
     let imageUrl: string | null = null;
 
     // Step 1: Try KIE.ai GPT Image (with optional reference image)
     try {
-      imageUrl = await generateWithKie(image_prompt.trim(), hasRef ? reference_image_url.trim() : null);
+      imageUrl = await generateWithKie(image_prompt.trim(), hasRef ? reference_image_base64 : null);
     } catch (kieErr) {
       const msg = kieErr instanceof Error ? kieErr.message : String(kieErr);
       console.warn(`[Carousel/Image] KIE.ai GPT Image failed: ${msg}`);

@@ -399,7 +399,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
 
-  const [productImageUrl, setProductImageUrl] = useState(""); // User-provided product image for solution slides
+  const [productImageBase64, setProductImageBase64] = useState<string | null>(null); // User-uploaded product image (base64) for solution slides
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [productInfo, setProductInfo] = useState<ProductInfo | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [carouselTitle, setCarouselTitle] = useState("");
@@ -591,24 +592,22 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         completedImages++;
         setProgress(35 + Math.round((completedImages / totalImages) * 60));
 
-        // Generate SOLUTION image — use user-provided product image as reference for GPT Image
+        // Generate SOLUTION image — use user-uploaded product image as reference for GPT Image
         try {
           setStepMessage(`Generating solution image ${i + 1}/${plan.slides.length}...`);
 
           let solutionImage: string | null = null;
 
-          // If user provided a product image, use it as reference for GPT Image
-          const refImageUrl = productImageUrl.trim() || null;
-
-          if (refImageUrl) {
+          // If user uploaded a product image, use it as reference for GPT Image
+          if (productImageBase64) {
             // Generate with GPT Image using the product image as reference
-            console.log(`[Carousel] Using user-provided product image as reference for solution slide ${i + 1}`);
+            console.log(`[Carousel] Using user-uploaded product image as reference for solution slide ${i + 1}`);
             const imgRes = await authFetch("/api/carousel/image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
                 image_prompt: slide.solution.image_prompt,
-                reference_image_url: refImageUrl,
+                reference_image_base64: productImageBase64,
               }),
             });
 
@@ -689,7 +688,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       setError(msg);
       setStep("error");
     }
-  }, [productUrl, numSlides, userInstructions, language, authFetch, user, productImageUrl]);
+  }, [productUrl, numSlides, userInstructions, language, authFetch, user, productImageBase64]);
 
   // ─── Save to Library ────────────────────────────────────────────────
   const saveToLibrary = useCallback(async () => {
@@ -1255,7 +1254,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             We'll analyze the product page and extract features, benefits, and target audience
           </p>
 
-          {/* Product Image URL Input */}
+          {/* Product Image Upload */}
           <div className="flex items-center gap-2 mt-6 mb-3">
             <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.green}12` }}>
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -1269,41 +1268,106 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             </label>
           </div>
 
+          {/* Hidden file input */}
           <input
-            type="url"
-            value={productImageUrl}
-            onChange={(e) => setProductImageUrl(e.target.value)}
-            placeholder="Paste your product image URL here (used as reference for solution slides)"
-            className="w-full px-5 py-4 rounded-2xl text-sm outline-none transition-all duration-200"
-            style={{
-              backgroundColor: `${C.green}08`,
-              border: `1.5px solid ${productImageUrl ? `${C.green}40` : "#F3F4F6"}`,
-              color: C.text,
-              boxShadow: productImageUrl ? `0 0 0 3px ${C.green}10` : "none",
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (!file) return;
+              // Convert to base64
+              const reader = new FileReader();
+              reader.onload = () => {
+                const result = reader.result as string;
+                setProductImageBase64(result);
+                console.log(`[Carousel] Product image uploaded (${(result.length / 1024).toFixed(0)}KB base64)`);
+              };
+              reader.readAsDataURL(file);
             }}
           />
 
-          {/* Preview of the product image */}
-          {productImageUrl.trim() && (
-            <div className="mt-3 flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: `${C.green}06`, border: "1px solid #F3F4F6" }}>
+          {/* Upload zone or preview */}
+          {productImageBase64 ? (
+            <div
+              className="rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:shadow-md"
+              style={{ backgroundColor: `${C.green}06`, border: `1.5px solid ${C.green}30` }}
+              onClick={() => fileInputRef.current?.click()}
+            >
               <img
-                src={productImageUrl.trim()}
+                src={productImageBase64}
                 alt="Product preview"
-                className="w-12 h-12 rounded-lg object-cover"
-                style={{ border: "1px solid #E5E7EB" }}
-                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+                className="w-16 h-16 rounded-xl object-cover"
+                style={{ border: "2px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
               />
-              <div>
-                <p className="text-xs font-semibold" style={{ color: C.green }}>Product image loaded</p>
-                <p className="text-[10px]" style={{ color: C.textMuted }}>This image will be used as reference for GPT Image to generate solution slides</p>
+              <div className="flex-1">
+                <p className="text-xs font-bold" style={{ color: C.green }}>Product image uploaded ✓</p>
+                <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
+                  This image will be used as reference for GPT Image to generate solution slides with your product
+                </p>
+                <p className="text-[10px] mt-1 font-semibold" style={{ color: C.pink }}>
+                  Click to change image
+                </p>
               </div>
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setProductImageBase64(null);
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200"
+                style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }}
+              >
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="18" y1="6" x2="6" y2="18" />
+                  <line x1="6" y1="6" x2="18" y2="18" />
+                </svg>
+              </button>
             </div>
-          )}
-
-          {!productImageUrl.trim() && (
-            <p className="text-[11px] mt-2" style={{ color: C.textMuted }}>
-              Optional: Paste the product image URL. GPT Image will use it as reference to create realistic solution slides with your product.
-            </p>
+          ) : (
+            <div
+              className="rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:shadow-md"
+              style={{
+                backgroundColor: `${C.green}04`,
+                border: `2px dashed ${C.green}30`,
+                minHeight: "120px",
+              }}
+              onClick={() => fileInputRef.current?.click()}
+              onDragOver={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+              onDrop={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                const file = e.dataTransfer.files?.[0];
+                if (file && file.type.startsWith("image/")) {
+                  const reader = new FileReader();
+                  reader.onload = () => {
+                    setProductImageBase64(reader.result as string);
+                  };
+                  reader.readAsDataURL(file);
+                }
+              }}
+            >
+              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${C.green}12` }}>
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+              </div>
+              <p className="text-xs font-bold" style={{ color: C.text }}>
+                Upload your product image
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
+                Click or drag & drop • PNG, JPG, WebP
+              </p>
+              <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
+                Optional: GPT Image will use it as reference to create solution slides featuring your product
+              </p>
+            </div>
           )}
 
           {/* Settings Row */}
