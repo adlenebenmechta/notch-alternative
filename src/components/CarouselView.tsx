@@ -399,6 +399,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [error, setError] = useState("");
   const [progress, setProgress] = useState(0);
 
+  const [productImageUrl, setProductImageUrl] = useState(""); // User-provided product image for solution slides
   const [productInfo, setProductInfo] = useState<ProductInfo | null>(null);
   const [productImages, setProductImages] = useState<string[]>([]);
   const [carouselTitle, setCarouselTitle] = useState("");
@@ -590,28 +591,38 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         completedImages++;
         setProgress(35 + Math.round((completedImages / totalImages) * 60));
 
-        // Generate SOLUTION image — use REAL product image if available
+        // Generate SOLUTION image — use user-provided product image as reference for GPT Image
         try {
-          setStepMessage(`Preparing solution image ${i + 1}/${plan.slides.length}...`);
-
-          // Pick a product image for this slide (cycle through available images)
-          const productImageUrl = extractedImages.length > 0
-            ? extractedImages[i % extractedImages.length]
-            : null;
+          setStepMessage(`Generating solution image ${i + 1}/${plan.slides.length}...`);
 
           let solutionImage: string | null = null;
 
-          if (productImageUrl) {
-            // Use the REAL product image from the website — format it to 9:16
-            console.log(`[Carousel] Using real product image for solution slide ${i + 1}`);
-            try {
-              solutionImage = await formatProductImageTo9x16(productImageUrl);
-            } catch (fmtErr) {
-              console.warn(`[Carousel] Product image formatting failed, using raw URL:`, fmtErr);
-              solutionImage = productImageUrl; // Fallback to raw URL
+          // If user provided a product image, use it as reference for GPT Image
+          const refImageUrl = productImageUrl.trim() || null;
+
+          if (refImageUrl) {
+            // Generate with GPT Image using the product image as reference
+            console.log(`[Carousel] Using user-provided product image as reference for solution slide ${i + 1}`);
+            const imgRes = await authFetch("/api/carousel/image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                image_prompt: slide.solution.image_prompt,
+                reference_image_url: refImageUrl,
+              }),
+            });
+
+            if (imgRes.ok) {
+              const imgData = await imgRes.json();
+              solutionImage = imgData.image;
+            } else {
+              const errData = await imgRes.json().catch(() => ({ error: "Image generation failed" }));
+              console.warn(`[Carousel] Solution image with reference failed: ${errData.error}`);
             }
-          } else {
-            // Fallback: generate with AI if no product images were extracted
+          }
+
+          // Fallback: generate without reference if no product image or if ref-based generation failed
+          if (!solutionImage) {
             const imgRes = await authFetch("/api/carousel/image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -678,7 +689,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       setError(msg);
       setStep("error");
     }
-  }, [productUrl, numSlides, userInstructions, language, authFetch, user]);
+  }, [productUrl, numSlides, userInstructions, language, authFetch, user, productImageUrl]);
 
   // ─── Save to Library ────────────────────────────────────────────────
   const saveToLibrary = useCallback(async () => {
@@ -1243,6 +1254,57 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           <p className="text-[11px] mt-2" style={{ color: C.textMuted }}>
             We'll analyze the product page and extract features, benefits, and target audience
           </p>
+
+          {/* Product Image URL Input */}
+          <div className="flex items-center gap-2 mt-6 mb-3">
+            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.green}12` }}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                <circle cx="8.5" cy="8.5" r="1.5" />
+                <polyline points="21 15 16 10 5 21" />
+              </svg>
+            </div>
+            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
+              Product Image <span style={{ color: C.textMuted }}>(for solution slides)</span>
+            </label>
+          </div>
+
+          <input
+            type="url"
+            value={productImageUrl}
+            onChange={(e) => setProductImageUrl(e.target.value)}
+            placeholder="Paste your product image URL here (used as reference for solution slides)"
+            className="w-full px-5 py-4 rounded-2xl text-sm outline-none transition-all duration-200"
+            style={{
+              backgroundColor: `${C.green}08`,
+              border: `1.5px solid ${productImageUrl ? `${C.green}40` : "#F3F4F6"}`,
+              color: C.text,
+              boxShadow: productImageUrl ? `0 0 0 3px ${C.green}10` : "none",
+            }}
+          />
+
+          {/* Preview of the product image */}
+          {productImageUrl.trim() && (
+            <div className="mt-3 flex items-center gap-3 p-3 rounded-xl" style={{ backgroundColor: `${C.green}06`, border: "1px solid #F3F4F6" }}>
+              <img
+                src={productImageUrl.trim()}
+                alt="Product preview"
+                className="w-12 h-12 rounded-lg object-cover"
+                style={{ border: "1px solid #E5E7EB" }}
+                onError={(e) => { (e.target as HTMLImageElement).style.display = "none"; }}
+              />
+              <div>
+                <p className="text-xs font-semibold" style={{ color: C.green }}>Product image loaded</p>
+                <p className="text-[10px]" style={{ color: C.textMuted }}>This image will be used as reference for GPT Image to generate solution slides</p>
+              </div>
+            </div>
+          )}
+
+          {!productImageUrl.trim() && (
+            <p className="text-[11px] mt-2" style={{ color: C.textMuted }}>
+              Optional: Paste the product image URL. GPT Image will use it as reference to create realistic solution slides with your product.
+            </p>
+          )}
 
           {/* Settings Row */}
           <div className="flex flex-wrap items-end gap-4 mt-6 mb-5">
