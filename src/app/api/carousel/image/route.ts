@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic';
 const KIE_API_KEY = process.env.KIE_API_KEY || "17276b59024a2d9400d2354ea49020b8";
 const KIE_API_URL = "https://api.kie.ai/api/v1/jobs/createTask";
 const KIE_POLL_URL = "https://api.kie.ai/api/v1/jobs/recordInfo";
+const KIE_UPLOAD_URL = "https://kieai.redpandaai.co/api/file-base64-upload";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -21,6 +22,43 @@ function enforcePhotorealisticPrompt(prompt: string): string {
     .replace(/\s{2,}/g, " ")
     .trim();
   return IMAGE_PROMPT_PREFIX + cleaned;
+}
+
+// ─── Upload base64 image to KIE.ai and get a download URL ─────────────────
+async function uploadBase64ToKie(base64DataUri: string): Promise<string> {
+  // Strip the data URI prefix (e.g., "data:image/png;base64,")
+  const rawBase64 = base64DataUri.includes(",") ? base64DataUri.split(",").slice(1).join(",") : base64DataUri;
+  
+  console.log(`[Carousel/Image] Uploading reference image to KIE.ai (${(rawBase64.length / 1024).toFixed(0)}KB)...`);
+  
+  const res = await fetch(KIE_UPLOAD_URL, {
+    method: "POST",
+    headers: {
+      "Authorization": `Bearer ${KIE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      base64Data: rawBase64,
+      fileName: `product-ref-${Date.now()}.png`,
+      uploadPath: "images",
+    }),
+  });
+
+  const text = await res.text();
+  let json: Record<string, unknown>;
+  try {
+    json = JSON.parse(text);
+  } catch {
+    throw new Error("KIE.ai upload returned non-JSON: " + text.slice(0, 200));
+  }
+
+  const downloadUrl = (json.data as Record<string, unknown>)?.downloadUrl as string;
+  if (!downloadUrl) {
+    throw new Error("KIE.ai upload succeeded but no downloadUrl returned: " + text.slice(0, 200));
+  }
+
+  console.log(`[Carousel/Image] Reference image uploaded! URL: ${downloadUrl.slice(0, 80)}...`);
+  return downloadUrl;
 }
 
 // ─── Poll for KIE.ai image result ──────────────────────────────────────────
@@ -71,23 +109,21 @@ async function pollKieImage(taskId: string, apiKey: string): Promise<string> {
   throw new Error("Image generation timed out after 6 minutes");
 }
 
-// ─── Generate image via KIE.ai (GPT Image model) ────────────────────────────
-async function generateWithKie(prompt: string, referenceImageBase64?: string | null): Promise<string> {
+// ─── Generate image WITH reference using google/nano-banana-edit ──────────
+// This model is PROVEN to work with reference images via KIE.ai
+async function generateWithReference(prompt: string, referenceImageUrl: string): Promise<string> {
   const enhancedPrompt = enforcePhotorealisticPrompt(prompt);
 
-  // Build the input payload
-  const inputPayload: Record<string, unknown> = {
+  const inputPayload = {
     prompt: enhancedPrompt,
-    size: "1024x1792",
+    image_urls: [referenceImageUrl],   // URL array — proven format
+    image_size: "9:16",                // Ratio format for nano-banana-edit
+    output_format: "png",
+    strength: 0.45,                    // 0.45 = product clearly visible, AI adds context
   };
 
-  // If a reference image is provided (base64 data URI), include it
-  if (referenceImageBase64) {
-    inputPayload.images = [referenceImageBase64];
-    console.log(`[Carousel/Image] Including reference image in GPT Image request (${(referenceImageBase64.length / 1024).toFixed(0)}KB)`);
-  }
+  console.log(`[Carousel/Image] Using google/nano-banana-edit with reference image (strength: 0.45)`);
 
-  // Submit task to KIE.ai
   const submitRes = await fetch(KIE_API_URL, {
     method: "POST",
     headers: {
@@ -95,7 +131,7 @@ async function generateWithKie(prompt: string, referenceImageBase64?: string | n
       "Content-Type": "application/json",
     },
     body: JSON.stringify({
-      model: "gpt-image-2-text-to-image",
+      model: "google/nano-banana-edit",
       input: inputPayload,
     }),
   });
@@ -119,9 +155,53 @@ async function generateWithKie(prompt: string, referenceImageBase64?: string | n
     throw new Error("No taskId returned from KIE.ai");
   }
 
-  console.log(`[Carousel/Image] KIE.ai task ${taskId} submitted (reference: ${!!referenceImageBase64}), polling...`);
+  console.log(`[Carousel/Image] nano-banana-edit task ${taskId} submitted, polling...`);
   const imageUrl = await pollKieImage(taskId as string, KIE_API_KEY);
-  console.log(`[Carousel/Image] KIE.ai image ready!`);
+  console.log(`[Carousel/Image] nano-banana-edit image ready!`);
+  return imageUrl;
+}
+
+// ─── Generate image WITHOUT reference using GPT Image ─────────────────────
+async function generateWithoutReference(prompt: string): Promise<string> {
+  const enhancedPrompt = enforcePhotorealisticPrompt(prompt);
+
+  const submitRes = await fetch(KIE_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${KIE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-image-2-text-to-image",
+      input: {
+        prompt: enhancedPrompt,
+        size: "1024x1792",
+      },
+    }),
+  });
+
+  const submitText = await submitRes.text();
+  let submitJson: Record<string, unknown>;
+  try {
+    submitJson = JSON.parse(submitText);
+  } catch {
+    throw new Error("KIE.ai API returned non-JSON: " + submitText.slice(0, 200));
+  }
+
+  if (submitJson.code !== 200) {
+    throw new Error(
+      "KIE.ai submit failed: " + (submitJson.msg || submitText.slice(0, 200))
+    );
+  }
+
+  const taskId = (submitJson.data as Record<string, unknown>)?.taskId;
+  if (!taskId) {
+    throw new Error("No taskId returned from KIE.ai");
+  }
+
+  console.log(`[Carousel/Image] GPT Image task ${taskId} submitted, polling...`);
+  const imageUrl = await pollKieImage(taskId as string, KIE_API_KEY);
+  console.log(`[Carousel/Image] GPT Image ready!`);
   return imageUrl;
 }
 
@@ -178,26 +258,71 @@ export async function POST(request: NextRequest) {
 
     let imageUrl: string | null = null;
 
-    // Step 1: Try KIE.ai GPT Image (with optional reference image)
-    try {
-      imageUrl = await generateWithKie(image_prompt.trim(), hasRef ? reference_image_base64 : null);
-    } catch (kieErr) {
-      const msg = kieErr instanceof Error ? kieErr.message : String(kieErr);
-      console.warn(`[Carousel/Image] KIE.ai GPT Image failed: ${msg}`);
-      
-      // If it failed with reference image, try once more without reference
-      if (hasRef) {
-        console.log(`[Carousel/Image] Retrying without reference image...`);
+    // ─── PATH 1: With reference image → use google/nano-banana-edit ──────
+    if (hasRef) {
+      try {
+        // Step 1: Upload the base64 image to KIE.ai to get a URL
+        const refImageUrl = await uploadBase64ToKie(reference_image_base64);
+        
+        // Step 2: Use nano-banana-edit with the reference URL
+        imageUrl = await generateWithReference(image_prompt.trim(), refImageUrl);
+      } catch (refErr) {
+        const msg = refErr instanceof Error ? refErr.message : String(refErr);
+        console.warn(`[Carousel/Image] nano-banana-edit with reference failed: ${msg}`);
+        
+        // Try nano-banana-edit with lower strength as fallback
         try {
-          imageUrl = await generateWithKie(image_prompt.trim(), null);
+          console.log(`[Carousel/Image] Retrying nano-banana-edit with lower strength...`);
+          const refImageUrl = await uploadBase64ToKie(reference_image_base64);
+          
+          const enhancedPrompt = enforcePhotorealisticPrompt(image_prompt.trim());
+          const submitRes = await fetch(KIE_API_URL, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${KIE_API_KEY}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify({
+              model: "google/nano-banana-edit",
+              input: {
+                prompt: enhancedPrompt,
+                image_urls: [refImageUrl],
+                image_size: "9:16",
+                output_format: "png",
+                strength: 0.55,  // Higher strength = more faithful to reference
+              },
+            }),
+          });
+
+          const submitText = await submitRes.text();
+          let submitJson: Record<string, unknown>;
+          try { submitJson = JSON.parse(submitText); } catch {
+            throw new Error("KIE.ai API returned non-JSON: " + submitText.slice(0, 200));
+          }
+          if (submitJson.code !== 200) {
+            throw new Error("KIE.ai submit failed: " + (submitJson.msg || submitText.slice(0, 200)));
+          }
+          const taskId = (submitJson.data as Record<string, unknown>)?.taskId;
+          if (!taskId) throw new Error("No taskId returned from KIE.ai");
+          imageUrl = await pollKieImage(taskId as string, KIE_API_KEY);
         } catch (retryErr) {
           const retryMsg = retryErr instanceof Error ? retryErr.message : String(retryErr);
-          console.warn(`[Carousel/Image] KIE.ai retry without reference also failed: ${retryMsg}`);
+          console.warn(`[Carousel/Image] nano-banana-edit retry also failed: ${retryMsg}`);
         }
       }
     }
 
-    // Step 2: Fallback to ZAI SDK
+    // ─── PATH 2: Without reference → use GPT Image text-to-image ────────
+    if (!imageUrl) {
+      try {
+        imageUrl = await generateWithoutReference(image_prompt.trim());
+      } catch (kieErr) {
+        const msg = kieErr instanceof Error ? kieErr.message : String(kieErr);
+        console.warn(`[Carousel/Image] GPT Image failed: ${msg}`);
+      }
+    }
+
+    // ─── PATH 3: Fallback to ZAI SDK ─────────────────────────────────────
     if (!imageUrl) {
       console.log('[Carousel/Image] KIE.ai failed, falling back to ZAI SDK...');
       imageUrl = await generateWithZAI(image_prompt.trim());
@@ -205,7 +330,7 @@ export async function POST(request: NextRequest) {
 
     if (!imageUrl) {
       return NextResponse.json(
-        { error: 'Image generation failed — both KIE.ai and fallback API failed' },
+        { error: 'Image generation failed — all methods failed' },
         { status: 500 }
       );
     }
