@@ -402,7 +402,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         // Generate PROBLEM image
         try {
           setStepMessage(`Generating problem image ${i + 1}/${plan.slides.length}...`);
-          const imgRes = await fetch("/api/carousel/image", {
+          const imgRes = await authFetch("/api/carousel/image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ image_prompt: slide.problem.image_prompt }),
@@ -458,7 +458,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         // Generate SOLUTION image
         try {
           setStepMessage(`Generating solution image ${i + 1}/${plan.slides.length}...`);
-          const imgRes = await fetch("/api/carousel/image", {
+          const imgRes = await authFetch("/api/carousel/image", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ image_prompt: slide.solution.image_prompt }),

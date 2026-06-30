@@ -143,7 +143,7 @@ async function generateWithZAI(prompt: string): Promise<string | null> {
 export async function POST(request: NextRequest) {
   try {
     // Auth check
-    const user = await getAuthUser();
+    const user = await getAuthUser(request);
     if (!user) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
