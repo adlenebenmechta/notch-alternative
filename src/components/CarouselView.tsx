@@ -50,6 +50,7 @@ interface ProductInfo {
   problems: string[];
   benefits: string[];
   targetAudience: string;
+  productImages?: string[];
 }
 
 interface GeneratedSlide extends CarouselSlide, ProblemSolutionImages {
@@ -66,6 +67,122 @@ interface CarouselViewProps {
   isAdmin?: boolean;
 }
 
+// ─── Proxy-load an external image to avoid CORS issues ────────────────────────
+// Uses /api/proxy-image?url=... to fetch external images through our server
+async function loadProxiedImage(imageUrl: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    // For external URLs, try loading directly first (works if CORS headers present)
+    // If that fails, use a proxy approach via canvas
+    const isExternal = imageUrl.startsWith("http");
+
+    img.onload = () => resolve(img);
+    img.onerror = () => {
+      if (isExternal) {
+        // Try loading without CORS for display (won't work for canvas export but shows the image)
+        const fallbackImg = new Image();
+        fallbackImg.crossOrigin = "anonymous";
+        fallbackImg.onload = () => resolve(fallbackImg);
+        fallbackImg.onerror = () => reject(new Error("Failed to load image"));
+        // Try with no-cors as last resort — at least it displays
+        fallbackImg.src = imageUrl;
+      } else {
+        reject(new Error("Failed to load image"));
+      }
+    };
+
+    img.src = imageUrl;
+  });
+}
+
+// ─── Format product image to 9:16 vertical with background ──────────────────
+// Takes a product image (any aspect ratio) and renders it centered on a 9:16 canvas
+// with a matching blurred background fill. Uses server proxy for CORS bypass.
+function formatProductImageTo9x16(imageUrl: string): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+
+    // Use our server proxy to bypass CORS for external images
+    const isExternal = imageUrl.startsWith("http");
+    const proxiedUrl = isExternal ? `/api/proxy-image?url=${encodeURIComponent(imageUrl)}` : imageUrl;
+
+    img.onload = () => {
+      const targetW = 768;
+      const targetH = 1344; // 9:16 ratio
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) {
+        reject(new Error("Canvas context not available"));
+        return;
+      }
+
+      // Fill background with a blurred/scaled version
+      ctx.drawImage(img, 0, 0, targetW, targetH);
+      ctx.filter = "blur(30px) brightness(0.5)";
+      ctx.drawImage(img, -10, -10, targetW + 20, targetH + 20);
+      ctx.filter = "none";
+
+      // Add semi-transparent overlay
+      ctx.fillStyle = "rgba(0,0,0,0.3)";
+      ctx.fillRect(0, 0, targetW, targetH);
+
+      // Calculate centered product image size (fit within canvas with padding)
+      const padding = targetW * 0.08;
+      const availW = targetW - padding * 2;
+      const availH = targetH * 0.75; // Leave room for text at bottom
+      const imgAspect = img.naturalWidth / img.naturalHeight;
+      const availAspect = availW / availH;
+
+      let drawW: number, drawH: number;
+      if (imgAspect > availAspect) {
+        // Image is wider — fit to width
+        drawW = availW;
+        drawH = availW / imgAspect;
+      } else {
+        // Image is taller — fit to height
+        drawH = availH;
+        drawW = availH * imgAspect;
+      }
+
+      const drawX = (targetW - drawW) / 2;
+      const drawY = (targetH * 0.45 - drawH) / 2; // Center in upper portion
+
+      // Draw subtle shadow behind product image
+      ctx.shadowColor = "rgba(0,0,0,0.5)";
+      ctx.shadowBlur = 20;
+      ctx.shadowOffsetX = 0;
+      ctx.shadowOffsetY = 5;
+
+      // Draw white background behind product image
+      const bgPad = 8;
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fillRect(drawX - bgPad, drawY - bgPad, drawW + bgPad * 2, drawH + bgPad * 2);
+
+      // Reset shadow
+      ctx.shadowColor = "transparent";
+      ctx.shadowBlur = 0;
+
+      // Draw the product image
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+
+      resolve(canvas.toDataURL("image/png"));
+    };
+
+    img.onerror = () => {
+      // If proxy also fails, just return the raw URL (it will display in <img> but won't have 9:16 formatting)
+      console.warn("[Carousel] Product image load failed (even via proxy), using raw URL");
+      resolve(imageUrl);
+    };
+
+    img.src = proxiedUrl;
+  });
+}
+
 // ─── Canvas: Render text overlay on image ────────────────────────────────────
 function renderTextOnImage(
   imageUrl: string,
@@ -79,6 +196,11 @@ function renderTextOnImage(
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
+
+    // Use proxy for external URLs to bypass CORS
+    const isExternal = imageUrl.startsWith("http");
+    const srcUrl = isExternal ? `/api/proxy-image?url=${encodeURIComponent(imageUrl)}` : imageUrl;
+
     img.onload = () => {
       const canvas = document.createElement("canvas");
       canvas.width = img.naturalWidth || 768;
@@ -234,7 +356,7 @@ function renderTextOnImage(
       resolve(canvas.toDataURL("image/png"));
     };
     img.onerror = () => reject(new Error("Failed to load image for text overlay"));
-    img.src = imageUrl;
+    img.src = srcUrl;
   });
 }
 
@@ -278,6 +400,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [progress, setProgress] = useState(0);
 
   const [productInfo, setProductInfo] = useState<ProductInfo | null>(null);
+  const [productImages, setProductImages] = useState<string[]>([]);
   const [carouselTitle, setCarouselTitle] = useState("");
   const [slides, setSlides] = useState<GeneratedSlide[]>([]);
   const [currentSlide, setCurrentSlide] = useState(0);
@@ -350,6 +473,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       const analyzeData = await analyzeRes.json();
       const pInfo: ProductInfo = analyzeData.productInfo;
       setProductInfo(pInfo);
+      // Store extracted product images for use in solution slides
+      const extractedImages: string[] = analyzeData.productImages || [];
+      setProductImages(extractedImages);
+      console.log(`[Carousel] Got ${extractedImages.length} product images for solution slides`);
       setProgress(20);
       setStep("planning");
       setStepMessage("DeepSeek is creating your carousel plan...");
@@ -463,22 +590,47 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         completedImages++;
         setProgress(35 + Math.round((completedImages / totalImages) * 60));
 
-        // Generate SOLUTION image
+        // Generate SOLUTION image — use REAL product image if available
         try {
-          setStepMessage(`Generating solution image ${i + 1}/${plan.slides.length}...`);
-          const imgRes = await authFetch("/api/carousel/image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image_prompt: slide.solution.image_prompt }),
-          });
+          setStepMessage(`Preparing solution image ${i + 1}/${plan.slides.length}...`);
 
-          if (imgRes.ok) {
-            const imgData = await imgRes.json();
+          // Pick a product image for this slide (cycle through available images)
+          const productImageUrl = extractedImages.length > 0
+            ? extractedImages[i % extractedImages.length]
+            : null;
+
+          let solutionImage: string | null = null;
+
+          if (productImageUrl) {
+            // Use the REAL product image from the website — format it to 9:16
+            console.log(`[Carousel] Using real product image for solution slide ${i + 1}`);
+            try {
+              solutionImage = await formatProductImageTo9x16(productImageUrl);
+            } catch (fmtErr) {
+              console.warn(`[Carousel] Product image formatting failed, using raw URL:`, fmtErr);
+              solutionImage = productImageUrl; // Fallback to raw URL
+            }
+          } else {
+            // Fallback: generate with AI if no product images were extracted
+            const imgRes = await authFetch("/api/carousel/image", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({ image_prompt: slide.solution.image_prompt }),
+            });
+
+            if (imgRes.ok) {
+              const imgData = await imgRes.json();
+              solutionImage = imgData.image;
+            }
+          }
+
+          if (solutionImage) {
+            // Apply text overlay with SOLUTION badge on the product image
             let overlayUrl: string | null = null;
-            if (imgData.image && (slide.solution.header_text || slide.solution.body_text)) {
+            if (slide.solution.header_text || slide.solution.body_text) {
               try {
                 overlayUrl = await renderTextOnImage(
-                  imgData.image,
+                  solutionImage,
                   slide.solution.header_text,
                   slide.solution.body_text,
                   "bottom",
@@ -493,22 +645,21 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             setSlides((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, solutionImageUrl: imgData.image, solutionOverlayUrl: overlayUrl, solutionLoading: false }
+                  ? { ...s, solutionImageUrl: solutionImage, solutionOverlayUrl: overlayUrl, solutionLoading: false }
                   : s
               )
             );
           } else {
-            const errData = await imgRes.json().catch(() => ({ error: "Image generation failed" }));
             setSlides((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, solutionLoading: false, solutionError: errData.error || "Image generation failed" }
+                  ? { ...s, solutionLoading: false, solutionError: "No product image available" }
                   : s
               )
             );
           }
         } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Image generation failed";
+          const msg = err instanceof Error ? err.message : "Solution image failed";
           setSlides((prev) =>
             prev.map((s, idx) =>
               idx === i ? { ...s, solutionLoading: false, solutionError: msg } : s

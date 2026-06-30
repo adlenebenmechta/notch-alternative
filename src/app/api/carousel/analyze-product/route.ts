@@ -69,6 +69,7 @@ export async function POST(request: NextRequest) {
     // Step 1: Scrape product page content using ZAI web-reader
     let productContent = "";
     let productTitle = "";
+    let productImages: string[] = [];
     try {
       const zai = await ZAI.create();
       const pageResult = await zai.functions.invoke("page_reader", {
@@ -76,8 +77,68 @@ export async function POST(request: NextRequest) {
       });
 
       if (pageResult?.data?.html) {
+        const rawHtml = pageResult.data.html;
+
+        // Extract product images BEFORE stripping HTML tags
+        const imgUrls = new Set<string>();
+
+        // Amazon main product images (landingImage, imageBlock)
+        const amazonMainMatch = rawHtml.match(/data-old-hires="([^"]+)"/g);
+        if (amazonMainMatch) {
+          for (const m of amazonMainMatch) {
+            const urlMatch = m.match(/data-old-hires="([^"]+)"/);
+            if (urlMatch && urlMatch[1]) imgUrls.add(urlMatch[1]);
+          }
+        }
+
+        // Amazon image gallery (colorImages)
+        const amazonGalleryMatch = rawHtml.match(/'colorImages':\s*\{\s*'initial':\s*\[([\s\S]*?)\]/);
+        if (amazonGalleryMatch) {
+          const urlMatches = amazonGalleryMatch[1].matchAll(/"(https?:\/\/[^"\s]+?)"/g);
+          for (const um of urlMatches) {
+            if (um[1] && !um[1].includes('sprite') && !um[1].includes('icon')) {
+              imgUrls.add(um[1]);
+            }
+          }
+        }
+
+        // Generic: extract all img src tags with large images
+        const imgSrcMatches = rawHtml.matchAll(/<img[^>]+src="(https?:\/\/[^"\s]+)"[^>]*>/gi);
+        for (const m of imgSrcMatches) {
+          const src = m[1];
+          // Filter: only keep likely product images (high-res, not icons/logos)
+          if (
+            src &&
+            !src.includes('sprite') &&
+            !src.includes('icon') &&
+            !src.includes('logo') &&
+            !src.includes('badge') &&
+            !src.includes('pixel') &&
+            !src.includes('1x1') &&
+            !src.includes('transparent') &&
+            !src.includes('ads') &&
+            (src.includes('.jpg') || src.includes('.jpeg') || src.includes('.png') || src.includes('.webp'))
+          ) {
+            imgUrls.add(src);
+          }
+        }
+
+        // Try to get the highest-resolution versions by removing size constraints from URLs
+        const processedUrls = new Set<string>();
+        for (const url of imgUrls) {
+          // Amazon: replace thumbnail sizes with full size
+          let cleanUrl = url;
+          if (url.includes('images-amazon.com') || url.includes('media-amazon.com')) {
+            cleanUrl = url.replace(/\._[A-Z0-9_]+_\./, '.'); // Remove ._AC_UYXXX_. patterns
+          }
+          processedUrls.add(cleanUrl);
+        }
+
+        productImages = Array.from(processedUrls).slice(0, 10); // Limit to top 10 images
+        console.log(`[Carousel/Analyze] Extracted ${productImages.length} product images`);
+
         // Strip HTML tags to get plain text
-        productContent = pageResult.data.html
+        productContent = rawHtml
           .replace(/<script[^>]*>[\s\S]*?<\/script>/gi, "")
           .replace(/<style[^>]*>[\s\S]*?<\/style>/gi, "")
           .replace(/<[^>]*>/g, " ")
@@ -148,6 +209,7 @@ ${instructions ? `## تعليمات المستخدم الإضافية:\n${instru
       success: true,
       productInfo,
       productTitle: productInfo.productName || productTitle,
+      productImages,
       scrapedContentLength: productContent.length,
     });
   } catch (error: unknown) {
