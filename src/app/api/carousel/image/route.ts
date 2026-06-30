@@ -142,11 +142,17 @@ async function generateWithZAI(prompt: string): Promise<string | null> {
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
+    // Auth check with detailed logging
+    const authHeader = request.headers.get("Authorization");
+    console.log(`[Carousel/Image] Auth header present: ${!!authHeader}`);
+
     const user = await getAuthUser(request);
     if (!user) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+      console.warn(`[Carousel/Image] getAuthUser returned null`);
+      return NextResponse.json({ error: "Unauthorized — please refresh the page and try again" }, { status: 401 });
     }
+
+    console.log(`[Carousel/Image] Authenticated: ${user.email}`);
 
     const body = await request.json();
     const { image_prompt } = body;

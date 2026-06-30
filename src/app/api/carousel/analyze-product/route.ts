@@ -40,11 +40,18 @@ async function deepSeekChat(
 
 export async function POST(request: NextRequest) {
   try {
-    // Auth check
+    // Auth check with detailed logging
+    const authHeader = request.headers.get("Authorization");
+    const xFirebaseToken = request.headers.get("X-Firebase-Id-Token");
+    console.log(`[Carousel/Analyze] Auth header present: ${!!authHeader}, X-Firebase: ${!!xFirebaseToken}`);
+
     const user = await getAuthUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      console.warn(`[Carousel/Analyze] getAuthUser returned null. AuthHeader: ${authHeader ? authHeader.slice(0, 20) + '...' : 'NONE'}`);
+      return NextResponse.json({ error: "Unauthorized — please refresh the page and try again" }, { status: 401 });
     }
+
+    console.log(`[Carousel/Analyze] Authenticated: ${user.email}`);
 
     const body = await request.json();
     const { productUrl, numSlides, userInstructions } = body;
