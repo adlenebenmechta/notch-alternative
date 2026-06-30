@@ -317,6 +317,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const handleGenerate = useCallback(async () => {
     if (!productUrl.trim()) return;
     abortRef.current = false;
+
+    // Pre-flight auth check
+    if (!user?.email) {
+      setError("You must be logged in to generate carousels. Please sign in and try again.");
+      return;
+    }
+    console.log("[Carousel] Starting generation for user:", user.email);
+
     setStep("analyzing");
     setError("");
     setProgress(5);
@@ -519,7 +527,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       setError(msg);
       setStep("error");
     }
-  }, [productUrl, numSlides, userInstructions, language, authFetch]);
+  }, [productUrl, numSlides, userInstructions, language, authFetch, user]);
 
   // ─── Save to Library ────────────────────────────────────────────────
   const saveToLibrary = useCallback(async () => {
