@@ -40,9 +40,8 @@ RUN fc-cache -f
 
 # Copy Prisma files for runtime DB migrations
 COPY --from=builder /app/prisma ./prisma
-COPY --from=builder /app/node_modules/.prisma ./node_modules/.prisma
-COPY --from=builder /app/node_modules/@prisma ./node_modules/@prisma
-COPY --from=builder /app/node_modules/prisma ./node_modules/prisma
+# Copy all node_modules needed for prisma CLI (effect, @prisma/config, etc.)
+COPY --from=builder /app/node_modules ./node_modules
 
 RUN addgroup --system --gid 1001 nodejs
 RUN adduser --system --uid 1001 nextjs
@@ -52,7 +51,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
 # Ensure nextjs user owns the prisma files for db push
-RUN chown -R nextjs:nodejs /app/prisma /app/node_modules/.prisma /app/node_modules/@prisma /app/node_modules/prisma
+RUN chown -R nextjs:nodejs /app/prisma /app/node_modules
 
 USER nextjs
 
