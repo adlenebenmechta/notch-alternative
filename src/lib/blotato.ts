@@ -31,6 +31,15 @@ export interface PublishOptions {
   thumbnailUrl?: string;
 }
 
+export interface PublishImagePostOptions {
+  accountId: string;
+  imageUrls: string[]; // Array of image URLs (1+ images = photo carousel)
+  caption: string;
+  hashtags?: string[];
+  musicTitle?: string;
+  scheduledAt?: Date;
+}
+
 /**
  * Blotato API client for publishing to TikTok and other social platforms
  */
@@ -121,6 +130,40 @@ export class BlotatoService {
     };
 
     if (thumbnailUrl) body.thumbnailUrl = thumbnailUrl;
+    if (scheduledAt) body.scheduledAt = scheduledAt.toISOString();
+
+    const data = await this.request('POST', '/posts', body);
+
+    return {
+      id: data.id || data.postId,
+      status: data.status || 'pending',
+      platformPostId: data.platformPostId,
+      url: data.url,
+      error: data.error,
+    };
+  }
+
+  /**
+   * Publish an image carousel post to TikTok (Photo Mode)
+   * TikTok supports 1+ images as a swipeable carousel
+   */
+  async publishImagePost(options: PublishImagePostOptions): Promise<BlotatoPostResponse> {
+    const { accountId, imageUrls, caption, hashtags, musicTitle, scheduledAt } = options;
+
+    if (!imageUrls || imageUrls.length === 0) {
+      throw new Error('At least one image URL is required');
+    }
+
+    const fullCaption = this.buildCaption(caption, hashtags, musicTitle);
+
+    const body: any = {
+      accountId,
+      content: fullCaption,
+      mediaUrls: imageUrls, // Pass array of image URLs directly
+      platform: 'tiktok',
+      postType: 'image', // Tell Blotato this is a photo post
+    };
+
     if (scheduledAt) body.scheduledAt = scheduledAt.toISOString();
 
     const data = await this.request('POST', '/posts', body);
