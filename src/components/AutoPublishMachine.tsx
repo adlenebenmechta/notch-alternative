@@ -75,6 +75,7 @@ interface LibraryVideo {
   duration: string | null;
   scenesCount: number;
   provider: string;
+  metadata?: string | null; // JSON string with carousel image URLs
   createdAt: string;
 }
 
@@ -179,9 +180,22 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
         .map((t) => t.trim().replace(/^#/, ""))
         .filter(Boolean);
 
+      // For carousels, extract ALL image URLs from metadata
+      let imageUrls = [libSelectedVideo.videoUrl];
+      if (isImage && libSelectedVideo.metadata) {
+        try {
+          const meta = JSON.parse(libSelectedVideo.metadata);
+          if (meta.imageUrls && Array.isArray(meta.imageUrls) && meta.imageUrls.length > 0) {
+            imageUrls = meta.imageUrls;
+          }
+        } catch {
+          // metadata is not valid JSON, use single image
+        }
+      }
+
       const body = isImage
         ? {
-            imageUrls: [libSelectedVideo.videoUrl],
+            imageUrls,
             caption: libAutoCaption ? undefined : (libCaption || libSelectedVideo.title),
             hashtags,
             musicTitle: libMusicTitle || undefined,
@@ -242,9 +256,22 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
         ? "/api/autopublish/publish-carousel"
         : "/api/autopublish/publish";
       
+      // For carousels, extract ALL image URLs from metadata
+      let imageUrls = [video.videoUrl];
+      if (isImage && video.metadata) {
+        try {
+          const meta = JSON.parse(video.metadata);
+          if (meta.imageUrls && Array.isArray(meta.imageUrls) && meta.imageUrls.length > 0) {
+            imageUrls = meta.imageUrls;
+          }
+        } catch {
+          // metadata is not valid JSON, use single image
+        }
+      }
+      
       const body = isImage
         ? {
-            imageUrls: [video.videoUrl],
+            imageUrls,
             caption: libraryPublishCaption || video.title,
             hashtags,
             aiDescription: video.title,
@@ -1223,6 +1250,18 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                               >
                                 {isImage ? "🖼 Photo" : "🎬 Video"}
                               </span>
+                              {isImage && (() => {
+                                let imgCount = 1;
+                                try {
+                                  const meta = JSON.parse(video.metadata || "{}");
+                                  if (meta.imageUrls) imgCount = meta.imageUrls.length;
+                                } catch {}
+                                return imgCount > 1 ? (
+                                  <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${C.gold}20`, color: C.gold }}>
+                                    {imgCount} images
+                                  </span>
+                                ) : null;
+                              })()}
                             </div>
                             <div className="text-[10px] flex items-center gap-3" style={{ color: C.textMuted }}>
                               <span>{video.provider}</span>
