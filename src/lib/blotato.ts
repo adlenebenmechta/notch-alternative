@@ -85,7 +85,8 @@ export class BlotatoService {
    */
   async getAccounts(): Promise<BlotatoAccount[]> {
     const data = await this.request('GET', '/users/me/accounts');
-    const accounts = data.accounts || data.data || data || [];
+    // Blotato returns { items: [...] } - handle all possible shapes
+    const accounts = data.items || data.accounts || data.data || (Array.isArray(data) ? data : []);
 
     return accounts.map((a: any) => ({
       id: a.id,
