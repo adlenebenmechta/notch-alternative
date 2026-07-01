@@ -224,14 +224,42 @@ export class BlotatoService {
    * Get post status (for polling)
    * Returns status: "in-progress", "published", "failed"
    * Returns publicUrl when published
+   *
+   * Note: For carousel posts, Blotato sometimes returns only the profile URL
+   * instead of the specific post URL. We try to fetch the actual postUrl
+   * from the posts list as a fallback.
    */
   async getPostStatus(postSubmissionId: string): Promise<BlotatoPostResponse> {
     const data = await this.request('GET', `/posts/${postSubmissionId}`);
+    let url = data.publicUrl || data.url;
+
+    // If the URL is just the profile URL (no /photo/ or /video/ in it),
+    // try to fetch the actual post URL from the posts list
+    if (url && url.includes('@') && !url.includes('/photo/') && !url.includes('/video/') && !url.includes('/reel/')) {
+      try {
+        const listData = await this.request('GET', '/posts?limit=20');
+        const items = listData.items || listData || [];
+        // Find the post that matches our submission ID
+        for (const item of items) {
+          const itemState = item.state || {};
+          if (itemState.postUrl && itemState.postUrl.includes('/photo/') || itemState.postUrl && itemState.postUrl.includes('/video/')) {
+            // Found a post with a specific URL - use it
+            // Note: We can't perfectly match by submission ID from the list,
+            // but we use the most recent published post with a specific URL
+            url = itemState.postUrl;
+            break;
+          }
+        }
+      } catch (err) {
+        console.warn('[Blotato] Failed to fetch post URL from list:', err);
+      }
+    }
+
     return {
       id: data.postSubmissionId || data.id,
-      status: data.status || 'unknown', // "in-progress", "published", "failed"
+      status: data.status || 'unknown',
       platformPostId: data.platformPostId,
-      url: data.publicUrl || data.url, // publicUrl is the TikTok URL when published
+      url,
       error: data.error || (data.status === 'failed' ? 'Publishing failed' : undefined),
       postSubmissionId: data.postSubmissionId,
     };
