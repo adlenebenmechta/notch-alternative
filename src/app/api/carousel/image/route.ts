@@ -12,6 +12,15 @@ const KIE_UPLOAD_URL = "https://kieai.redpandaai.co/api/file-base64-upload";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
+// ─── Remove people/face references from prompts (they look fake) ───────────
+function removePeopleFromPrompt(prompt: string): string {
+  return prompt
+    .replace(/\b(person|people|woman|man|girl|boy|child|hands|hand|face|faces|smile|smiling|looking|woman's|man's|her |his |she |he )\b/gi, "")
+    .replace(/\b(holding|wearing|using by|used by|carrying)\s+(a\s+)?(person|woman|man|girl|boy|someone)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 // ─── Upload base64 image to KIE.ai (same as bof-generate) ────────────────
 async function uploadImageToKie(base64Data: string, fileName: string): Promise<string> {
   let rawBase64 = base64Data;
@@ -93,7 +102,9 @@ async function generateSolutionWithProduct(
 ): Promise<string> {
   // Build a BOF-style product placement prompt
   // The prompt tells the model to keep the product visible and place it in the described scene
-  const productPlacementPrompt = `Place this product in the following scene: ${solutionPrompt}. CRITICAL: The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. Photorealistic, high quality product photography style.`;
+  // Remove any people references from the prompt — faces look fake
+  const cleanPrompt = removePeopleFromPrompt(solutionPrompt);
+  const productPlacementPrompt = `Place this product in the following scene: ${cleanPrompt}. CRITICAL: The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. NO people, NO faces, NO hands in the image — product only with environment. Photorealistic, high quality product photography style.`;
 
   console.log(`[Carousel/Image] Using google/nano-banana-edit for solution with product ref`);
 
@@ -135,13 +146,14 @@ async function generateSolutionWithProduct(
 
 // ─── Generate PROBLEM image (no reference) using GPT Image ─────────────────
 async function generateProblemImage(prompt: string): Promise<string> {
-  // Clean the prompt for text-to-image
-  const cleaned = prompt
+  // Clean the prompt for text-to-image — remove people and text references
+  const noPeople = removePeopleFromPrompt(prompt);
+  const cleaned = noPeople
     .replace(/\b(text|typography|lettering|words|font|headline|title|caption|quote)\b/gi, "")
     .replace(/\b(infographic|illustration|graphic design|cartoon|vector|clip.?art)\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  const enhancedPrompt = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE: " + cleaned;
+  const enhancedPrompt = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, NO people, NO faces, NO hands, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE: " + cleaned;
 
   const submitRes = await fetch(KIE_API_URL, {
     method: "POST",
