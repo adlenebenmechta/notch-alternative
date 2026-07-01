@@ -140,10 +140,11 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [libraryAccountId, setLibraryAccountId] = useState("");
 
   // ─── Fetch Library Videos ──────────────────────────────────────────────────
+  const { authFetch } = useAuth();
   const fetchLibrary = useCallback(async () => {
     setLibraryLoading(true);
     try {
-      const res = await fetch("/api/videos");
+      const res = await authFetch("/api/videos");
       const data = await res.json();
       setLibraryVideos(data.videos || []);
     } catch (err) {
@@ -151,7 +152,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
     } finally {
       setLibraryLoading(false);
     }
-  }, []);
+  }, [authFetch]);
 
   // ─── Publish Library Video ─────────────────────────────────────────────────
   const handlePublishLibraryVideo = async (video: LibraryVideo) => {
