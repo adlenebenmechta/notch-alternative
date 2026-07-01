@@ -87,6 +87,7 @@ model GeneratedVideo {
   duration     String?
   scenesCount  Int      @default(1)
   provider     String   @default("kie")
+  metadata     String?  // JSON string for extra data (e.g. carousel image URLs)
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
