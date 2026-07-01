@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/providers/auth-provider";
+import PipelineMonitor from "@/components/PipelineMonitor";
 
 // ─── Colors (matching existing design) ─────────────────────────────────────
 
@@ -137,6 +138,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [libraryPublishCaption, setLibraryPublishCaption] = useState("");
   const [libraryPublishHashtags, setLibraryPublishHashtags] = useState("fyp, viral, ai");
   const [libraryPublishing, setLibraryPublishing] = useState<string | null>(null);
+  const [monitoringPostId, setMonitoringPostId] = useState<string | null>(null);
   const [libraryAccountId, setLibraryAccountId] = useState("");
 
   // ─── Fetch Library Videos ──────────────────────────────────────────────────
@@ -200,8 +202,9 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
       if (data.error) {
         alert(`Error: ${data.error}`);
       } else {
-        alert(`✅ "${video.title}" is being published to TikTok!`);
         setLibraryPublishCaption("");
+        // Open pipeline monitor
+        setMonitoringPostId(data.postId);
       }
     } catch (err: any) {
       alert(`Error: ${err.message}`);
@@ -1157,6 +1160,13 @@ WEBHOOK_SECRET=random_secret_string`}
           </div>
         )}
       </main>
+      {/* Pipeline Monitor Modal */}
+      {monitoringPostId && (
+        <PipelineMonitor
+          postId={monitoringPostId}
+          onClose={() => setMonitoringPostId(null)}
+        />
+      )}
     </div>
   );
 }
