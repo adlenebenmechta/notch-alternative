@@ -1,0 +1,74 @@
+// Prisma schema additions for Auto-Publish Machine (Blotato API)
+// These models will be ADDED to the existing schema - DO NOT replace existing models
+// Run `npx prisma db push` after merging these models into your schema.prisma
+
+// ─── ADD THESE MODELS TO YOUR EXISTING prisma/schema.prisma ────────────────
+
+model TikTokAccount {
+  id           String   @id @default(cuid())
+  blotatoId    String   @unique
+  username     String?
+  displayName  String?
+  platform     String   @default("tiktok")
+  avatarUrl    String?
+  isActive     Boolean  @default(true)
+  lastSyncedAt DateTime?
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+  posts        Post[]
+}
+
+model Post {
+  id              String        @id @default(cuid())
+  accountId       String
+  account         TikTokAccount @relation(fields: [accountId], references: [id], onDelete: Cascade)
+
+  source          String        @default("manual")
+  externalId      String?
+
+  videoUrl        String
+  thumbnailUrl    String?
+  caption         String?
+  hashtags        String?
+  musicTitle      String?
+  aiDescription   String?
+
+  status          String        @default("PENDING")
+  scheduledAt     DateTime?
+  publishedAt     DateTime?
+  blotatoPostId   String?
+
+  views           Int           @default(0)
+  likes           Int           @default(0)
+  comments        Int           @default(0)
+  shares          Int           @default(0)
+  tiktokUrl       String?
+
+  errorMessage    String?
+  retryCount      Int           @default(0)
+
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  logs            PostLog[]
+  analytics       Analytics[]
+}
+
+model PostLog {
+  id        String   @id @default(cuid())
+  postId    String
+  level     String
+  message   String
+  createdAt DateTime @default(now())
+  post      Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Analytics {
+  id         String   @id @default(cuid())
+  postId     String
+  views      Int
+  likes      Int
+  comments   Int
+  shares     Int
+  recordedAt DateTime @default(now())
+  post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
