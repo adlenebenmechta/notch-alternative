@@ -325,7 +325,7 @@ export async function publishPost(postId: string): Promise<boolean> {
  * Poll post status until published or failed (max 5 min)
  */
 async function pollPostStatus(postId: string, blotatoPostId: string): Promise<void> {
-  const maxAttempts = 30;
+  const maxAttempts = 60; // 10 minutes for carousels (was 5 min)
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 10000));
 
