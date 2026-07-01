@@ -29,8 +29,29 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
+    // Get the post first to check if it has a blotatoPostId
+    const post = await db.post.findUnique({ where: { id } });
+    if (!post) {
+      return NextResponse.json({ error: 'Post not found' }, { status: 404 });
+    }
+
+    // If the post has a Blotato ID and is NOT yet published, try to delete from Blotato
+    // (Published posts usually can't be deleted from TikTok via API)
+    if (post.blotatoPostId && post.status !== 'PUBLISHED') {
+      try {
+        const { BlotatoService } = await import('@/lib/blotato');
+        const blotato = new BlotatoService();
+        await blotato.deletePost(post.blotatoPostId);
+        console.log(`[DELETE] Deleted post ${id} from Blotato`);
+      } catch (err: any) {
+        console.warn(`[DELETE] Failed to delete from Blotato: ${err.message}`);
+        // Continue to delete from DB anyway
+      }
+    }
+
+    // Delete from database
     await db.post.delete({ where: { id } });
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, message: 'Post deleted' });
   } catch (err: any) {
     return NextResponse.json({ error: err.message }, { status: 500 });
   }
