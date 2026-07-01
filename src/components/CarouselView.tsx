@@ -3,6 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/providers/auth-provider";
 import { saveVideoToStorage } from "@/lib/video-store";
+import SlidePublisher from "@/components/SlidePublisher";
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
@@ -216,6 +217,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [viewingProblem, setViewingProblem] = useState(true); // Toggle between problem/solution view
 
   const [savedToLibrary, setSavedToLibrary] = useState(false);
+  const [autoPublishTikTok, setAutoPublishTikTok] = useState(false);
+  const [publishStates, setPublishStates] = useState<Record<number, "idle" | "publishing" | "published" | "failed">>({});
   const abortRef = useRef(false);
 
   // ─── Text Editor States ──────────────────────────────────────────────
@@ -708,6 +711,20 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               Save
             </button>
           )}
+
+          {/* Per-slide TikTok publish button */}
+          {step === "complete" && slides[currentSlide] && (
+            <div className="ml-2">
+              <SlidePublisher
+                slideNumber={slides[currentSlide].slide_number}
+                problemImageUrl={slides[currentSlide].problemImageUrl}
+                solutionImageUrl={slides[currentSlide].solutionImageUrl}
+                carouselTitle={carouselTitle}
+                autoPublish={autoPublishTikTok}
+                onPublishStateChange={handlePublishStateChange}
+              />
+            </div>
+          )}
         </header>
 
         {/* Slide Display */}
@@ -1170,6 +1187,96 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </span>
             </button>
 
+            {/* ─── TikTok Auto-Publish Controls ────────────────────────── */}
+            <div
+              className="mt-4 p-4 rounded-2xl"
+              style={{
+                backgroundColor: "rgba(228, 97, 173, 0.08)",
+                border: "1.5px solid rgba(228, 97, 173, 0.25)",
+              }}
+            >
+              <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
+                <div className="flex items-center gap-2">
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
+                    <path d="M19 7.5c-1.5 0-3-1-3-3 0-.5.1-1 .3-1.4-2.7-.4-5.5-.1-8 1C4 6 1.5 10.5 1.5 15.5c0 4 3 7.5 7 7.5 4.5 0 7-3.5 7-7 0-1.5-.5-3-1.5-4 .8.3 1.7.5 2.5.5 1.5 0 3-.5 4-1.5-.5-2-1.5-3.5-3.5-3.5z" stroke="#E461AD" strokeWidth="1.8" fill="none" />
+                  </svg>
+                  <div>
+                    <div className="text-sm font-bold" style={{ color: C.white }}>
+                      TikTok Auto-Publish
+                    </div>
+                    <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
+                      Publish each slide as a TikTok photo carousel (2 images per post)
+                    </div>
+                  </div>
+                </div>
+
+                {/* Auto-publish toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#9CA3AF" }}>
+                    Auto-publish
+                  </span>
+                  <div
+                    className="relative w-10 h-5 rounded-full transition-colors"
+                    style={{
+                      backgroundColor: autoPublishTikTok ? C.pink : "rgba(156, 163, 175, 0.3)",
+                    }}
+                    onClick={() => setAutoPublishTikTok(!autoPublishTikTok)}
+                  >
+                    <div
+                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
+                      style={{
+                        transform: autoPublishTikTok ? "translateX(22px)" : "translateX(2px)",
+                      }}
+                    />
+                  </div>
+                </label>
+              </div>
+
+              {/* Publish All button */}
+              <button
+                onClick={handlePublishAllToTikTok}
+                className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all hover:scale-[1.02]"
+                style={{
+                  background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                  color: C.white,
+                }}
+              >
+                <span className="flex items-center justify-center gap-2">
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                  </svg>
+                  Publish All Slides to TikTok ({slides.filter(s => s.problemImageUrl && s.solutionImageUrl).length} ready)
+                </span>
+              </button>
+
+              {/* Per-slide publish status */}
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {slides.map((s, i) => {
+                  const state = publishStates[s.slide_number] || "idle";
+                  const ready = !!(s.problemImageUrl && s.solutionImageUrl);
+                  const colors = {
+                    idle: ready ? C.pink : "rgba(156, 163, 175, 0.3)",
+                    publishing: C.cyan,
+                    published: C.green,
+                    failed: C.red,
+                  };
+                  return (
+                    <div
+                      key={i}
+                      className="px-2 py-1 rounded text-[9px] font-bold"
+                      style={{
+                        backgroundColor: `${colors[state]}20`,
+                        color: colors[state],
+                      }}
+                      title={`Slide ${s.slide_number}: ${state}`}
+                    >
+                      {state === "publishing" ? "⏳" : state === "published" ? "✅" : state === "failed" ? "❌" : ready ? "⏸" : "⏳"} {s.slide_number}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+
             {/* Library Saved Indicator */}
             {savedToLibrary && (
               <div className="mt-3 text-center">
@@ -1290,6 +1397,43 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   // ═══════════════════════════════════════════════════════════════════════
   // INPUT VIEW
   // ═══════════════════════════════════════════════════════════════════════
+  // Track publish state for each slide
+  const handlePublishStateChange = useCallback((slideNum: number, state: "idle" | "publishing" | "published" | "failed") => {
+    setPublishStates(prev => ({ ...prev, [slideNum]: state }));
+  }, []);
+
+  // Publish all slides at once
+  const handlePublishAllToTikTok = async () => {
+    const readySlides = slides.filter(s => s.problemImageUrl && s.solutionImageUrl);
+    if (readySlides.length === 0) {
+      alert("No slides ready to publish. Generate images first.");
+      return;
+    }
+    if (!confirm(`Publish ${readySlides.length} slide(s) to TikTok?`)) return;
+
+    for (const slide of readySlides) {
+      try {
+        await fetch("/api/autopublish/publish-carousel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrls: [slide.problemImageUrl, slide.solutionImageUrl],
+            caption: `${carouselTitle} - Slide ${slide.slide_number} 🔥`,
+            hashtags: ["fyp", "viral", "carousel", "ai"],
+            aiDescription: `Slide ${slide.slide_number}`,
+            externalId: `carousel_${slide.slide_number}_${Date.now()}`,
+            autoCaption: false,
+          }),
+        });
+        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "published" }));
+      } catch (err) {
+        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "failed" }));
+      }
+      // Small delay between publishes to avoid rate limiting
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  };
+
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.cream }}>
       {/* Top Bar */}
