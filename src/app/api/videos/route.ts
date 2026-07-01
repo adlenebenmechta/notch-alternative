@@ -85,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json();
-    const { title, videoUrl, thumbnailUrl, duration, scenesCount, provider } = body;
+    const { title, videoUrl, thumbnailUrl, duration, scenesCount, provider, metadata } = body;
 
     if (!videoUrl) {
       return NextResponse.json({ error: "videoUrl is required" }, { status: 400 });
@@ -93,6 +93,9 @@ export async function POST(request: NextRequest) {
 
     // Resolve the correct DB user ID
     const dbUserId = await resolveUserId(user.id, user.email);
+
+    // Serialize metadata to JSON string if it's an object
+    const metadataStr = metadata ? (typeof metadata === "string" ? metadata : JSON.stringify(metadata)) : null;
 
     // Try to save to DB, return in-memory record if DB unavailable
     let video;
@@ -106,6 +109,7 @@ export async function POST(request: NextRequest) {
           duration: duration || null,
           scenesCount: scenesCount || 1,
           provider: provider || "kie",
+          metadata: metadataStr,
         },
       });
     } catch (dbErr) {
@@ -120,6 +124,7 @@ export async function POST(request: NextRequest) {
         duration: duration || null,
         scenesCount: scenesCount || 1,
         provider: provider || "kie",
+        metadata: metadataStr,
         createdAt: new Date().toISOString(),
       };
     }
