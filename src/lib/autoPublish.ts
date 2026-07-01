@@ -45,6 +45,148 @@ export async function syncAccounts(): Promise<number> {
 }
 
 /**
+ * Create and publish a carousel post (multiple images)
+ * Used by the AI Viral Carousel Machine - each slide has 2 images (problem + solution)
+ */
+export async function createCarouselPost(data: {
+  accountId?: string;
+  imageUrls: string[]; // 2+ images
+  caption?: string;
+  hashtags?: string[];
+  musicTitle?: string;
+  aiDescription?: string;
+  externalId?: string; // slide number, etc.
+  scheduledAt?: string;
+  autoCaption?: boolean;
+}): Promise<{ post: any; needsAccount: boolean; blotatoError?: string }> {
+  let account;
+  if (data.accountId) {
+    account = await db.tikTokAccount.findFirst({
+      where: { blotatoId: data.accountId, isActive: true },
+    });
+  }
+  if (!account) {
+    account = await db.tikTokAccount.findFirst({ where: { isActive: true } });
+  }
+
+  if (!account) {
+    return { post: null, needsAccount: true };
+  }
+
+  let caption = data.caption || '';
+  let hashtags = data.hashtags || [];
+
+  if (data.autoCaption && !caption) {
+    const generated = await generateAICaption(data.aiDescription || '');
+    caption = generated.caption;
+    hashtags = generated.hashtags;
+  }
+
+  // Create post in DB
+  const post = await db.post.create({
+    data: {
+      accountId: account.id,
+      source: 'carousel',
+      externalId: data.externalId,
+      // Use first image as videoUrl placeholder (for compatibility)
+      videoUrl: data.imageUrls[0],
+      thumbnailUrl: data.imageUrls[0],
+      caption,
+      hashtags: hashtags.length ? JSON.stringify(hashtags) : null,
+      musicTitle: data.musicTitle,
+      aiDescription: data.aiDescription,
+      status: data.scheduledAt ? 'SCHEDULED' : 'PENDING',
+      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+    },
+  });
+
+  await logPost(post.id, 'INFO', `Carousel post created (${data.imageUrls.length} images)`);
+
+  // If not scheduled, publish immediately
+  if (!data.scheduledAt) {
+    publishImageCarousel(post.id, data.imageUrls).catch((err) => {
+      console.error(`[AutoPublish] Background carousel publish failed for ${post.id}:`, err);
+    });
+  }
+
+  return { post, needsAccount: false };
+}
+
+/**
+ * Publish an image carousel post to TikTok via Blotato
+ */
+export async function publishImageCarousel(postId: string, imageUrls?: string[]): Promise<boolean> {
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    include: { account: true },
+  });
+
+  if (!post || !post.account) {
+    console.error(`[AutoPublish] Post ${postId} not found or no account`);
+    return false;
+  }
+
+  if (post.status === 'PUBLISHED') {
+    console.log(`[AutoPublish] Post ${postId} already published`);
+    return true;
+  }
+
+  // Use provided imageUrls or fallback to post.videoUrl as single image
+  const finalImageUrls = imageUrls && imageUrls.length > 0
+    ? imageUrls
+    : [post.videoUrl]; // fallback - the videoUrl field stores first image URL for carousel posts
+
+  await db.post.update({
+    where: { id: postId },
+    data: { status: 'PUBLISHING' },
+  });
+  await logPost(postId, 'INFO', `Starting Blotato carousel publish (${finalImageUrls.length} images)`);
+
+  try {
+    const hashtags = post.hashtags ? JSON.parse(post.hashtags) : [];
+
+    const result = await blotato.publishImagePost({
+      accountId: post.account.blotatoId,
+      imageUrls: finalImageUrls,
+      caption: post.caption || '',
+      hashtags,
+      musicTitle: post.musicTitle || undefined,
+      scheduledAt: post.scheduledAt || undefined,
+    });
+
+    await db.post.update({
+      where: { id: postId },
+      data: {
+        blotatoPostId: result.id,
+        status: result.status === 'published' || result.status === 'success' ? 'PUBLISHED' : 'PENDING',
+        publishedAt: result.status === 'published' ? new Date() : null,
+        tiktokUrl: result.url || null,
+      },
+    });
+
+    await logPost(postId, 'INFO', `Blotato carousel post created: ${result.id} (status: ${result.status})`);
+
+    if (result.status !== 'published' && result.status !== 'success') {
+      pollPostStatus(postId, result.id).catch(() => {});
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error(`[AutoPublish] Carousel publish failed for ${postId}:`, err.message);
+    await db.post.update({
+      where: { id: postId },
+      data: {
+        status: 'FAILED',
+        errorMessage: err.message,
+        retryCount: { increment: 1 },
+      },
+    });
+    await logPost(postId, 'ERROR', `Carousel publish failed: ${err.message}`);
+    return false;
+  }
+}
+
+/**
  * Create a new post
  */
 export async function createPost(data: {
