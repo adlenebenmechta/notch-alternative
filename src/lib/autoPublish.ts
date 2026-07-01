@@ -1,0 +1,306 @@
+// Post Processor - manages post lifecycle (create, publish, sync analytics)
+
+import { db } from '@/lib/db';
+import { BlotatoService } from '@/lib/blotato';
+
+const blotato = new BlotatoService();
+
+/**
+ * Synchronize TikTok accounts from Blotato
+ */
+export async function syncAccounts(): Promise<number> {
+  try {
+    console.log('[AutoPublish] Syncing accounts from Blotato...');
+    const accounts = await blotato.getTikTokAccounts();
+    console.log(`[AutoPublish] Found ${accounts.length} TikTok account(s)`);
+
+    let count = 0;
+    for (const acc of accounts) {
+      await db.tikTokAccount.upsert({
+        where: { blotatoId: acc.id },
+        create: {
+          blotatoId: acc.id,
+          username: acc.username,
+          displayName: acc.displayName,
+          platform: acc.platform,
+          avatarUrl: acc.avatarUrl,
+          isActive: true,
+          lastSyncedAt: new Date(),
+        },
+        update: {
+          username: acc.username,
+          displayName: acc.displayName,
+          avatarUrl: acc.avatarUrl,
+          lastSyncedAt: new Date(),
+        },
+      });
+      count++;
+    }
+
+    return count;
+  } catch (err: any) {
+    console.error('[AutoPublish] Failed to sync accounts:', err.message);
+    throw err;
+  }
+}
+
+/**
+ * Create a new post
+ */
+export async function createPost(data: {
+  accountId?: string;
+  videoUrl: string;
+  thumbnailUrl?: string;
+  caption?: string;
+  hashtags?: string[];
+  musicTitle?: string;
+  aiDescription?: string;
+  externalId?: string;
+  scheduledAt?: string;
+  autoCaption?: boolean;
+}): Promise<{ post: any; needsAccount: boolean }> {
+  let account;
+  if (data.accountId) {
+    account = await db.tikTokAccount.findFirst({
+      where: { blotatoId: data.accountId, isActive: true },
+    });
+  }
+  if (!account) {
+    account = await db.tikTokAccount.findFirst({ where: { isActive: true } });
+  }
+
+  if (!account) {
+    return { post: null, needsAccount: true };
+  }
+
+  let caption = data.caption || '';
+  let hashtags = data.hashtags || [];
+
+  if (data.autoCaption && !caption) {
+    const generated = await generateAICaption(data.aiDescription || '');
+    caption = generated.caption;
+    hashtags = generated.hashtags;
+  }
+
+  const post = await db.post.create({
+    data: {
+      accountId: account.id,
+      source: 'manual',
+      externalId: data.externalId,
+      videoUrl: data.videoUrl,
+      thumbnailUrl: data.thumbnailUrl,
+      caption,
+      hashtags: hashtags.length ? JSON.stringify(hashtags) : null,
+      musicTitle: data.musicTitle,
+      aiDescription: data.aiDescription,
+      status: data.scheduledAt ? 'SCHEDULED' : 'PENDING',
+      scheduledAt: data.scheduledAt ? new Date(data.scheduledAt) : null,
+    },
+  });
+
+  await logPost(post.id, 'INFO', `Post created`);
+
+  if (!data.scheduledAt) {
+    publishPost(post.id).catch((err) => {
+      console.error(`[AutoPublish] Background publish failed for ${post.id}:`, err);
+    });
+  }
+
+  return { post, needsAccount: false };
+}
+
+/**
+ * Publish a post to TikTok via Blotato
+ */
+export async function publishPost(postId: string): Promise<boolean> {
+  const post = await db.post.findUnique({
+    where: { id: postId },
+    include: { account: true },
+  });
+
+  if (!post || !post.account) {
+    console.error(`[AutoPublish] Post ${postId} not found or no account`);
+    return false;
+  }
+
+  if (post.status === 'PUBLISHED') {
+    console.log(`[AutoPublish] Post ${postId} already published`);
+    return true;
+  }
+
+  await db.post.update({
+    where: { id: postId },
+    data: { status: 'PUBLISHING' },
+  });
+  await logPost(postId, 'INFO', 'Starting Blotato publish');
+
+  try {
+    const hashtags = post.hashtags ? JSON.parse(post.hashtags) : [];
+
+    const result = await blotato.publishPost({
+      accountId: post.account.blotatoId,
+      videoUrl: post.videoUrl,
+      caption: post.caption || '',
+      hashtags,
+      musicTitle: post.musicTitle || undefined,
+      scheduledAt: post.scheduledAt || undefined,
+      thumbnailUrl: post.thumbnailUrl || undefined,
+    });
+
+    await db.post.update({
+      where: { id: postId },
+      data: {
+        blotatoPostId: result.id,
+        status: result.status === 'published' || result.status === 'success' ? 'PUBLISHED' : 'PENDING',
+        publishedAt: result.status === 'published' ? new Date() : null,
+        tiktokUrl: result.url || null,
+      },
+    });
+
+    await logPost(postId, 'INFO', `Blotato post created: ${result.id} (status: ${result.status})`);
+
+    if (result.status !== 'published' && result.status !== 'success') {
+      pollPostStatus(postId, result.id).catch(() => {});
+    }
+
+    return true;
+  } catch (err: any) {
+    console.error(`[AutoPublish] Publish failed for ${postId}:`, err.message);
+    await db.post.update({
+      where: { id: postId },
+      data: {
+        status: 'FAILED',
+        errorMessage: err.message,
+        retryCount: { increment: 1 },
+      },
+    });
+    await logPost(postId, 'ERROR', `Publish failed: ${err.message}`);
+    return false;
+  }
+}
+
+/**
+ * Poll post status until published or failed (max 5 min)
+ */
+async function pollPostStatus(postId: string, blotatoPostId: string): Promise<void> {
+  const maxAttempts = 30;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise((r) => setTimeout(r, 10000));
+
+    try {
+      const status = await blotato.getPostStatus(blotatoPostId);
+      console.log(`[AutoPublish] Poll ${i + 1}: post ${postId} status: ${status.status}`);
+
+      if (status.status === 'published' || status.status === 'success') {
+        await db.post.update({
+          where: { id: postId },
+          data: {
+            status: 'PUBLISHED',
+            publishedAt: new Date(),
+            tiktokUrl: status.url || null,
+          },
+        });
+        await logPost(postId, 'INFO', `Published successfully: ${status.url}`);
+        return;
+      }
+
+      if (status.status === 'failed' || status.status === 'error') {
+        await db.post.update({
+          where: { id: postId },
+          data: {
+            status: 'FAILED',
+            errorMessage: status.error || 'Blotato reported failure',
+          },
+        });
+        await logPost(postId, 'ERROR', `Blotato failed: ${status.error}`);
+        return;
+      }
+    } catch (err: any) {
+      console.warn(`[AutoPublish] Poll error: ${err.message}`);
+    }
+  }
+
+  await logPost(postId, 'WARN', 'Polling timeout - check Blotato dashboard');
+}
+
+/**
+ * Generate AI caption using ZAI SDK (or fallback to templates)
+ */
+async function generateAICaption(
+  description: string
+): Promise<{ caption: string; hashtags: string[] }> {
+  try {
+    const ZAI = (await import('z-ai-web-dev-sdk')).default;
+    const zai = await ZAI.create();
+
+    const completion = await zai.chat.completions.create({
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You are a TikTok content strategist. Generate a catchy caption and 5-8 relevant hashtags. Return JSON: {"caption":"...","hashtags":["tag1","tag2"]}',
+        },
+        {
+          role: 'user',
+          content: `Description: ${description || 'AI-generated video'}`,
+        },
+      ],
+      temperature: 0.7,
+      max_tokens: 300,
+    });
+
+    const content = completion.choices[0]?.message?.content || '{}';
+    const jsonStr = content.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
+    const parsed = JSON.parse(jsonStr);
+    return {
+      caption: parsed.caption || '🔥 Check this out!',
+      hashtags: parsed.hashtags || ['fyp', 'foryou', 'viral'],
+    };
+  } catch (err) {
+    console.error('[AutoPublish] AI caption failed:', err);
+    return {
+      caption: '🔥 Check this out! #fyp',
+      hashtags: ['fyp', 'foryou', 'viral', 'trending'],
+    };
+  }
+}
+
+/**
+ * Update analytics for a post
+ */
+export async function updatePostAnalytics(postId: string): Promise<void> {
+  const post = await db.post.findUnique({ where: { id: postId } });
+  if (!post || !post.blotatoPostId) return;
+
+  const analytics = await blotato.getPostAnalytics(post.blotatoPostId);
+
+  await db.post.update({
+    where: { id: postId },
+    data: {
+      views: analytics.views,
+      likes: analytics.likes,
+      comments: analytics.comments,
+      shares: analytics.shares,
+    },
+  });
+
+  await db.analytics.create({
+    data: {
+      postId,
+      views: analytics.views,
+      likes: analytics.likes,
+      comments: analytics.comments,
+      shares: analytics.shares,
+    },
+  });
+}
+
+async function logPost(postId: string, level: string, message: string): Promise<void> {
+  try {
+    await db.postLog.create({
+      data: { postId, level, message },
+    });
+  } catch (err) {
+    console.error('Failed to log post:', err);
+  }
+}
