@@ -617,6 +617,44 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
   // ─── Touch / Swipe ──────────────────────────────────────────────────
   const touchStartX = useRef(0);
+  // ─── TikTok Auto-Publish Helpers ─────────────────────────────────────
+  // Track publish state for each slide
+  const handlePublishStateChange = useCallback((slideNum: number, state: "idle" | "publishing" | "published" | "failed") => {
+    setPublishStates(prev => ({ ...prev, [slideNum]: state }));
+  }, []);
+
+  // Publish all slides at once
+  const handlePublishAllToTikTok = async () => {
+    const readySlides = slides.filter(s => s.problemImageUrl && s.solutionImageUrl);
+    if (readySlides.length === 0) {
+      alert("No slides ready to publish. Generate images first.");
+      return;
+    }
+    if (!confirm(`Publish ${readySlides.length} slide(s) to TikTok?`)) return;
+
+    for (const slide of readySlides) {
+      try {
+        await fetch("/api/autopublish/publish-carousel", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            imageUrls: [slide.problemImageUrl, slide.solutionImageUrl],
+            caption: `${carouselTitle} - Slide ${slide.slide_number} 🔥`,
+            hashtags: ["fyp", "viral", "carousel", "ai"],
+            aiDescription: `Slide ${slide.slide_number}`,
+            externalId: `carousel_${slide.slide_number}_${Date.now()}`,
+            autoCaption: false,
+          }),
+        });
+        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "published" }));
+      } catch (err) {
+        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "failed" }));
+      }
+      // Small delay between publishes to avoid rate limiting
+      await new Promise(r => setTimeout(r, 1500));
+    }
+  };
+
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
   };
@@ -1396,44 +1434,6 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
   // ═══════════════════════════════════════════════════════════════════════
   // INPUT VIEW
-  // ═══════════════════════════════════════════════════════════════════════
-  // Track publish state for each slide
-  const handlePublishStateChange = useCallback((slideNum: number, state: "idle" | "publishing" | "published" | "failed") => {
-    setPublishStates(prev => ({ ...prev, [slideNum]: state }));
-  }, []);
-
-  // Publish all slides at once
-  const handlePublishAllToTikTok = async () => {
-    const readySlides = slides.filter(s => s.problemImageUrl && s.solutionImageUrl);
-    if (readySlides.length === 0) {
-      alert("No slides ready to publish. Generate images first.");
-      return;
-    }
-    if (!confirm(`Publish ${readySlides.length} slide(s) to TikTok?`)) return;
-
-    for (const slide of readySlides) {
-      try {
-        await fetch("/api/autopublish/publish-carousel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageUrls: [slide.problemImageUrl, slide.solutionImageUrl],
-            caption: `${carouselTitle} - Slide ${slide.slide_number} 🔥`,
-            hashtags: ["fyp", "viral", "carousel", "ai"],
-            aiDescription: `Slide ${slide.slide_number}`,
-            externalId: `carousel_${slide.slide_number}_${Date.now()}`,
-            autoCaption: false,
-          }),
-        });
-        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "published" }));
-      } catch (err) {
-        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "failed" }));
-      }
-      // Small delay between publishes to avoid rate limiting
-      await new Promise(r => setTimeout(r, 1500));
-    }
-  };
-
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.cream }}>
       {/* Top Bar */}
