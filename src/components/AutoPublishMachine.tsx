@@ -65,6 +65,18 @@ interface Post {
   };
 }
 
+// Library video from your site's existing video library
+interface LibraryVideo {
+  id: string;
+  title: string;
+  videoUrl: string;
+  thumbnailUrl: string | null;
+  duration: string | null;
+  scenesCount: number;
+  provider: string;
+  createdAt: string;
+}
+
 // ─── Status Configuration ──────────────────────────────────────────────────
 
 const STATUS_CONFIG: Record<string, { label: string; emoji: string; color: string }> = {
@@ -106,7 +118,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [posts, setPosts] = useState<Post[]>([]);
   const [accounts, setAccounts] = useState<TikTokAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"publish" | "posts" | "accounts" | "setup">("publish");
+  const [activeTab, setActiveTab] = useState<"publish" | "posts" | "library" | "accounts" | "setup">("publish");
 
   // Publish form state
   const [videoUrl, setVideoUrl] = useState("");
@@ -117,6 +129,85 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [scheduledAt, setScheduledAt] = useState("");
   const [autoCaption, setAutoCaption] = useState(false);
   const [publishing, setPublishing] = useState(false);
+
+  // Library state
+  const [libraryVideos, setLibraryVideos] = useState<LibraryVideo[]>([]);
+  const [libraryLoading, setLibraryLoading] = useState(false);
+  const [selectedLibraryVideo, setSelectedLibraryVideo] = useState<LibraryVideo | null>(null);
+  const [libraryPublishCaption, setLibraryPublishCaption] = useState("");
+  const [libraryPublishHashtags, setLibraryPublishHashtags] = useState("fyp, viral, ai");
+  const [libraryPublishing, setLibraryPublishing] = useState<string | null>(null);
+  const [libraryAccountId, setLibraryAccountId] = useState("");
+
+  // ─── Fetch Library Videos ──────────────────────────────────────────────────
+  const fetchLibrary = useCallback(async () => {
+    setLibraryLoading(true);
+    try {
+      const res = await fetch("/api/videos");
+      const data = await res.json();
+      setLibraryVideos(data.videos || []);
+    } catch (err) {
+      console.error("Library fetch error:", err);
+    } finally {
+      setLibraryLoading(false);
+    }
+  }, []);
+
+  // ─── Publish Library Video ─────────────────────────────────────────────────
+  const handlePublishLibraryVideo = async (video: LibraryVideo) => {
+    setLibraryPublishing(video.id);
+    try {
+      const hashtags = libraryPublishHashtags
+        .split(",")
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean);
+
+      // Determine if it's a video or image carousel based on provider/URL
+      const isImage = video.provider === "carousel" || video.videoUrl.match(/\.(jpg|jpeg|png|webp)$/i);
+      
+      const endpoint = isImage
+        ? "/api/autopublish/publish-carousel"
+        : "/api/autopublish/publish";
+      
+      const body = isImage
+        ? {
+            imageUrls: [video.videoUrl],
+            caption: libraryPublishCaption || video.title,
+            hashtags,
+            aiDescription: video.title,
+            externalId: `library_${video.id}`,
+            accountId: libraryAccountId || undefined,
+            autoCaption: !libraryPublishCaption,
+          }
+        : {
+            videoUrl: video.videoUrl,
+            caption: libraryPublishCaption || video.title,
+            hashtags,
+            aiDescription: video.title,
+            externalId: `library_${video.id}`,
+            accountId: libraryAccountId || undefined,
+            autoCaption: !libraryPublishCaption,
+          };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+
+      const data = await response.json();
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+      } else {
+        alert(`✅ "${video.title}" is being published to TikTok!`);
+        setLibraryPublishCaption("");
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLibraryPublishing(null);
+    }
+  };
 
   // ─── Fetch Data ──────────────────────────────────────────────────────────
 
@@ -146,6 +237,13 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
     const interval = setInterval(fetchData, 15000);
     return () => clearInterval(interval);
   }, [fetchData]);
+
+  // Fetch library when Library tab is opened
+  useEffect(() => {
+    if (activeTab === "library") {
+      fetchLibrary();
+    }
+  }, [activeTab, fetchLibrary]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -403,6 +501,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
           {[
             { id: "publish", label: "Publish New", icon: "🚀" },
             { id: "posts", label: "All Posts", icon: "📋" },
+            { id: "library", label: "Library", icon: "📚" },
             { id: "accounts", label: "Accounts", icon: "👥" },
             { id: "setup", label: "Setup", icon: "⚙️" },
           ].map((tab) => (
@@ -750,6 +849,181 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                     </div>
                   );
                 })}
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Library Tab ────────────────────────────────────────────── */}
+        {activeTab === "library" && (
+          <div
+            className="rounded-2xl p-5 shadow-sm"
+            style={{ backgroundColor: C.white, border: `1.5px solid ${C.cardBorder}` }}
+          >
+            <div className="flex items-center justify-between mb-4 flex-wrap gap-2">
+              <h2 className="text-base font-bold" style={{ color: C.text }}>
+                📚 Your Library ({libraryVideos.length})
+              </h2>
+              <button
+                onClick={fetchLibrary}
+                className="px-3 py-1.5 rounded-lg text-xs font-bold transition-all hover:scale-105"
+                style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}`, color: C.text }}
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {libraryLoading ? (
+              <div className="py-10 text-center">
+                <div className="w-8 h-8 rounded-full border-2 animate-spin mx-auto mb-3"
+                  style={{ borderColor: `${C.pink}30`, borderTopColor: C.pink }} />
+                <p className="text-sm" style={{ color: C.textMuted }}>Loading library...</p>
+              </div>
+            ) : libraryVideos.length === 0 ? (
+              <div className="py-10 text-center">
+                <div className="text-4xl mb-3">📭</div>
+                <p className="text-sm font-semibold" style={{ color: C.text }}>No videos in library yet</p>
+                <p className="text-xs mt-1" style={{ color: C.textMuted }}>
+                  Generate AI videos or carousels first - they will appear here
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {/* Account selector for library publishing */}
+                <div
+                  className="p-3 rounded-xl"
+                  style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+                >
+                  <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                    TikTok Account (optional - default: first active)
+                  </label>
+                  <select
+                    value={libraryAccountId}
+                    onChange={(e) => setLibraryAccountId(e.target.value)}
+                    className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                    style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                  >
+                    <option value="">Auto (first active account)</option>
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.blotatoId}>
+                        @{acc.username || acc.displayName || "unknown"}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Videos list */}
+                <div className="space-y-2 max-h-[600px] overflow-y-auto pr-1">
+                  {libraryVideos.map((video) => {
+                    const isImage = video.provider === "carousel" || video.videoUrl.match(/\.(jpg|jpeg|png|webp)$/i);
+                    const isPublishing = libraryPublishing === video.id;
+                    return (
+                      <div
+                        key={video.id}
+                        className="p-3 rounded-xl border"
+                        style={{ borderColor: C.cardBorder, backgroundColor: C.cream }}
+                      >
+                        <div className="flex items-start gap-3 flex-wrap">
+                          {/* Thumbnail */}
+                          <div className="flex-shrink-0 w-20 h-20 rounded-lg overflow-hidden bg-gray-200">
+                            {video.thumbnailUrl ? (
+                              <img
+                                src={video.thumbnailUrl}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : isImage ? (
+                              <img
+                                src={video.videoUrl}
+                                alt={video.title}
+                                className="w-full h-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-full h-full flex items-center justify-center text-2xl">
+                                🎬
+                              </div>
+                            )}
+                          </div>
+
+                          {/* Info */}
+                          <div className="flex-1 min-w-[200px]">
+                            <div className="flex items-center gap-2 mb-1 flex-wrap">
+                              <span className="text-sm font-semibold" style={{ color: C.text }}>
+                                {video.title}
+                              </span>
+                              <span
+                                className="text-[9px] font-bold uppercase px-2 py-0.5 rounded-full"
+                                style={{
+                                  backgroundColor: isImage ? `${C.pink}20` : `${C.cyan}20`,
+                                  color: isImage ? C.pink : C.cyan,
+                                }}
+                              >
+                                {isImage ? "🖼 Photo" : "🎬 Video"}
+                              </span>
+                            </div>
+                            <div className="text-[10px] flex items-center gap-3" style={{ color: C.textMuted }}>
+                              <span>{video.provider}</span>
+                              {video.scenesCount > 1 && <span>{video.scenesCount} scenes</span>}
+                              <span>{new Date(video.createdAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}</span>
+                            </div>
+
+                            {/* Edit caption for publish */}
+                            <div className="mt-2">
+                              <input
+                                type="text"
+                                value={libraryPublishCaption}
+                                onChange={(e) => setLibraryPublishCaption(e.target.value)}
+                                placeholder={`Custom caption (default: ${video.title})`}
+                                className="w-full px-2 py-1 rounded text-[10px] focus:outline-none"
+                                style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                              />
+                            </div>
+                          </div>
+
+                          {/* Publish button */}
+                          <button
+                            onClick={() => handlePublishLibraryVideo(video)}
+                            disabled={isPublishing}
+                            className="px-3 py-2 rounded-lg text-[10px] font-bold transition-all hover:scale-105 disabled:opacity-50"
+                            style={{
+                              background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                              color: C.white,
+                            }}
+                          >
+                            {isPublishing ? (
+                              <span className="flex items-center gap-1">
+                                <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                                Publishing...
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1">
+                                🚀 Publish to TikTok
+                              </span>
+                            )}
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Hashtags input (applies to all library publishes) */}
+                <div
+                  className="p-3 rounded-xl mt-3"
+                  style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+                >
+                  <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                    Hashtags (applies to all library publishes, comma-separated)
+                  </label>
+                  <input
+                    type="text"
+                    value={libraryPublishHashtags}
+                    onChange={(e) => setLibraryPublishHashtags(e.target.value)}
+                    placeholder="fyp, viral, ai, trending"
+                    className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                    style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                  />
+                </div>
               </div>
             )}
           </div>
