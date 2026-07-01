@@ -1,10 +1,17 @@
 // Blotato API Service - TikTok auto-publishing
-// Docs: https://help.blotato.com/api/start
+// Docs: https://help.blotato.com/api/publish-post
 // REST API: Base URL: https://backend.blotato.com/v2
 // Auth Header: blotato-api-key: YOUR_API_KEY
 //
-// IMPORTANT: All POST /posts requests must wrap body in a "post" object:
-// { "post": { "accountId": "...", "content": "...", "mediaUrls": [...] } }
+// IMPORTANT: POST /posts body structure:
+// {
+//   "post": {
+//     "accountId": "...",
+//     "content": { "text": "...", "mediaUrls": [...], "platform": "tiktok" },
+//     "target": { "targetType": "tiktok", "privacyLevel": "PUBLIC", ... }
+//   },
+//   "scheduledTime": "..." (optional, root-level)
+// }
 
 const BLOTATO_BASE_URL = 'https://backend.blotato.com/v2';
 
@@ -22,6 +29,7 @@ export interface BlotatoPostResponse {
   platformPostId?: string;
   url?: string;
   error?: string;
+  postSubmissionId?: string;
 }
 
 export interface PublishOptions {
@@ -116,38 +124,60 @@ export class BlotatoService {
   }
 
   /**
-   * Publish a post to a social platform
-   * Body must be wrapped in { post: { ... } }
+   * Build the TikTok target object with required fields
+   */
+  private buildTikTokTarget(): any {
+    return {
+      targetType: 'tiktok',
+      privacyLevel: 'PUBLIC',
+      disabledComments: false,
+      disabledDuet: false,
+      disabledStitch: false,
+      isBrandedContent: false,
+      isYourBrand: false,
+      isAiGenerated: true,
+    };
+  }
+
+  /**
+   * Publish a video post to TikTok
    */
   async publishPost(options: PublishOptions): Promise<BlotatoPostResponse> {
-    const { accountId, videoUrl, caption, hashtags, musicTitle, scheduledAt, thumbnailUrl } = options;
+    const { accountId, videoUrl, caption, hashtags, musicTitle, scheduledAt } = options;
 
-    const fullCaption = this.buildCaption(caption, hashtags, musicTitle);
+    const fullText = this.buildCaption(caption, hashtags, musicTitle);
 
-    const postBody: any = {
+    const postBody = {
       accountId,
-      content: fullCaption,
-      mediaUrls: [videoUrl],
-      platform: 'tiktok',
+      content: {
+        text: fullText,
+        mediaUrls: [videoUrl],
+        platform: 'tiktok',
+      },
+      target: this.buildTikTokTarget(),
     };
 
-    if (thumbnailUrl) postBody.thumbnailUrl = thumbnailUrl;
-    if (scheduledAt) postBody.scheduledAt = scheduledAt.toISOString();
+    const requestBody: any = { post: postBody };
+    // scheduledTime must be root-level (not inside post)
+    if (scheduledAt) {
+      requestBody.scheduledTime = scheduledAt.toISOString();
+    }
 
-    // Wrap in "post" object as required by Blotato API
-    const data = await this.request('POST', '/posts', { post: postBody });
+    const data = await this.request('POST', '/posts', requestBody);
 
     return {
-      id: data.id || data.postId || (data.post && data.post.id) || '',
+      id: data.id || data.postId || data.postSubmissionId || (data.post && data.post.id) || '',
       status: data.status || (data.post && data.post.status) || 'pending',
       platformPostId: data.platformPostId,
       url: data.url || (data.post && data.post.url),
       error: data.error,
+      postSubmissionId: data.postSubmissionId,
     };
   }
 
   /**
    * Publish an image carousel post to TikTok (Photo Mode)
+   * TikTok supports 1+ images as a swipeable carousel
    */
   async publishImagePost(options: PublishImagePostOptions): Promise<BlotatoPostResponse> {
     const { accountId, imageUrls, caption, hashtags, musicTitle, scheduledAt } = options;
@@ -156,27 +186,36 @@ export class BlotatoService {
       throw new Error('At least one image URL is required');
     }
 
-    const fullCaption = this.buildCaption(caption, hashtags, musicTitle);
+    const fullText = this.buildCaption(caption, hashtags, musicTitle);
 
-    const postBody: any = {
+    const postBody = {
       accountId,
-      content: fullCaption,
-      mediaUrls: imageUrls,
-      platform: 'tiktok',
-      postType: 'image',
+      content: {
+        text: fullText,
+        mediaUrls: imageUrls,
+        platform: 'tiktok',
+      },
+      target: {
+        ...this.buildTikTokTarget(),
+        autoAddMusic: true, // Auto-add trending music for photo posts
+        imageCoverIndex: 0, // First image as cover
+      },
     };
 
-    if (scheduledAt) postBody.scheduledAt = scheduledAt.toISOString();
+    const requestBody: any = { post: postBody };
+    if (scheduledAt) {
+      requestBody.scheduledTime = scheduledAt.toISOString();
+    }
 
-    // Wrap in "post" object as required by Blotato API
-    const data = await this.request('POST', '/posts', { post: postBody });
+    const data = await this.request('POST', '/posts', requestBody);
 
     return {
-      id: data.id || data.postId || (data.post && data.post.id) || '',
+      id: data.id || data.postId || data.postSubmissionId || (data.post && data.post.id) || '',
       status: data.status || (data.post && data.post.status) || 'pending',
       platformPostId: data.platformPostId,
       url: data.url || (data.post && data.post.url),
       error: data.error,
+      postSubmissionId: data.postSubmissionId,
     };
   }
 
@@ -191,6 +230,7 @@ export class BlotatoService {
       platformPostId: data.platformPostId,
       url: data.url,
       error: data.error,
+      postSubmissionId: data.postSubmissionId,
     };
   }
 
@@ -230,6 +270,9 @@ export class BlotatoService {
     }
   }
 
+  /**
+   * Build caption text with hashtags and music
+   */
   private buildCaption(caption: string, hashtags?: string[], musicTitle?: string): string {
     let full = caption || '';
     if (musicTitle) full += `\n\n🎵 ${musicTitle}`;
