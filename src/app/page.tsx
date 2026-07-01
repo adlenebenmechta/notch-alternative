@@ -14,6 +14,7 @@ import UserProfilePanel from "@/components/UserProfilePanel";
 import BOFVideosMachine from "@/components/BOFVideosMachine";
 import ClaymotionVideosMachine from "@/components/ClaymotionVideosMachine";
 import AllInOneMachine from "@/components/AllInOneMachine";
+import AutoPublishMachine from "@/components/AutoPublishMachine";
 
 // ─── Colors (matching the existing design) ────────────────────────────────────
 
@@ -360,6 +361,8 @@ export default function Home() {
             setCurrentView("claymotion");
           } else if (dest === "allinone-machine") {
             setCurrentView("allinone");
+          } else if (dest === "autopublish-machine") {
+            setCurrentView("autopublish");
           }
         }}
         onOpenLibrary={() => {
@@ -406,10 +409,17 @@ export default function Home() {
             setCurrentView("bof");
           } else if (dest === "claymotion-videos-machine") {
             setCurrentView("claymotion");
+          } else if (dest === "autopublish-machine") {
+            setCurrentView("autopublish");
           }
         }}
       />
     );
+  }
+
+  // Auto-Publish Machine view
+  if (currentView === "autopublish") {
+    return <AutoPublishMachine onBack={() => setCurrentView("menu")} isAdmin={!!isAdmin} />;
   }
 
   // Unified Library view
