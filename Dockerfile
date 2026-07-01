@@ -62,4 +62,4 @@ ENV HOSTNAME "0.0.0.0"
 
 # Run prisma db push then start the server
 # db push creates/updates tables without migration files
-CMD ["sh", "-c", "./node_modules/.bin/prisma db push --skip-generate 2>&1 || echo 'DB push failed, continuing anyway'; node server.js"]
+CMD ["sh", "-c", "npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || echo 'DB push failed, continuing anyway'; node server.js"]
