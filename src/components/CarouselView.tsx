@@ -561,7 +561,12 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           duration: null,
           scenesCount: slides.length,
           provider: "carousel",
-          metadata: { type: "carousel", slideCount: slides.length, productUrl },
+          metadata: {
+            type: "carousel",
+            slideCount: slides.length,
+            productUrl,
+            imageUrls: allImages, // ALL image URLs (problem + solution for each slide)
+          },
         }),
       });
     } catch {
