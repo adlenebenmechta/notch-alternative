@@ -2,6 +2,9 @@
 // Docs: https://help.blotato.com/api/start
 // REST API: Base URL: https://backend.blotato.com/v2
 // Auth Header: blotato-api-key: YOUR_API_KEY
+//
+// IMPORTANT: All POST /posts requests must wrap body in a "post" object:
+// { "post": { "accountId": "...", "content": "...", "mediaUrls": [...] } }
 
 const BLOTATO_BASE_URL = 'https://backend.blotato.com/v2';
 
@@ -33,7 +36,7 @@ export interface PublishOptions {
 
 export interface PublishImagePostOptions {
   accountId: string;
-  imageUrls: string[]; // Array of image URLs (1+ images = photo carousel)
+  imageUrls: string[];
   caption: string;
   hashtags?: string[];
   musicTitle?: string;
@@ -64,7 +67,6 @@ export class BlotatoService {
     const response = await fetch(url, {
       method,
       headers: {
-        // Blotato uses blotato-api-key header (not Authorization Bearer)
         'blotato-api-key': this.apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
@@ -94,7 +96,6 @@ export class BlotatoService {
    */
   async getAccounts(): Promise<BlotatoAccount[]> {
     const data = await this.request('GET', '/users/me/accounts');
-    // Blotato returns { items: [...] } - handle all possible shapes
     const accounts = data.items || data.accounts || data.data || (Array.isArray(data) ? data : []);
 
     return accounts.map((a: any) => ({
@@ -116,36 +117,37 @@ export class BlotatoService {
 
   /**
    * Publish a post to a social platform
+   * Body must be wrapped in { post: { ... } }
    */
   async publishPost(options: PublishOptions): Promise<BlotatoPostResponse> {
     const { accountId, videoUrl, caption, hashtags, musicTitle, scheduledAt, thumbnailUrl } = options;
 
     const fullCaption = this.buildCaption(caption, hashtags, musicTitle);
 
-    const body: any = {
+    const postBody: any = {
       accountId,
       content: fullCaption,
       mediaUrls: [videoUrl],
       platform: 'tiktok',
     };
 
-    if (thumbnailUrl) body.thumbnailUrl = thumbnailUrl;
-    if (scheduledAt) body.scheduledAt = scheduledAt.toISOString();
+    if (thumbnailUrl) postBody.thumbnailUrl = thumbnailUrl;
+    if (scheduledAt) postBody.scheduledAt = scheduledAt.toISOString();
 
-    const data = await this.request('POST', '/posts', body);
+    // Wrap in "post" object as required by Blotato API
+    const data = await this.request('POST', '/posts', { post: postBody });
 
     return {
-      id: data.id || data.postId,
-      status: data.status || 'pending',
+      id: data.id || data.postId || (data.post && data.post.id) || '',
+      status: data.status || (data.post && data.post.status) || 'pending',
       platformPostId: data.platformPostId,
-      url: data.url,
+      url: data.url || (data.post && data.post.url),
       error: data.error,
     };
   }
 
   /**
    * Publish an image carousel post to TikTok (Photo Mode)
-   * TikTok supports 1+ images as a swipeable carousel
    */
   async publishImagePost(options: PublishImagePostOptions): Promise<BlotatoPostResponse> {
     const { accountId, imageUrls, caption, hashtags, musicTitle, scheduledAt } = options;
@@ -156,23 +158,24 @@ export class BlotatoService {
 
     const fullCaption = this.buildCaption(caption, hashtags, musicTitle);
 
-    const body: any = {
+    const postBody: any = {
       accountId,
       content: fullCaption,
-      mediaUrls: imageUrls, // Pass array of image URLs directly
+      mediaUrls: imageUrls,
       platform: 'tiktok',
-      postType: 'image', // Tell Blotato this is a photo post
+      postType: 'image',
     };
 
-    if (scheduledAt) body.scheduledAt = scheduledAt.toISOString();
+    if (scheduledAt) postBody.scheduledAt = scheduledAt.toISOString();
 
-    const data = await this.request('POST', '/posts', body);
+    // Wrap in "post" object as required by Blotato API
+    const data = await this.request('POST', '/posts', { post: postBody });
 
     return {
-      id: data.id || data.postId,
-      status: data.status || 'pending',
+      id: data.id || data.postId || (data.post && data.post.id) || '',
+      status: data.status || (data.post && data.post.status) || 'pending',
       platformPostId: data.platformPostId,
-      url: data.url,
+      url: data.url || (data.post && data.post.url),
       error: data.error,
     };
   }
