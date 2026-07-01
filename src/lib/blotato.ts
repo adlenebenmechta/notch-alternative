@@ -289,14 +289,24 @@ export class BlotatoService {
   }
 
   /**
-   * Delete a scheduled post
+   * Delete a scheduled post (only works for scheduled, not published posts)
+   * Uses /schedules/{id} endpoint (not /posts/{id})
+   * Published posts cannot be deleted via API - must be deleted manually on TikTok
    */
   async deletePost(postId: string): Promise<boolean> {
     try {
-      await this.request('DELETE', `/posts/${postId}`);
+      // Try the schedules endpoint first (correct endpoint for deletion)
+      await this.request('DELETE', `/schedules/${postId}`);
+      console.log(`[Blotato] Deleted scheduled post: ${postId}`);
       return true;
     } catch (err: any) {
-      console.error(`[Blotato] Failed to delete post ${postId}:`, err.message);
+      console.warn(`[Blotato] Failed to delete post ${postId}: ${err.message}`);
+      // If it's a 404, the post might already be published (can't delete)
+      // or already deleted - either way, return true so DB cleanup continues
+      if (err.message.includes('404') || err.message.includes('Not Found')) {
+        console.log(`[Blotato] Post ${postId} not found (maybe already published or deleted)`);
+        return true;
+      }
       return false;
     }
   }
