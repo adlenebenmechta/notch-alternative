@@ -125,11 +125,12 @@ export class BlotatoService {
 
   /**
    * Build the TikTok target object with required fields
+   * privacyLevel values: "SELF_ONLY", "PUBLIC_TO_EVERYONE", "MUTUAL_FOLLOW_FRIENDS", "FOLLOWER_OF_CREATOR"
    */
   private buildTikTokTarget(): any {
     return {
       targetType: 'tiktok',
-      privacyLevel: 'PUBLIC',
+      privacyLevel: 'PUBLIC_TO_EVERYONE',
       disabledComments: false,
       disabledDuet: false,
       disabledStitch: false,
@@ -221,15 +222,17 @@ export class BlotatoService {
 
   /**
    * Get post status (for polling)
+   * Returns status: "in-progress", "published", "failed"
+   * Returns publicUrl when published
    */
-  async getPostStatus(postId: string): Promise<BlotatoPostResponse> {
-    const data = await this.request('GET', `/posts/${postId}`);
+  async getPostStatus(postSubmissionId: string): Promise<BlotatoPostResponse> {
+    const data = await this.request('GET', `/posts/${postSubmissionId}`);
     return {
-      id: data.id,
-      status: data.status,
+      id: data.postSubmissionId || data.id,
+      status: data.status || 'unknown', // "in-progress", "published", "failed"
       platformPostId: data.platformPostId,
-      url: data.url,
-      error: data.error,
+      url: data.publicUrl || data.url, // publicUrl is the TikTok URL when published
+      error: data.error || (data.status === 'failed' ? 'Publishing failed' : undefined),
       postSubmissionId: data.postSubmissionId,
     };
   }
