@@ -1,7 +1,9 @@
 // Blotato API Service - TikTok auto-publishing
 // Docs: https://help.blotato.com/api/start
+// REST API: Base URL: https://backend.blotato.com/v2
+// Auth Header: blotato-api-key: YOUR_API_KEY
 
-const BLOTATO_BASE_URL = 'https://api.blotato.com/v2';
+const BLOTATO_BASE_URL = 'https://backend.blotato.com/v2';
 
 export interface BlotatoAccount {
   id: string;
@@ -53,9 +55,10 @@ export class BlotatoService {
     const response = await fetch(url, {
       method,
       headers: {
-        Authorization: `Bearer ${this.apiKey}`,
+        // Blotato uses blotato-api-key header (not Authorization Bearer)
+        'blotato-api-key': this.apiKey,
         'Content-Type': 'application/json',
-        Accept: 'application/json',
+        'Accept': 'application/json',
       },
       body: body ? JSON.stringify(body) : undefined,
     });
