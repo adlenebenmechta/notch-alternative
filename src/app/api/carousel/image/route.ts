@@ -104,7 +104,7 @@ async function generateSolutionWithProduct(
   // The prompt tells the model to keep the product visible and place it in the described scene
   // Remove any people references from the prompt — faces look fake
   const cleanPrompt = removePeopleFromPrompt(solutionPrompt);
-  const productPlacementPrompt = `Place this product in the following scene: ${cleanPrompt}. CRITICAL: The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. NO people, NO faces, NO hands in the image — product only with environment. Photorealistic, high quality product photography style.`;
+  const productPlacementPrompt = `Place this product in the following scene: ${cleanPrompt}. CRITICAL RULES: (1) The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. (2) This image MUST NOT contain any people, faces, hands, or human body parts — product only with environment. (3) This image MUST NOT contain any text, writing, words, letters, typography, signs, labels, logos, or watermarks anywhere in the image. The image must be 100% text-free. No text overlays, no captions, no graphic design elements. Photorealistic, high quality product photography style.`;
 
   console.log(`[Carousel/Image] Using google/nano-banana-edit for solution with product ref`);
 
@@ -153,7 +153,7 @@ async function generateProblemImage(prompt: string): Promise<string> {
     .replace(/\b(infographic|illustration|graphic design|cartoon|vector|clip.?art)\b/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
-  const enhancedPrompt = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, NO people, NO faces, NO hands, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE: " + cleaned;
+  const enhancedPrompt = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot. CRITICAL: This image MUST NOT contain any people, faces, hands, or human body parts. CRITICAL: This image MUST NOT contain any text, writing, words, letters, typography, signs, labels, logos, or watermarks. The image must be 100% text-free and people-free. Only objects, environment, and atmosphere. No text overlays, no captions, no graphic design elements: " + cleaned;
 
   const submitRes = await fetch(KIE_API_URL, {
     method: "POST",
@@ -261,7 +261,8 @@ export async function POST(request: NextRequest) {
           // Retry with higher strength (more faithful to reference)
           try {
             console.log(`[Carousel/Image] Retrying with strength 0.55...`);
-            const retryPrompt = `Place this product in the following scene: ${image_prompt.trim()}. CRITICAL: The product must remain the main focus, clearly visible with its original packaging and branding exactly as shown. Photorealistic, high quality.`;
+            const cleanRetryPrompt = removePeopleFromPrompt(image_prompt.trim());
+            const retryPrompt = `Place this product in the following scene: ${cleanRetryPrompt}. CRITICAL RULES: (1) The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. (2) ABSOLUTELY NO people, NO faces, NO hands, NO human body parts in the image. (3) ABSOLUTELY NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO WATERMARKS anywhere in the image. The image must be completely text-free. Photorealistic, high quality product photography style.`;
 
             const retryRes = await fetch(KIE_API_URL, {
               method: "POST",

@@ -25,21 +25,17 @@ const C = {
 interface ProblemSolutionImages {
   problemImageUrl: string | null;
   solutionImageUrl: string | null;
-  problemOverlayUrl: string | null;
-  solutionOverlayUrl: string | null;
 }
 
 interface CarouselSlide {
   slide_number: number;
   problem: {
     image_prompt: string;
-    header_text: string | null;
-    body_text: string | null;
+    problem_text: string | null;
   };
   solution: {
     image_prompt: string;
-    header_text: string | null;
-    body_text: string | null;
+    solution_text: string | null;
   };
 }
 
@@ -183,203 +179,14 @@ function formatProductImageTo9x16(imageUrl: string): Promise<string> {
   });
 }
 
-// ─── Canvas: Render text overlay on image ────────────────────────────────────
-function renderTextOnImage(
-  imageUrl: string,
-  headerText: string | null,
-  bodyText: string | null,
-  position: "top" | "center" | "bottom",
-  slideIndex: number,
-  totalSlides: number,
-  isProblem: boolean
-): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-
-    // Use proxy for external URLs to bypass CORS
-    const isExternal = imageUrl.startsWith("http");
-    const srcUrl = isExternal ? `/api/proxy-image?url=${encodeURIComponent(imageUrl)}` : imageUrl;
-
-    img.onload = () => {
-      const canvas = document.createElement("canvas");
-      canvas.width = img.naturalWidth || 768;
-      canvas.height = img.naturalHeight || 1344;
-      const ctx = canvas.getContext("2d");
-      if (!ctx) {
-        reject(new Error("Canvas context not available"));
-        return;
-      }
-
-      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
-
-      const hasHeader = headerText && headerText.trim() !== "";
-      const hasBody = bodyText && bodyText.trim() !== "";
-      const hasText = !!(hasHeader || hasBody);
-
-      const maxWidth = canvas.width * 0.85;
-      const padding = canvas.width * 0.075;
-
-      if (hasText) {
-        // Gradient overlay
-        const gradHeight = canvas.height * 0.4;
-        let gradStart, gradEnd;
-        if (position === "top") {
-          gradStart = 0;
-          gradEnd = gradHeight;
-        } else if (position === "center") {
-          gradStart = (canvas.height - gradHeight) / 2;
-          gradEnd = gradStart + gradHeight;
-        } else {
-          gradStart = canvas.height - gradHeight;
-          gradEnd = canvas.height;
-        }
-
-        const grad = ctx.createLinearGradient(0, gradStart, 0, gradEnd);
-        grad.addColorStop(0, "rgba(0,0,0,0)");
-        grad.addColorStop(0.3, isProblem ? "rgba(180,0,0,0.45)" : "rgba(0,120,0,0.35)");
-        grad.addColorStop(1, isProblem ? "rgba(120,0,0,0.85)" : "rgba(0,80,0,0.75)");
-        ctx.fillStyle = grad;
-        ctx.fillRect(0, gradStart, canvas.width, gradHeight);
-
-        // Badge: PROBLEM or SOLUTION
-        const badgeFontSize = canvas.width * 0.04;
-        ctx.font = `bold ${badgeFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
-        const badgeText = isProblem ? "PROBLEM" : "SOLUTION";
-        const badgePadding = badgeFontSize * 0.6;
-        const badgeTextWidth = ctx.measureText(badgeText).width;
-        const badgeW = badgeTextWidth + badgePadding * 2;
-        const badgeH = badgeFontSize + badgePadding * 1.2;
-        const badgeX = padding;
-        const badgeY = padding;
-
-        ctx.fillStyle = isProblem ? "rgba(220,38,38,0.8)" : "rgba(34,197,94,0.8)";
-        const badgeRadius = badgeH / 2;
-        ctx.beginPath();
-        ctx.moveTo(badgeX + badgeRadius, badgeY);
-        ctx.lineTo(badgeX + badgeW - badgeRadius, badgeY);
-        ctx.quadraticCurveTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + badgeRadius);
-        ctx.lineTo(badgeX + badgeW, badgeY + badgeH - badgeRadius);
-        ctx.quadraticCurveTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - badgeRadius, badgeY + badgeH);
-        ctx.lineTo(badgeX + badgeRadius, badgeY + badgeH);
-        ctx.quadraticCurveTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - badgeRadius);
-        ctx.lineTo(badgeX, badgeY + badgeRadius);
-        ctx.quadraticCurveTo(badgeX, badgeY, badgeX + badgeRadius, badgeY);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
-
-        // Slide number badge
-        const slideBadgeText = `${slideIndex + 1}/${totalSlides}`;
-        ctx.font = `bold ${badgeFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
-        const slideBadgeW = ctx.measureText(slideBadgeText).width + badgePadding * 2;
-        const slideBadgeX = canvas.width - padding - slideBadgeW;
-
-        ctx.fillStyle = "rgba(0,0,0,0.55)";
-        ctx.beginPath();
-        ctx.moveTo(slideBadgeX + badgeRadius, badgeY);
-        ctx.lineTo(slideBadgeX + slideBadgeW - badgeRadius, badgeY);
-        ctx.quadraticCurveTo(slideBadgeX + slideBadgeW, badgeY, slideBadgeX + slideBadgeW, badgeY + badgeRadius);
-        ctx.lineTo(slideBadgeX + slideBadgeW, badgeY + badgeH - badgeRadius);
-        ctx.quadraticCurveTo(slideBadgeX + slideBadgeW, badgeY + badgeH, slideBadgeX + slideBadgeW - badgeRadius, badgeY + badgeH);
-        ctx.lineTo(slideBadgeX + badgeRadius, badgeY + badgeH);
-        ctx.quadraticCurveTo(slideBadgeX, badgeY + badgeH, slideBadgeX, badgeY + badgeH - badgeRadius);
-        ctx.lineTo(slideBadgeX, badgeY + badgeRadius);
-        ctx.quadraticCurveTo(slideBadgeX, badgeY, slideBadgeX + badgeRadius, badgeY);
-        ctx.closePath();
-        ctx.fill();
-
-        ctx.fillStyle = "#FFFFFF";
-        ctx.fillText(slideBadgeText, slideBadgeX + slideBadgeW / 2, badgeY + badgeH / 2);
-
-        // Draw header text
-        if (hasHeader) {
-          const headerLen = headerText!.length;
-          let headerFontSize: number;
-          if (headerLen <= 20) headerFontSize = canvas.width * 0.08;
-          else if (headerLen <= 40) headerFontSize = canvas.width * 0.065;
-          else headerFontSize = canvas.width * 0.055;
-          headerFontSize = Math.max(headerFontSize, 28);
-
-          ctx.font = `bold ${headerFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
-          ctx.fillStyle = "#FFFFFF";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "alphabetic";
-
-          const headerLines = wrapText(ctx, headerText!, maxWidth);
-          const lineHeight = headerFontSize * 1.35;
-
-          let baseY: number;
-          if (position === "top") {
-            baseY = padding + badgeH + 16 + headerFontSize;
-          } else if (position === "center") {
-            const totalHeight = headerLines.length * lineHeight + (hasBody ? headerFontSize * 0.5 + 20 : 0);
-            baseY = canvas.height / 2 - totalHeight / 2 + headerFontSize;
-          } else {
-            const bodyLines = hasBody ? wrapText(ctx, bodyText!, maxWidth, headerFontSize * 0.7) : [];
-            const bodyFontSize = headerFontSize * 0.7;
-            const bodyLineHeight = bodyFontSize * 1.35;
-            const totalHeight = headerLines.length * lineHeight + (hasBody ? 20 + bodyLines.length * bodyLineHeight : 0);
-            baseY = canvas.height - padding - totalHeight + headerFontSize;
-          }
-
-          ctx.shadowColor = "rgba(0,0,0,0.6)";
-          ctx.shadowBlur = headerFontSize * 0.15;
-          ctx.shadowOffsetX = 0;
-          ctx.shadowOffsetY = 2;
-
-          for (let i = 0; i < headerLines.length; i++) {
-            ctx.fillText(headerLines[i], canvas.width / 2, baseY + i * lineHeight);
-          }
-
-          // Body text
-          if (hasBody) {
-            const bodyFontSize = headerFontSize * 0.7;
-            ctx.font = `${bodyFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
-            const bodyLines = wrapText(ctx, bodyText!, maxWidth, bodyFontSize);
-            const bodyLineHeight = bodyFontSize * 1.35;
-            const bodyStartY = baseY + headerLines.length * lineHeight + 10;
-            ctx.shadowBlur = bodyFontSize * 0.1;
-
-            for (let i = 0; i < bodyLines.length; i++) {
-              ctx.fillText(bodyLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
-            }
-          }
-        }
-      }
-
-      ctx.shadowBlur = 0;
-      resolve(canvas.toDataURL("image/png"));
-    };
-    img.onerror = () => reject(new Error("Failed to load image for text overlay"));
-    img.src = srcUrl;
-  });
-}
-
-function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, fontSize?: number): string[] {
-  if (fontSize) {
-    ctx.font = `${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+// ─── Copy text to clipboard ────────────────────────────────────────────────
+async function copyToClipboard(text: string): Promise<boolean> {
+  try {
+    await navigator.clipboard.writeText(text);
+    return true;
+  } catch {
+    return false;
   }
-  const words = text.split(" ");
-  const lines: string[] = [];
-  let currentLine = "";
-
-  for (const word of words) {
-    const testLine = currentLine ? currentLine + " " + word : word;
-    const metrics = ctx.measureText(testLine);
-    if (metrics.width > maxWidth && currentLine) {
-      lines.push(currentLine);
-      currentLine = word;
-    } else {
-      currentLine = testLine;
-    }
-  }
-  if (currentLine) lines.push(currentLine);
-  return lines;
 }
 
 // ─── Carousel View Component ───────────────────────────────────────────────
@@ -504,6 +311,17 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
       const planData = await planRes.json();
       const plan = planData.plan;
+
+      // Normalize: map old field names (header_text/body_text) to new (problem_text/solution_text)
+      for (const s of plan.slides) {
+        if (s.problem && !s.problem.problem_text) {
+          s.problem.problem_text = (s.problem as Record<string, unknown>).header_text as string || (s.problem as Record<string, unknown>).body_text as string || null;
+        }
+        if (s.solution && !s.solution.solution_text) {
+          s.solution.solution_text = (s.solution as Record<string, unknown>).header_text as string || (s.solution as Record<string, unknown>).body_text as string || "sorry if they sold out";
+        }
+      }
+
       setCarouselTitle(plan.carousel_title || pInfo.productName || "Carousel");
       setProgress(35);
       setStep("generating");
@@ -516,8 +334,6 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         ...s,
         problemImageUrl: null,
         solutionImageUrl: null,
-        problemOverlayUrl: null,
-        solutionOverlayUrl: null,
         problemLoading: true,
         solutionLoading: true,
       }));
@@ -547,27 +363,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
           if (imgRes.ok) {
             const imgData = await imgRes.json();
-            // Apply text overlay
-            let overlayUrl: string | null = null;
-            if (imgData.image && (slide.problem.header_text || slide.problem.body_text)) {
-              try {
-                overlayUrl = await renderTextOnImage(
-                  imgData.image,
-                  slide.problem.header_text,
-                  slide.problem.body_text,
-                  "bottom",
-                  i,
-                  plan.slides.length,
-                  true
-                );
-              } catch (overlayErr) {
-                console.warn(`[Carousel] Problem overlay failed for slide ${i + 1}:`, overlayErr);
-              }
-            }
+            // No text overlay — images are clean, text is shown separately
             setSlides((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, problemImageUrl: imgData.image, problemOverlayUrl: overlayUrl, problemLoading: false }
+                  ? { ...s, problemImageUrl: imgData.image, problemLoading: false }
                   : s
               )
             );
@@ -594,7 +394,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
         // Generate SOLUTION image — use user-uploaded product image as reference for GPT Image
         try {
-          setStepMessage(`Generating solution image ${i + 1}/${plan.slides.length}...`);
+          setStepMessage(`Generating product image ${i + 1}/${plan.slides.length}...`);
 
           let solutionImage: string | null = null;
 
@@ -635,27 +435,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           }
 
           if (solutionImage) {
-            // Apply text overlay with SOLUTION badge on the product image
-            let overlayUrl: string | null = null;
-            if (slide.solution.header_text || slide.solution.body_text) {
-              try {
-                overlayUrl = await renderTextOnImage(
-                  solutionImage,
-                  slide.solution.header_text,
-                  slide.solution.body_text,
-                  "bottom",
-                  i,
-                  plan.slides.length,
-                  false
-                );
-              } catch (overlayErr) {
-                console.warn(`[Carousel] Solution overlay failed for slide ${i + 1}:`, overlayErr);
-              }
-            }
+            // No text overlay — images are clean, text is shown separately
             setSlides((prev) =>
               prev.map((s, idx) =>
                 idx === i
-                  ? { ...s, solutionImageUrl: solutionImage, solutionOverlayUrl: overlayUrl, solutionLoading: false }
+                  ? { ...s, solutionImageUrl: solutionImage, solutionLoading: false }
                   : s
               )
             );
@@ -697,8 +481,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     // Save each slide pair as a library entry
     const allImages: string[] = [];
     for (const slide of slides) {
-      if (slide.problemOverlayUrl || slide.problemImageUrl) allImages.push(slide.problemOverlayUrl || slide.problemImageUrl!);
-      if (slide.solutionOverlayUrl || slide.solutionImageUrl) allImages.push(slide.solutionOverlayUrl || slide.solutionImageUrl!);
+      if (slide.problemImageUrl) allImages.push(slide.problemImageUrl);
+      if (slide.solutionImageUrl) allImages.push(slide.solutionImageUrl);
     }
 
     // Save to API
@@ -747,14 +531,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const downloadAll = useCallback(async () => {
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      const problemUrl = slide.problemOverlayUrl || slide.problemImageUrl;
-      const solutionUrl = slide.solutionOverlayUrl || slide.solutionImageUrl;
+      const problemUrl = slide.problemImageUrl;
+      const solutionUrl = slide.solutionImageUrl;
       if (problemUrl) {
         await downloadImage(problemUrl, `${carouselTitle}-slide${i + 1}-problem.png`);
         await new Promise((r) => setTimeout(r, 400));
       }
       if (solutionUrl) {
-        await downloadImage(solutionUrl, `${carouselTitle}-slide${i + 1}-solution.png`);
+        await downloadImage(solutionUrl, `${carouselTitle}-slide${i + 1}-product.png`);
         await new Promise((r) => setTimeout(r, 400));
       }
     }
@@ -784,12 +568,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   if (step === "complete" && slides.length > 0) {
     const slide = slides[currentSlide];
     const currentDisplayUrl = viewingProblem
-      ? (slide.problemOverlayUrl || slide.problemImageUrl)
-      : (slide.solutionOverlayUrl || slide.solutionImageUrl);
+      ? slide.problemImageUrl
+      : slide.solutionImageUrl;
     const currentLoading = viewingProblem ? slide.problemLoading : slide.solutionLoading;
     const currentError = viewingProblem ? slide.problemError : slide.solutionError;
-    const currentHeaderText = viewingProblem ? slide.problem.header_text : slide.solution.header_text;
-    const currentBodyText = viewingProblem ? slide.problem.body_text : slide.solution.body_text;
+    const currentText = viewingProblem ? slide.problem.problem_text : slide.solution.solution_text;
 
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.dark }}>
@@ -822,7 +605,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#E0E0E0" }}>
               {currentSlide + 1} / {slides.length}
             </span>
-            {/* Problem/Solution toggle */}
+            {/* Problem/Product toggle */}
             <button
               onClick={() => setViewingProblem(!viewingProblem)}
               className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
@@ -833,7 +616,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               }}
             >
               <span className="w-2 h-2 rounded-full" style={{ backgroundColor: viewingProblem ? "#EF4444" : "#22C55E" }} />
-              {viewingProblem ? "Problem" : "Solution"}
+              {viewingProblem ? "Problem" : "Product"}
             </button>
           </div>
 
@@ -842,7 +625,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               onClick={() =>
                 downloadImage(
                   currentDisplayUrl,
-                  `${carouselTitle}-slide${currentSlide + 1}-${viewingProblem ? "problem" : "solution"}.png`
+                  `${carouselTitle}-slide${currentSlide + 1}-${viewingProblem ? "problem" : "product"}.png`
                 )
               }
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
@@ -875,12 +658,12 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <div className="text-center">
                     <div className="w-12 h-12 rounded-full border-3 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: `${viewingProblem ? C.red : C.green}33`, borderTopColor: viewingProblem ? C.red : C.green }} />
                     <p className="text-xs font-medium" style={{ color: "#A0A0A0" }}>
-                      Generating {viewingProblem ? "problem" : "solution"} image...
+                    Generating {viewingProblem ? "problem" : "product"} image...
                     </p>
                   </div>
                 </div>
               ) : currentDisplayUrl ? (
-                <img src={currentDisplayUrl} alt={viewingProblem ? "Problem" : "Solution"} className="w-full h-full object-cover" />
+                <img src={currentDisplayUrl} alt={viewingProblem ? "Problem" : "Product"} className="w-full h-full object-cover" />
               ) : (
                 <div className="w-full h-full flex items-center justify-center p-8">
                   <div className="text-center">
@@ -907,22 +690,56 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   }}
                 >
                   <span className="w-2 h-2 rounded-full bg-white" />
-                  {viewingProblem ? "Problem" : "Solution"}
+                  {viewingProblem ? "Problem" : "Product"}
                 </div>
               )}
             </div>
 
-            {/* Slide Text Content */}
-            <div className="mt-4 px-2">
-              {currentHeaderText && (
-                <h2 className="text-lg font-black mb-2" style={{ color: C.white }}>{currentHeaderText}</h2>
-              )}
-              {currentBodyText && (
-                <p className="text-sm leading-relaxed" style={{ color: "#A0A0A0" }}>{currentBodyText}</p>
-              )}
-            </div>
+            {/* Copyable Text — user writes it their own way */}
+            {currentText && (
+              <div className="mt-4 px-2">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: viewingProblem ? "#EF4444" : "#22C55E" }}>
+                    {viewingProblem ? "Problem Text" : "Product Text"}
+                  </span>
+                  <button
+                    onClick={async () => {
+                      const ok = await copyToClipboard(currentText!);
+                      if (ok) {
+                        const btn = document.activeElement as HTMLElement;
+                        btn.dataset.copied = "1";
+                        btn.textContent = "Copied!";
+                        setTimeout(() => { btn.dataset.copied = ""; btn.textContent = "Copy"; }, 1500);
+                      }
+                    }}
+                    className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
+                    style={{ backgroundColor: `${C.pink}20`, color: C.pink, border: `1px solid ${C.pink}30` }}
+                  >
+                    Copy
+                  </button>
+                </div>
+                <div
+                  className="p-3 rounded-xl text-sm leading-relaxed font-medium cursor-pointer"
+                  style={{
+                    backgroundColor: "#1A1A1A",
+                    color: C.white,
+                    border: `1.5px solid #333333`,
+                  }}
+                  onClick={async () => {
+                    const ok = await copyToClipboard(currentText!);
+                    if (ok) {
+                      const el = document.activeElement as HTMLElement;
+                      el.style.borderColor = C.green;
+                      setTimeout(() => { el.style.borderColor = "#333333"; }, 1000);
+                    }
+                  }}
+                >
+                  {currentText}
+                </div>
+              </div>
+            )}
 
-            {/* Problem/Solution Toggle Buttons */}
+            {/* Problem/Product Toggle Buttons */}
             <div className="flex items-center gap-2 mt-4">
               <button
                 onClick={() => setViewingProblem(true)}
@@ -953,7 +770,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                   <polyline points="22 4 12 14.01 9 11.01" />
                 </svg>
-                Solution
+                Product
               </button>
             </div>
 
@@ -1179,7 +996,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5" style={{ backgroundColor: `${C.gold}18` }}>
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.gold }} />
             <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: C.gold }}>
-              AI-Powered Problem/Solution
+              AI-Powered Problem/Product
             </span>
           </div>
 
@@ -1190,7 +1007,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           </h1>
 
           <p className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style={{ color: C.textMuted }}>
-            Paste your product link, choose the number of slides, and let DeepSeek AI create stunning Problem/Solution carousels — ready to go viral.
+            Paste your product link, choose the number of slides, and let DeepSeek AI create stunning Problem/Product carousels — clean images, you add the text.
           </p>
         </div>
 
@@ -1199,7 +1016,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           {[
             { num: "1", title: "Paste Link", desc: "Add your product URL", color: C.pink },
             { num: "2", title: "AI Analyzes", desc: "DeepSeek extracts features", color: C.gold },
-            { num: "3", title: "Get Slides", desc: "Problem → Solution images", color: "#22C55E" },
+            { num: "3", title: "Get Slides", desc: "Problem → Product images", color: "#22C55E" },
           ].map((item) => (
             <div
               key={item.num}
@@ -1264,7 +1081,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </svg>
             </div>
             <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-              Product Image <span style={{ color: C.textMuted }}>(for solution slides)</span>
+              Product Image <span style={{ color: C.textMuted }}>(for product slides)</span>
             </label>
           </div>
 
@@ -1304,7 +1121,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               <div className="flex-1">
                 <p className="text-xs font-bold" style={{ color: C.green }}>Product image uploaded ✓</p>
                 <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
-                  This image will be used as reference for GPT Image to generate solution slides with your product
+                  This image will be used as reference to place your product in the product slides
                 </p>
                 <p className="text-[10px] mt-1 font-semibold" style={{ color: C.pink }}>
                   Click to change image
@@ -1365,7 +1182,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 Click or drag & drop • PNG, JPG, WebP
               </p>
               <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
-                Optional: GPT Image will use it as reference to create solution slides featuring your product
+                Optional: GPT Image will use it as reference to create product slides featuring your product
               </p>
             </div>
           )}
@@ -1404,7 +1221,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 ))}
               </div>
               <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
-                {numSlides * 2} images total (problem + solution per slide)
+                {numSlides * 2} images total (problem + product per slide)
               </p>
             </div>
 
@@ -1527,7 +1344,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 <span className="text-xs font-bold uppercase" style={{ color: "#EF4444" }}>Problem</span>
               </div>
               <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>
-                Shows the pain point WITHOUT the product. Dark tones, frustrated expressions, chaotic environment — makes your audience feel the struggle.
+                "If you are..." style image showing the pain point. Dark tones, messy environment — no faces, no text on image. You add the text yourself!
               </p>
             </div>
 
@@ -1539,7 +1356,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </svg>
             </div>
 
-            {/* Solution */}
+            {/* Product */}
             <div className="flex-1 rounded-xl p-4" style={{ backgroundColor: "rgba(34,197,94,0.06)", border: "1px dashed rgba(34,197,94,0.2)" }}>
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.15)" }}>
@@ -1548,10 +1365,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                     <polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
                 </div>
-                <span className="text-xs font-bold uppercase" style={{ color: "#22C55E" }}>Solution</span>
+                <span className="text-xs font-bold uppercase" style={{ color: "#22C55E" }}>Product</span>
               </div>
               <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>
-                Shows the result WITH the product. Bright tones, happy expressions, organized environment — gives hope and desire to buy.
+                Your product front & center with "sorry if they sold out" text. Bright tones, clean setup — no faces, no text on image. Copy & paste the text yourself!
               </p>
             </div>
           </div>
@@ -1576,8 +1393,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                 </svg>
               ),
-              title: "Problem / Solution",
-              desc: "Each slide shows the pain point then the solution — proven viral format",
+              title: "Problem / Product",
+              desc: "\"If you are...\" then product + \"sorry if they sold out\" — proven viral format",
             },
             {
               icon: (
@@ -1587,8 +1404,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
               ),
-              title: "Ready to Post",
-              desc: "Download all images as 9:16 vertical — perfect for Instagram & TikTok",
+              title: "Clean Images",
+              desc: "No AI text or faces — you write text your way. Download 9:16 vertical for Instagram & TikTok",
             },
           ].map((feature, i) => (
             <div

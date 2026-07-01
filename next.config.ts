@@ -7,6 +7,9 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
+  turbopack: {
+    root: "/home/z/my-project/repo",
+  },
 };
 
 export default nextConfig;
