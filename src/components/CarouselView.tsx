@@ -218,6 +218,22 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [savedToLibrary, setSavedToLibrary] = useState(false);
   const abortRef = useRef(false);
 
+  // ─── Text Editor States ──────────────────────────────────────────────
+  const [showTextEditor, setShowTextEditor] = useState(false);
+  const [textOverlayText, setTextOverlayText] = useState("");
+  const [textFontSize, setTextFontSize] = useState(48);
+  const [textFontColor, setTextFontColor] = useState("#FFFFFF");
+  const [textStrokeColor, setTextStrokeColor] = useState("#000000");
+  const [textStrokeWidth, setTextStrokeWidth] = useState(3);
+  const [textPosition, setTextPosition] = useState<"top" | "center" | "bottom" | "custom">("bottom");
+  const [textCustomX, setTextCustomX] = useState(50);
+  const [textCustomY, setTextCustomY] = useState(82);
+  const [textAlignment, setTextAlignment] = useState<"left" | "center" | "right">("center");
+  const [textShadow, setTextShadow] = useState(true);
+  const [textFont, setTextFont] = useState("dejavu-bold");
+  const [textApplying, setTextApplying] = useState(false);
+  const [textedImageUrl, setTextedImageUrl] = useState<string | null>(null); // The image with text applied
+
   // ─── Download helper ─────────────────────────────────────────────────
   const downloadImage = useCallback(async (imageUrl: string, filename: string) => {
     try {
@@ -244,6 +260,51 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       window.open(imageUrl, "_blank");
     }
   }, []);
+
+  // ─── Apply Text Overlay via FFmpeg ──────────────────────────────────
+  const applyTextOverlay = useCallback(async () => {
+    const slide = slides[currentSlide];
+    const baseImageUrl = viewingProblem ? slide.problemImageUrl : slide.solutionImageUrl;
+    if (!baseImageUrl || !textOverlayText.trim()) return;
+
+    setTextApplying(true);
+    try {
+      const res = await authFetch("/api/carousel/add-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl: baseImageUrl,
+          text: textOverlayText.trim(),
+          fontSize: textFontSize,
+          fontColor: textFontColor,
+          strokeColor: textStrokeColor,
+          strokeWidth: textStrokeWidth,
+          position: textPosition,
+          x: textCustomX,
+          y: textCustomY,
+          alignment: textAlignment,
+          shadow: textShadow,
+          fontFile: textFont,
+        }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ error: "Failed to apply text" }));
+        throw new Error(err.error || "Failed to apply text");
+      }
+
+      const data = await res.json();
+      if (data.image) {
+        setTextedImageUrl(data.image);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : "Failed to apply text overlay";
+      console.error("[Carousel] Text overlay error:", msg);
+      alert("Failed to apply text: " + msg);
+    } finally {
+      setTextApplying(false);
+    }
+  }, [slides, currentSlide, viewingProblem, textOverlayText, textFontSize, textFontColor, textStrokeColor, textStrokeWidth, textPosition, textCustomX, textCustomY, textAlignment, textShadow, textFont, authFetch]);
 
   // ─── Main Generation Pipeline ────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
@@ -527,6 +588,13 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     }
   }, [step, slides, savedToLibrary, saveToLibrary]);
 
+  // Reset text overlay when switching slides or problem/product
+  useEffect(() => {
+    setTextedImageUrl(null);
+    setTextOverlayText("");
+    setShowTextEditor(false);
+  }, [currentSlide, viewingProblem]);
+
   // ─── Download All ───────────────────────────────────────────────────
   const downloadAll = useCallback(async () => {
     for (let i = 0; i < slides.length; i++) {
@@ -567,9 +635,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   // ═══════════════════════════════════════════════════════════════════════
   if (step === "complete" && slides.length > 0) {
     const slide = slides[currentSlide];
-    const currentDisplayUrl = viewingProblem
+    const baseImageUrl = viewingProblem
       ? slide.problemImageUrl
       : slide.solutionImageUrl;
+    const currentDisplayUrl = textedImageUrl || baseImageUrl;
     const currentLoading = viewingProblem ? slide.problemLoading : slide.solutionLoading;
     const currentError = viewingProblem ? slide.problemError : slide.solutionError;
     const currentText = viewingProblem ? slide.problem.problem_text : slide.solution.solution_text;
@@ -695,47 +764,313 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               )}
             </div>
 
-            {/* Copyable Text — user writes it their own way */}
-            {currentText && (
+            {/* Text Editor Panel — FFmpeg overlay with full control */}
+            {currentDisplayUrl && !currentLoading && (
               <div className="mt-4 px-2">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: viewingProblem ? "#EF4444" : "#22C55E" }}>
-                    {viewingProblem ? "Problem Text" : "Product Text"}
-                  </span>
-                  <button
-                    onClick={async () => {
-                      const ok = await copyToClipboard(currentText!);
-                      if (ok) {
-                        const btn = document.activeElement as HTMLElement;
-                        btn.dataset.copied = "1";
-                        btn.textContent = "Copied!";
-                        setTimeout(() => { btn.dataset.copied = ""; btn.textContent = "Copy"; }, 1500);
-                      }
-                    }}
-                    className="px-2 py-1 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
-                    style={{ backgroundColor: `${C.pink}20`, color: C.pink, border: `1px solid ${C.pink}30` }}
-                  >
-                    Copy
-                  </button>
-                </div>
-                <div
-                  className="p-3 rounded-xl text-sm leading-relaxed font-medium cursor-pointer"
-                  style={{
-                    backgroundColor: "#1A1A1A",
-                    color: C.white,
-                    border: `1.5px solid #333333`,
-                  }}
-                  onClick={async () => {
-                    const ok = await copyToClipboard(currentText!);
-                    if (ok) {
-                      const el = document.activeElement as HTMLElement;
-                      el.style.borderColor = C.green;
-                      setTimeout(() => { el.style.borderColor = "#333333"; }, 1000);
+                {/* Toggle Text Editor */}
+                <button
+                  onClick={() => {
+                    if (!showTextEditor && !textOverlayText && currentText) {
+                      setTextOverlayText(currentText || "");
                     }
+                    setShowTextEditor(!showTextEditor);
+                  }}
+                  className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
+                  style={{
+                    backgroundColor: showTextEditor ? `${C.pink}20` : "#1A1A1A",
+                    color: showTextEditor ? C.pink : "#E0E0E0",
+                    border: `1.5px solid ${showTextEditor ? `${C.pink}40` : "#333333"}`,
                   }}
                 >
-                  {currentText}
-                </div>
+                  <span className="flex items-center gap-2">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 7 4 4 20 4 20 7" />
+                      <line x1="9" y1="20" x2="15" y2="20" />
+                      <line x1="12" y1="4" x2="12" y2="20" />
+                    </svg>
+                    {showTextEditor ? "Close Text Editor" : "Add Text Overlay"}
+                  </span>
+                  <span style={{ transform: showTextEditor ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
+                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
+                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </button>
+
+                {showTextEditor && (
+                  <div className="mt-3 space-y-3" style={{ animation: "fadeIn 0.2s ease-out" }}>
+                    {/* Text Input */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                        Text (use Enter for new line)
+                      </label>
+                      <textarea
+                        value={textOverlayText}
+                        onChange={(e) => setTextOverlayText(e.target.value)}
+                        placeholder={currentText || "Type your text here..."}
+                        rows={3}
+                        className="w-full px-3 py-2 rounded-xl text-sm font-medium resize-none outline-none transition-all duration-200"
+                        style={{
+                          backgroundColor: "#111111",
+                          color: C.white,
+                          border: "1.5px solid #333333",
+                        }}
+                        onFocus={(e) => { e.target.style.borderColor = C.pink; }}
+                        onBlur={(e) => { e.target.style.borderColor = "#333333"; }}
+                      />
+                    </div>
+
+                    {/* Font Size + Font Family Row */}
+                    <div className="flex gap-2">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                          Font Size: {textFontSize}px
+                        </label>
+                        <input
+                          type="range"
+                          min={20}
+                          max={120}
+                          value={textFontSize}
+                          onChange={(e) => setTextFontSize(Number(e.target.value))}
+                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                          style={{ background: `linear-gradient(to right, ${C.pink} ${(textFontSize - 20) / 100 * 100}%, #333333 ${(textFontSize - 20) / 100 * 100}%)` }}
+                        />
+                      </div>
+                      <div className="w-32">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                          Font
+                        </label>
+                        <select
+                          value={textFont}
+                          onChange={(e) => setTextFont(e.target.value)}
+                          className="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none"
+                          style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
+                        >
+                          <option value="dejavu-bold">DejaVu Bold</option>
+                          <option value="dejavu-regular">DejaVu Regular</option>
+                          <option value="tinos-bold">Tinos Bold</option>
+                          <option value="tinos-regular">Tinos Regular</option>
+                          <option value="carlito-bold">Carlito Bold</option>
+                          <option value="carlito-regular">Carlito Regular</option>
+                          <option value="noto-sans-sc">Noto Sans SC</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Colors Row */}
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                          Text Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={textFontColor}
+                            onChange={(e) => setTextFontColor(e.target.value)}
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
+                            style={{ backgroundColor: "transparent" }}
+                          />
+                          <input
+                            type="text"
+                            value={textFontColor}
+                            onChange={(e) => setTextFontColor(e.target.value)}
+                            className="flex-1 px-2 py-1 rounded-lg text-[11px] font-mono outline-none"
+                            style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
+                          />
+                        </div>
+                      </div>
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                          Stroke Color
+                        </label>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="color"
+                            value={textStrokeColor}
+                            onChange={(e) => setTextStrokeColor(e.target.value)}
+                            className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
+                            style={{ backgroundColor: "transparent" }}
+                          />
+                          <input
+                            type="text"
+                            value={textStrokeColor}
+                            onChange={(e) => setTextStrokeColor(e.target.value)}
+                            className="flex-1 px-2 py-1 rounded-lg text-[11px] font-mono outline-none"
+                            style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Stroke Width + Shadow Row */}
+                    <div className="flex gap-3">
+                      <div className="flex-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                          Stroke Width: {textStrokeWidth}px
+                        </label>
+                        <input
+                          type="range"
+                          min={0}
+                          max={10}
+                          value={textStrokeWidth}
+                          onChange={(e) => setTextStrokeWidth(Number(e.target.value))}
+                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                          style={{ background: `linear-gradient(to right, ${C.pink} ${textStrokeWidth * 10}%, #333333 ${textStrokeWidth * 10}%)` }}
+                        />
+                      </div>
+                      <div className="flex items-end pb-1">
+                        <button
+                          onClick={() => setTextShadow(!textShadow)}
+                          className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
+                          style={{
+                            backgroundColor: textShadow ? `${C.pink}20` : "#111111",
+                            color: textShadow ? C.pink : "#666666",
+                            border: `1.5px solid ${textShadow ? `${C.pink}40` : "#333333"}`,
+                          }}
+                        >
+                          Shadow {textShadow ? "ON" : "OFF"}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Position Presets */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                        Position
+                      </label>
+                      <div className="flex gap-1.5">
+                        {(["top", "center", "bottom", "custom"] as const).map((pos) => (
+                          <button
+                            key={pos}
+                            onClick={() => setTextPosition(pos)}
+                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
+                            style={{
+                              backgroundColor: textPosition === pos ? `${C.pink}20` : "#111111",
+                              color: textPosition === pos ? C.pink : "#666666",
+                              border: `1.5px solid ${textPosition === pos ? `${C.pink}40` : "#333333"}`,
+                            }}
+                          >
+                            {pos}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Custom X/Y Sliders (only when "custom" position) */}
+                    {textPosition === "custom" && (
+                      <div className="flex gap-3">
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                            X: {textCustomX}%
+                          </label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={textCustomX}
+                            onChange={(e) => setTextCustomX(Number(e.target.value))}
+                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                            style={{ background: `linear-gradient(to right, ${C.pink} ${textCustomX}%, #333333 ${textCustomX}%)` }}
+                          />
+                        </div>
+                        <div className="flex-1">
+                          <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                            Y: {textCustomY}%
+                          </label>
+                          <input
+                            type="range"
+                            min={0}
+                            max={100}
+                            value={textCustomY}
+                            onChange={(e) => setTextCustomY(Number(e.target.value))}
+                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
+                            style={{ background: `linear-gradient(to right, ${C.pink} ${textCustomY}%, #333333 ${textCustomY}%)` }}
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Alignment */}
+                    <div>
+                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
+                        Alignment
+                      </label>
+                      <div className="flex gap-1.5">
+                        {(["left", "center", "right"] as const).map((al) => (
+                          <button
+                            key={al}
+                            onClick={() => setTextAlignment(al)}
+                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
+                            style={{
+                              backgroundColor: textAlignment === al ? `${C.pink}20` : "#111111",
+                              color: textAlignment === al ? C.pink : "#666666",
+                              border: `1.5px solid ${textAlignment === al ? `${C.pink}40` : "#333333"}`,
+                            }}
+                          >
+                            {al}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Apply / Reset Buttons */}
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        onClick={applyTextOverlay}
+                        disabled={textApplying || !textOverlayText.trim()}
+                        className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 disabled:opacity-30"
+                        style={{
+                          background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                          color: C.white,
+                        }}
+                      >
+                        {textApplying ? (
+                          <span className="flex items-center justify-center gap-2">
+                            <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${C.white}44`, borderTopColor: C.white }} />
+                            Applying...
+                          </span>
+                        ) : (
+                          <span className="flex items-center justify-center gap-1.5">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                              <polyline points="20 6 9 17 4 12" />
+                            </svg>
+                            Apply Text
+                          </span>
+                        )}
+                      </button>
+                      {textedImageUrl && (
+                        <button
+                          onClick={() => setTextedImageUrl(null)}
+                          className="px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
+                          style={{ backgroundColor: "#1A1A1A", color: "#EF4444", border: "1.5px solid rgba(220,38,38,0.4)" }}
+                        >
+                          Reset
+                        </button>
+                      )}
+                    </div>
+
+                    {/* Quick text suggestions */}
+                    {currentText && !textOverlayText && (
+                      <div className="pt-1">
+                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#555555" }}>
+                          Suggested text — tap to use
+                        </label>
+                        <button
+                          onClick={() => setTextOverlayText(currentText)}
+                          className="w-full px-3 py-2 rounded-xl text-xs text-left font-medium transition-all duration-200"
+                          style={{
+                            backgroundColor: "#111111",
+                            color: "#AAAAAA",
+                            border: "1px dashed #333333",
+                          }}
+                        >
+                          {currentText}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
