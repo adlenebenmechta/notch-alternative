@@ -140,6 +140,14 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [libraryPublishing, setLibraryPublishing] = useState<string | null>(null);
   const [monitoringPostId, setMonitoringPostId] = useState<string | null>(null);
   const [libraryAccountId, setLibraryAccountId] = useState("");
+  // Library publish form state
+  const [libSelectedVideo, setLibSelectedVideo] = useState<LibraryVideo | null>(null);
+  const [libCaption, setLibCaption] = useState("");
+  const [libHashtags, setLibHashtags] = useState("fyp, viral, ai");
+  const [libMusicTitle, setLibMusicTitle] = useState("");
+  const [libAutoCaption, setLibAutoCaption] = useState(false);
+  const [libScheduledAt, setLibScheduledAt] = useState("");
+  const [libPublishing, setLibPublishing] = useState(false);
 
   // ─── Fetch Library Videos ──────────────────────────────────────────────────
   const { authFetch } = useAuth();
@@ -156,7 +164,69 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
     }
   }, [authFetch]);
 
-  // ─── Publish Library Video ─────────────────────────────────────────────────
+  // ─── Publish from Library Form ─────────────────────────────────────────────
+  const handlePublishFromLibraryForm = async () => {
+    if (!libSelectedVideo) {
+      alert("Please select a video from your library first");
+      return;
+    }
+    setLibPublishing(true);
+    try {
+      const isImage = libSelectedVideo.provider === "carousel" || libSelectedVideo.videoUrl.match(/\.(jpg|jpeg|png|webp)$/i);
+      const endpoint = isImage ? "/api/autopublish/publish-carousel" : "/api/autopublish/publish";
+      const hashtags = libHashtags
+        .split(",")
+        .map((t) => t.trim().replace(/^#/, ""))
+        .filter(Boolean);
+
+      const body = isImage
+        ? {
+            imageUrls: [libSelectedVideo.videoUrl],
+            caption: libAutoCaption ? undefined : (libCaption || libSelectedVideo.title),
+            hashtags,
+            musicTitle: libMusicTitle || undefined,
+            aiDescription: libSelectedVideo.title,
+            externalId: `library_form_${libSelectedVideo.id}`,
+            accountId: libraryAccountId || undefined,
+            scheduledAt: libScheduledAt || undefined,
+            autoCaption: libAutoCaption,
+          }
+        : {
+            videoUrl: libSelectedVideo.videoUrl,
+            caption: libAutoCaption ? undefined : (libCaption || libSelectedVideo.title),
+            hashtags,
+            musicTitle: libMusicTitle || undefined,
+            aiDescription: libSelectedVideo.title,
+            externalId: `library_form_${libSelectedVideo.id}`,
+            accountId: libraryAccountId || undefined,
+            scheduledAt: libScheduledAt || undefined,
+            autoCaption: libAutoCaption,
+          };
+
+      const response = await fetch(endpoint, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+      });
+      const data = await response.json();
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+      } else {
+        setLibCaption("");
+        setLibMusicTitle("");
+        setLibScheduledAt("");
+        setLibAutoCaption(false);
+        setMonitoringPostId(data.postId);
+        fetchData();
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setLibPublishing(false);
+    }
+  };
+
+  // ─── Publish Library Video (quick publish from card) ──────────────────────
   const handlePublishLibraryVideo = async (video: LibraryVideo) => {
     setLibraryPublishing(video.id);
     try {
@@ -875,6 +945,195 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
               >
                 🔄 Refresh
               </button>
+            </div>
+
+            {/* ─── Publish New from Library ────────────────────────────── */}
+            <div
+              className="rounded-xl p-4 mb-4"
+              style={{
+                backgroundColor: C.cream,
+                border: `1.5px solid ${C.pink}40`,
+              }}
+            >
+              <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>
+                🚀 Publish New to TikTok
+              </h3>
+
+              {/* Step 1: Select video from library */}
+              <div className="mb-3">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                  Step 1: Select Video from Library *
+                </label>
+                {libraryVideos.length === 0 ? (
+                  <p className="text-xs italic" style={{ color: C.textMuted }}>
+                    No videos in library. Generate AI videos or carousels first.
+                  </p>
+                ) : (
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-40 overflow-y-auto">
+                    {libraryVideos.map((v) => {
+                      const isSelected = libSelectedVideo?.id === v.id;
+                      const isImg = v.provider === "carousel" || v.videoUrl.match(/\.(jpg|jpeg|png|webp)$/i);
+                      return (
+                        <button
+                          key={v.id}
+                          onClick={() => setLibSelectedVideo(v)}
+                          className="p-2 rounded-lg text-left transition-all"
+                          style={{
+                            backgroundColor: isSelected ? `${C.pink}20` : C.white,
+                            border: `1.5px solid ${isSelected ? C.pink : C.cardBorder}`,
+                          }}
+                        >
+                          <div className="flex items-center gap-2">
+                            <div className="w-10 h-10 rounded overflow-hidden flex-shrink-0 bg-gray-200">
+                              {(v.thumbnailUrl || (isImg ? v.videoUrl : null)) ? (
+                                <img src={v.thumbnailUrl || v.videoUrl} alt="" className="w-full h-full object-cover" />
+                              ) : (
+                                <div className="w-full h-full flex items-center justify-center text-base">🎬</div>
+                              )}
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <div className="text-[10px] font-semibold truncate" style={{ color: C.text }}>
+                                {v.title}
+                              </div>
+                              <div className="text-[8px]" style={{ color: C.textMuted }}>
+                                {isImg ? "🖼 Photo" : "🎬 Video"} · {v.provider}
+                              </div>
+                            </div>
+                          </div>
+                        </button>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Step 2: Account selection */}
+              <div className="mb-3">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                  Step 2: TikTok Account
+                </label>
+                <select
+                  value={libraryAccountId}
+                  onChange={(e) => setLibraryAccountId(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                  style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                >
+                  <option value="">Auto (first active account)</option>
+                  {accounts.map((acc) => (
+                    <option key={acc.id} value={acc.blotatoId}>
+                      @{acc.username || acc.displayName || "unknown"} ({acc._count.posts} posts)
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Step 3: Auto caption toggle */}
+              <div className="mb-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={libAutoCaption}
+                    onChange={(e) => setLibAutoCaption(e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <span className="text-xs font-semibold" style={{ color: C.text }}>
+                    ✨ Auto-generate caption with AI
+                  </span>
+                </label>
+                <p className="text-[10px] mt-1 ml-6" style={{ color: C.textMuted }}>
+                  Uses AI to write an engaging caption automatically based on video title
+                </p>
+              </div>
+
+              {/* Step 4: Caption (if not auto) */}
+              {!libAutoCaption && (
+                <div className="mb-3">
+                  <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                    Step 4: Caption
+                  </label>
+                  <textarea
+                    value={libCaption}
+                    onChange={(e) => setLibCaption(e.target.value)}
+                    placeholder={libSelectedVideo ? `Default: ${libSelectedVideo.title}` : "Write an engaging caption..."}
+                    rows={2}
+                    className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none resize-none"
+                    style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                  />
+                </div>
+              )}
+
+              {/* Step 5: Hashtags */}
+              <div className="mb-3">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                  Step 5: Hashtags (comma-separated)
+                </label>
+                <input
+                  type="text"
+                  value={libHashtags}
+                  onChange={(e) => setLibHashtags(e.target.value)}
+                  placeholder="fyp, viral, ai, trending"
+                  className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                  style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                />
+              </div>
+
+              {/* Step 6: Music title */}
+              <div className="mb-3">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                  Step 6: Music Title (optional)
+                </label>
+                <input
+                  type="text"
+                  value={libMusicTitle}
+                  onChange={(e) => setLibMusicTitle(e.target.value)}
+                  placeholder="Trending Song Name"
+                  className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                  style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                />
+              </div>
+
+              {/* Step 7: Schedule */}
+              <div className="mb-4">
+                <label className="block text-[10px] font-bold uppercase tracking-wide mb-1.5" style={{ color: C.textMuted }}>
+                  Step 7: Schedule (optional - leave empty to publish now)
+                </label>
+                <input
+                  type="datetime-local"
+                  value={libScheduledAt}
+                  onChange={(e) => setLibScheduledAt(e.target.value)}
+                  className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
+                  style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
+                />
+              </div>
+
+              {/* Publish button */}
+              <button
+                onClick={handlePublishFromLibraryForm}
+                disabled={libPublishing || !libSelectedVideo}
+                className="w-full py-3 rounded-xl text-sm font-bold uppercase tracking-wide transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100"
+                style={{
+                  background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                  color: C.white,
+                }}
+              >
+                {libPublishing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Processing...
+                  </span>
+                ) : libScheduledAt ? (
+                  "📅 Schedule Post"
+                ) : (
+                  "🚀 Publish Now"
+                )}
+              </button>
+            </div>
+
+            {/* ─── Quick Publish Section ───────────────────────────────── */}
+            <div className="mb-2">
+              <h3 className="text-sm font-bold mb-2" style={{ color: C.text }}>
+                ⚡ Quick Publish (one click per video)
+              </h3>
             </div>
 
             {libraryLoading ? (
