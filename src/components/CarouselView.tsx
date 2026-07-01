@@ -847,11 +847,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                           style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
                         >
                           <option value="dejavu-bold">DejaVu Bold</option>
-                          <option value="dejavu-regular">DejaVu Regular</option>
+                          
                           <option value="tinos-bold">Tinos Bold</option>
-                          <option value="tinos-regular">Tinos Regular</option>
+                          
                           <option value="carlito-bold">Carlito Bold</option>
-                          <option value="carlito-regular">Carlito Regular</option>
+                          
                           <option value="noto-sans-sc">Noto Sans SC</option>
                         </select>
                       </div>

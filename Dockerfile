@@ -2,7 +2,7 @@ FROM node:20-alpine AS base
 
 # Install FFmpeg and font dependencies in base image
 # harfbuzz is needed for text shaping in FFmpeg drawtext
-RUN apk add --no-cache ffmpeg fontconfig freetype harfbuzz
+RUN apk add --no-cache ffmpeg fontconfig freetype harfbuzz font-dejavu
 
 # Install dependencies only when needed
 FROM base AS deps
@@ -29,12 +29,13 @@ FROM base AS runner
 WORKDIR /app
 ENV NODE_ENV production
 
-# Install FFmpeg and fonts in production image
+# Install FFmpeg, fonts, and all font dependencies in production image
+# font-dejavu provides DejaVu Sans/Serif/Mono fonts for FFmpeg drawtext
 # harfbuzz is needed for text shaping in FFmpeg drawtext
-RUN apk add --no-cache ffmpeg fontconfig freetype harfbuzz
+RUN apk add --no-cache ffmpeg fontconfig freetype harfbuzz font-dejavu font-noto font-noto-cjk
 
-# Copy Poppins Bold font and register it
-COPY --from=builder /app/public/fonts/Poppins-Bold.ttf /usr/share/fonts/truetype/custom/Poppins-Bold.ttf
+# Copy custom fonts from builder and register them
+COPY --from=builder /app/public/fonts/ /usr/share/fonts/truetype/custom/
 RUN fc-cache -f
 
 # Copy Prisma files for runtime DB migrations

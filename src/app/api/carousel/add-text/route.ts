@@ -32,17 +32,43 @@ interface TextOverlayParams {
   alignment?: "left" | "center" | "right"; // Text alignment (default: "center")
 }
 
-// Available fonts on the server
-const FONTS: Record<string, string> = {
-  "dejavu-bold": "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-  "dejavu-regular": "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-  "tinos-bold": "/usr/share/fonts/truetype/english/Tinos-Bold.ttf",
-  "tinos-regular": "/usr/share/fonts/truetype/english/Tinos-Regular.ttf",
-  "carlito-bold": "/usr/share/fonts/truetype/english/Carlito-Bold.ttf",
-  "carlito-regular": "/usr/share/fonts/truetype/english/Carlito-Regular.ttf",
-  "liberation": "/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf",
-  "noto-sans-sc": "/usr/share/fonts/truetype/chinese/NotoSansSC[wght].ttf",
+// Available fonts — resolve dynamically via fc-list for Docker/Alpine compatibility
+// Fallback paths for both Debian (local dev) and Alpine (Docker/Railway)
+const FONTS: Record<string, string[]> = {
+  "dejavu-bold": [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans-Bold.ttf",
+  ],
+  "dejavu-regular": [
+    "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+    "/usr/share/fonts/TTF/DejaVuSans.ttf",
+  ],
+  "tinos-bold": [
+    "/usr/share/fonts/truetype/english/Tinos-Bold.ttf",
+    "/usr/share/fonts/TTF/Tinos-Bold.ttf",
+  ],
+  "carlito-bold": [
+    "/usr/share/fonts/truetype/english/Carlito-Bold.ttf",
+    "/usr/share/fonts/TTF/Carlito-Bold.ttf",
+  ],
+  "noto-sans-sc": [
+    "/usr/share/fonts/truetype/chinese/NotoSansSC[wght].ttf",
+    "/usr/share/fonts/noto-cjk/NotoSansCJK-Regular.ttc",
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",
+  ],
+  "poppins-bold": [
+    "/usr/share/fonts/truetype/custom/Poppins-Bold.ttf",
+  ],
 };
+
+function resolveFont(fontName: string): string {
+  const candidates = FONTS[fontName] || FONTS["dejavu-bold"];
+  for (const path of candidates) {
+    if (existsSync(path)) return path;
+  }
+  // Last resort: return first candidate and let FFmpeg handle the error
+  return candidates[0];
+}
 
 function escapeFFmpegText(text: string): string {
   return text
@@ -151,7 +177,7 @@ export async function POST(request: NextRequest) {
       }
 
       // Step 4: Resolve font path
-      const resolvedFont = FONTS[fontFile] || FONTS["dejavu-bold"];
+      const resolvedFont = resolveFont(fontFile);
 
       // Step 5: Build FFmpeg drawtext filter
       // Handle multiline text — split by \n and create multiple drawtext filters
