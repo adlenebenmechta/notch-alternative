@@ -1377,7 +1377,24 @@ export default function MainMenu({
       ),
       accentColor: "#8B5CF6",
     },
-  ];
+  ,
+    {
+      id: "autopublish-machine",
+      title: "Auto-Publish Machine",
+      subtitle: "Schedule & Publish to TikTok",
+      description: "Auto-publish your AI videos to TikTok at the best times. Connect multiple accounts, schedule posts, and track analytics.",
+      icon: (
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#FF0050" strokeWidth="2.5" fill="none" />
+          <path d="M18 18l8 4-8 4V18z" fill="#FF0050" opacity="0.8" />
+          <path d="M4 40h40" stroke="#FF0050" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="38" cy="14" r="6" fill="#25F4EE" opacity="0.2" />
+          <path d="M36 12l4 4m0-4l-4 4" stroke="#25F4EE" strokeWidth="2" strokeLinecap="round" />
+          <path d="M14 4l3 3m0-3l-3 3" stroke="#FF0050" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      ),
+      accentColor: "#FF0050",
+    }];
 
   return (
     <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: "var(--font-etna), 'Etna', sans-serif" }}>
@@ -1595,7 +1612,8 @@ export default function MainMenu({
                 const isBofCard = !item.disabled && item.id === "bof-videos-machine";
                 const isClaymotionCard = !item.disabled && item.id === "claymotion-videos-machine";
                 const isAllInOneCard = !item.disabled && item.id === "allinone-machine";
-                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard;
+                const isAutoPublishCard = !item.disabled && item.id === "autopublish-machine";
+                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard || isAutoPublishCard;
                 const isHovered = activeCard === index && !item.disabled;
                 return (
                 <div
