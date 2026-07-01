@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import path from "path";
 
 const nextConfig: NextConfig = {
   output: "standalone",
@@ -8,7 +9,8 @@ const nextConfig: NextConfig = {
   },
   reactStrictMode: false,
   turbopack: {
-    root: "/home/z/my-project/repo",
+    // Use current working directory (works in both local dev and Docker/Railway)
+    root: process.cwd(),
   },
 };
 
