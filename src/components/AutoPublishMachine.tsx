@@ -647,12 +647,36 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   };
 
   const handleDelete = async (postId: string) => {
-    if (!confirm("Delete this post?")) return;
+    // Find the post to check its status
+    const post = posts.find((p) => p.id === postId);
+    const isPublished = post?.status === "PUBLISHED";
+
+    let confirmMsg = "Delete this post?\n\n";
+    if (isPublished) {
+      confirmMsg = "⚠️ WARNING: This post is ALREADY PUBLISHED on TikTok.\n\n";
+      confirmMsg += "Deleting will ONLY remove it from your dashboard.\n";
+      confirmMsg += "The post will REMAIN on TikTok.\n\n";
+      confirmMsg += "To remove it from TikTok, you MUST delete it manually:\n";
+      confirmMsg += "  1. Open TikTok app on your phone\n";
+      confirmMsg += "  2. Go to your profile\n";
+      confirmMsg += "  3. Find the post → tap ⋮ → Delete\n\n";
+      confirmMsg += "Continue deleting from dashboard?";
+    } else {
+      confirmMsg += "This post is not yet published. It will be cancelled on Blotato and removed from your dashboard.\n\nContinue?";
+    }
+
+    if (!confirm(confirmMsg)) return;
     try {
-      await fetch(`/api/autopublish/posts/${postId}`, { method: "DELETE" });
-      fetchData();
+      const res = await fetch(`/api/autopublish/posts/${postId}`, { method: "DELETE" });
+      const data = await res.json();
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+      } else {
+        fetchData();
+      }
     } catch (err) {
       console.error(err);
+      alert("Failed to delete post");
     }
   };
 
