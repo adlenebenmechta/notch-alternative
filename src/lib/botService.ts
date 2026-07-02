@@ -26,7 +26,146 @@ export interface BotTaskResult {
 }
 
 /**
- * Parse a natural language command using AI
+ * Simple keyword-based parser (fallback when AI is unavailable)
+ */
+function simpleParse(command: string): ParsedCommand {
+  const cmd = command.toLowerCase().trim();
+  
+  // Help
+  if (cmd === 'help' || cmd.includes('what can you')) {
+    return {
+      action: 'help',
+      rawCommand: command,
+      explanation: 'Showing help information.',
+    };
+  }
+  
+  // List
+  if (cmd === 'list' || cmd.includes('show tasks') || cmd.includes('my tasks')) {
+    return {
+      action: 'list',
+      rawCommand: command,
+      explanation: 'Listing your recent bot tasks.',
+    };
+  }
+  
+  // Auto-publish new
+  if (cmd.includes('auto publish') || cmd.includes('auto-publish') || cmd.includes('automate')) {
+    let recurring: 'daily' | 'weekly' | 'hourly' | undefined;
+    let time: string | undefined;
+    if (cmd.includes('daily') || cmd.includes('every day')) { recurring = 'daily'; }
+    if (cmd.includes('weekly') || cmd.includes('every week')) { recurring = 'weekly'; }
+    if (cmd.includes('hourly') || cmd.includes('every hour')) { recurring = 'hourly'; }
+    
+    // Extract time (e.g., "8pm", "20:00", "at 8")
+    const timeMatch = cmd.match(/(\d{1,2})\s*(am|pm)?/);
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1]);
+      if (timeMatch[2]?.toLowerCase() === 'pm' && hour < 12) hour += 12;
+      if (timeMatch[2]?.toLowerCase() === 'am' && hour === 12) hour = 0;
+      time = `${hour.toString().padStart(2, '0')}:00`;
+    }
+    
+    return {
+      action: 'auto_publish_new',
+      recurring,
+      recurringTime: time || '12:00',
+      rawCommand: command,
+      explanation: `Setting up auto-publish automation${recurring ? ` ${recurring} at ${time || '12:00'}` : ' for new content'}.`,
+    };
+  }
+  
+  // Bulk publish
+  if (cmd.includes('bulk') || cmd.includes('batch')) {
+    const countMatch = cmd.match(/(\d+)\s*video/);
+    const count = countMatch ? parseInt(countMatch[1]) : 3;
+    return {
+      action: 'bulk_publish',
+      count,
+      rawCommand: command,
+      explanation: `Bulk publishing ${count} videos with 2-hour intervals.`,
+    };
+  }
+  
+  // Schedule
+  if (cmd.includes('schedule') || cmd.includes('tomorrow') || cmd.includes('next week') || cmd.includes('monday') || cmd.includes('tuesday') || cmd.includes('friday')) {
+    let scheduledAt: string | undefined;
+    const now = new Date();
+    
+    if (cmd.includes('tomorrow')) {
+      scheduledAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString();
+    } else if (cmd.includes('next week')) {
+      scheduledAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000).toISOString();
+    } else if (cmd.includes('in ') && cmd.includes('hour')) {
+      const hourMatch = cmd.match(/in\s+(\d+)\s*hour/);
+      const hours = hourMatch ? parseInt(hourMatch[1]) : 2;
+      scheduledAt = new Date(now.getTime() + hours * 60 * 60 * 1000).toISOString();
+    } else {
+      // Default: 2 hours from now
+      scheduledAt = new Date(now.getTime() + 2 * 60 * 60 * 1000).toISOString();
+    }
+    
+    // Try to extract time (e.g., "8pm")
+    const timeMatch = cmd.match(/(\d{1,2})\s*(am|pm)/);
+    if (timeMatch) {
+      let hour = parseInt(timeMatch[1]);
+      if (timeMatch[2]?.toLowerCase() === 'pm' && hour < 12) hour += 12;
+      if (timeMatch[2]?.toLowerCase() === 'am' && hour === 12) hour = 0;
+      const date = new Date(scheduledAt);
+      date.setHours(hour, 0, 0, 0);
+      scheduledAt = date.toISOString();
+    }
+    
+    const countMatch = cmd.match(/(\d+)\s*video/);
+    const count = countMatch ? parseInt(countMatch[1]) : 1;
+    
+    return {
+      action: 'schedule',
+      count,
+      scheduledAt,
+      rawCommand: command,
+      explanation: `Scheduling ${count} video(s) for ${new Date(scheduledAt).toLocaleString()}.`,
+    };
+  }
+  
+  // Publish now
+  if (cmd.includes('publish') || cmd.includes('post') || cmd.includes('share')) {
+    const countMatch = cmd.match(/(\d+)\s*video/);
+    const count = countMatch ? parseInt(countMatch[1]) : 1;
+    
+    // Check for specific title (in quotes)
+    const titleMatch = command.match(/[""']([^""']+)[""']/);
+    const videoTitle = titleMatch ? titleMatch[1] : undefined;
+    
+    // Check for "all"
+    if (cmd.includes('all')) {
+      return {
+        action: 'publish_now',
+        count: 99, // publish all
+        videoTitle,
+        rawCommand: command,
+        explanation: `Publishing all videos from your library to TikTok now.`,
+      };
+    }
+    
+    return {
+      action: 'publish_now',
+      count,
+      videoTitle,
+      rawCommand: command,
+      explanation: `Publishing ${count} video(s) to TikTok now.`,
+    };
+  }
+  
+  return {
+    action: 'unknown',
+    rawCommand: command,
+    explanation: 'Sorry, I could not understand that command. Type "help" for available commands.',
+  };
+}
+
+/**
+ * Parse a natural language command using AI (with fallback to simple parser)
  */
 export async function parseCommand(command: string, libraryVideos: any[]): Promise<ParsedCommand> {
   try {
@@ -101,12 +240,9 @@ Rules:
       rawCommand: command,
     };
   } catch (err: any) {
-    console.error('[Bot] Parse error:', err);
-    return {
-      action: 'unknown',
-      rawCommand: command,
-      explanation: 'Sorry, I could not parse that command. Try: "publish 2 videos" or "schedule my carousel for tomorrow 8pm"',
-    };
+    console.error('[Bot] AI parse error, falling back to simple parser:', err.message);
+    // Fallback to simple keyword-based parser
+    return simpleParse(command);
   }
 }
 
