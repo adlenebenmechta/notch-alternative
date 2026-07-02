@@ -318,6 +318,56 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     }
   }, [slides, currentSlide, viewingProblem, textOverlayText, textFontSize, textFontColor, textStrokeColor, textStrokeWidth, textPosition, textCustomX, textCustomY, textAlignment, textShadow, textFont, authFetch]);
 
+  // ─── Ensure texted image is available for a given slide ───────────────
+  // If the texted image is already in the cache, return it.
+  // Otherwise, call /api/carousel/add-text to render text onto the image.
+  const ensureTextedImage = useCallback(async (
+    slideIndex: number,
+    type: "problem" | "solution"
+  ): Promise<string | null> => {
+    const cacheKey = `${slideIndex}-${type}`;
+    const cached = textedImageCacheRef.current.get(cacheKey);
+    if (cached) return cached;
+
+    const slide = slides[slideIndex];
+    if (!slide) return null;
+
+    const imageUrl = type === "problem" ? slide.problemImageUrl : slide.solutionImageUrl;
+    const text = type === "problem" ? slide.problem.problem_text : slide.solution.solution_text;
+
+    if (!imageUrl || !text) return imageUrl || null;
+
+    try {
+      const res = await authFetch("/api/carousel/add-text", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          imageUrl,
+          text,
+          fontSize: 48,
+          fontColor: "#FFFFFF",
+          strokeColor: "#000000",
+          strokeWidth: 3,
+          position: "bottom",
+          alignment: "center",
+          shadow: true,
+          fontFile: "dejavu-bold",
+        }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.image) {
+          textedImageCacheRef.current.set(cacheKey, data.image);
+          textContentCacheRef.current.set(cacheKey, text);
+          return data.image;
+        }
+      }
+    } catch (e) {
+      console.warn(`[Carousel] ensureTextedImage failed for slide ${slideIndex} ${type}:`, e);
+    }
+    return imageUrl;
+  }, [slides, authFetch]);
+
   // ─── Main Generation Pipeline ────────────────────────────────────────
   const handleGenerate = useCallback(async () => {
     if (!productUrl.trim()) return;
@@ -745,11 +795,48 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
     for (const slide of readySlides) {
       try {
+        // Use texted images from cache when available
+        const slideIdx = slides.indexOf(slide);
+        const textedProblem = slideIdx >= 0 ? textedImageCacheRef.current.get(`${slideIdx}-problem`) : null;
+        const textedSolution = slideIdx >= 0 ? textedImageCacheRef.current.get(`${slideIdx}-solution`) : null;
+        let problemUrl = textedProblem || slide.problemImageUrl!;
+        let solutionUrl = textedSolution || slide.solutionImageUrl!;
+
+        // Upload data URLs to get persistent HTTP URLs (TikTok API requires HTTP)
+        if (problemUrl.startsWith("data:")) {
+          try {
+            const blob = await (await fetch(problemUrl)).blob();
+            const file = new File([blob], `texted_problem_${slide.slide_number}.png`, { type: "image/png" });
+            const fd = new FormData();
+            fd.append("avatar", file);
+            const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+            const upData = await upRes.json();
+            if (upData.success && upData.avatarUrl) problemUrl = upData.avatarUrl;
+          } catch (e) {
+            console.warn("[Carousel] Upload texted problem failed, using original:", e);
+            problemUrl = slide.problemImageUrl!;
+          }
+        }
+        if (solutionUrl.startsWith("data:")) {
+          try {
+            const blob = await (await fetch(solutionUrl)).blob();
+            const file = new File([blob], `texted_solution_${slide.slide_number}.png`, { type: "image/png" });
+            const fd = new FormData();
+            fd.append("avatar", file);
+            const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+            const upData = await upRes.json();
+            if (upData.success && upData.avatarUrl) solutionUrl = upData.avatarUrl;
+          } catch (e) {
+            console.warn("[Carousel] Upload texted solution failed, using original:", e);
+            solutionUrl = slide.solutionImageUrl!;
+          }
+        }
+
         await fetch("/api/autopublish/publish-carousel", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            imageUrls: [slide.problemImageUrl, slide.solutionImageUrl],
+            imageUrls: [problemUrl, solutionUrl],
             caption: `${carouselTitle} - Slide ${slide.slide_number} 🔥`,
             hashtags: ["fyp", "viral", "carousel", "ai"],
             aiDescription: `Slide ${slide.slide_number}`,
@@ -868,9 +955,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 slideNumber={slides[currentSlide].slide_number}
                 problemImageUrl={slides[currentSlide].problemImageUrl}
                 solutionImageUrl={slides[currentSlide].solutionImageUrl}
+                textedProblemUrl={textedImageCacheRef.current.get(`${currentSlide}-problem`) || null}
+                textedSolutionUrl={textedImageCacheRef.current.get(`${currentSlide}-solution`) || null}
+                problemText={slides[currentSlide].problem.problem_text}
+                solutionText={slides[currentSlide].solution.solution_text}
                 carouselTitle={carouselTitle}
                 autoPublish={autoPublishTikTok}
                 onPublishStateChange={handlePublishStateChange}
+                authFetch={authFetch}
               />
             </div>
           )}

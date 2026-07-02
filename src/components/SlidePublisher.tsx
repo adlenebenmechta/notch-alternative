@@ -23,12 +23,80 @@ interface SlidePublisherProps {
   slideNumber: number;
   problemImageUrl: string | null;
   solutionImageUrl: string | null;
+  /** Pre-rendered image URLs with text overlay (data URLs or HTTP URLs) */
+  textedProblemUrl?: string | null;
+  textedSolutionUrl?: string | null;
+  /** Text to overlay if texted URLs are not available yet */
+  problemText?: string | null;
+  solutionText?: string | null;
   carouselTitle: string;
   autoPublish: boolean;
   onPublishStateChange?: (slideNumber: number, state: PublishState) => void;
+  /** Optional authFetch for calling add-text API */
+  authFetch?: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 type PublishState = "idle" | "publishing" | "published" | "failed";
+
+// ─── Upload a base64 data URL to get a persistent HTTP URL ────────────────
+async function uploadDataUrlToPersistent(dataUrl: string): Promise<string> {
+  // If it's already an HTTP URL, return as-is
+  if (dataUrl.startsWith("http")) return dataUrl;
+
+  // Convert data URL to a File and upload via /api/upload-avatar
+  const res = await fetch(dataUrl);
+  const blob = await res.blob();
+  const file = new File([blob], `texted_${Date.now()}.png`, { type: "image/png" });
+
+  const formData = new FormData();
+  formData.append("avatar", file);
+
+  const uploadRes = await fetch("/api/upload-avatar", {
+    method: "POST",
+    body: formData,
+  });
+
+  const uploadData = await uploadRes.json();
+  if (!uploadData.success || !uploadData.avatarUrl) {
+    throw new Error("Failed to upload texted image: " + (uploadData.error || "unknown"));
+  }
+
+  return uploadData.avatarUrl;
+}
+
+// ─── Apply text overlay via server API ────────────────────────────────────
+async function applyTextOverlay(
+  imageUrl: string,
+  text: string,
+  authFetchFn?: (url: string, options?: RequestInit) => Promise<Response>
+): Promise<string | null> {
+  const fetchFn = authFetchFn || fetch.bind(window);
+  try {
+    const res = await fetchFn("/api/carousel/add-text", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageUrl,
+        text,
+        fontSize: 48,
+        fontColor: "#FFFFFF",
+        strokeColor: "#000000",
+        strokeWidth: 3,
+        position: "bottom",
+        alignment: "center",
+        shadow: true,
+        fontFile: "dejavu-bold",
+      }),
+    });
+    if (res.ok) {
+      const data = await res.json();
+      if (data.image) return data.image;
+    }
+  } catch (e) {
+    console.warn("[SlidePublisher] applyTextOverlay failed:", e);
+  }
+  return null;
+}
 
 // ─── SlidePublisher Component ──────────────────────────────────────────────
 
@@ -36,9 +104,14 @@ export default function SlidePublisher({
   slideNumber,
   problemImageUrl,
   solutionImageUrl,
+  textedProblemUrl,
+  textedSolutionUrl,
+  problemText,
+  solutionText,
   carouselTitle,
   autoPublish,
   onPublishStateChange,
+  authFetch: authFetchProp,
 }: SlidePublisherProps) {
   const [state, setState] = useState<PublishState>("idle");
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
@@ -72,11 +145,44 @@ export default function SlidePublisher({
     setErrorMsg(null);
 
     try {
+      // Determine the images to publish — prefer texted versions
+      let problemUrl = textedProblemUrl || problemImageUrl!;
+      let solutionUrl = textedSolutionUrl || solutionImageUrl!;
+
+      // If no texted version exists but we have text, generate it now
+      if (!textedProblemUrl && problemText && problemImageUrl) {
+        const texted = await applyTextOverlay(problemImageUrl, problemText, authFetchProp);
+        if (texted) problemUrl = texted;
+      }
+      if (!textedSolutionUrl && solutionText && solutionImageUrl) {
+        const texted = await applyTextOverlay(solutionImageUrl, solutionText, authFetchProp);
+        if (texted) solutionUrl = texted;
+      }
+
+      // If texted images are data URLs (base64), upload them to get persistent HTTP URLs
+      // The TikTok publish API requires HTTP URLs
+      if (problemUrl.startsWith("data:")) {
+        try {
+          problemUrl = await uploadDataUrlToPersistent(problemUrl);
+        } catch (e) {
+          console.warn("[SlidePublisher] Failed to upload texted problem image, using original:", e);
+          problemUrl = problemImageUrl!;
+        }
+      }
+      if (solutionUrl.startsWith("data:")) {
+        try {
+          solutionUrl = await uploadDataUrlToPersistent(solutionUrl);
+        } catch (e) {
+          console.warn("[SlidePublisher] Failed to upload texted solution image, using original:", e);
+          solutionUrl = solutionImageUrl!;
+        }
+      }
+
       const response = await fetch("/api/autopublish/publish-carousel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          imageUrls: [problemImageUrl, solutionImageUrl],
+          imageUrls: [problemUrl, solutionUrl],
           caption: `${carouselTitle} - Slide ${slideNumber} 🔥`,
           hashtags: ["fyp", "viral", "carousel", "ai", "tiktok"],
           aiDescription: `Carousel slide ${slideNumber} for ${carouselTitle}`,
