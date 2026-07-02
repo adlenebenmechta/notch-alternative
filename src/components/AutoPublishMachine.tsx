@@ -169,6 +169,74 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [botLoading, setBotLoading] = useState(false);
   const [botTasks, setBotTasks] = useState<BotTask[]>([]);
 
+  // Google Drive import state
+  const [gdriveUrl, setGdriveUrl] = useState("");
+  const [gdriveAutoPublish, setGdriveAutoPublish] = useState(false);
+  const [gdrivePublishMode, setGdrivePublishMode] = useState<"now" | "bulk">("now");
+  const [gdrivePreview, setGdrivePreview] = useState<any[]>([]);
+  const [gdriveLoading, setGdriveLoading] = useState(false);
+  const [gdriveImporting, setGdriveImporting] = useState(false);
+
+  // ─── Google Drive: Preview Files ──────────────────────────────────────────
+  const handleGdrivePreview = async () => {
+    if (!gdriveUrl.trim()) return;
+    setGdriveLoading(true);
+    setGdrivePreview([]);
+    try {
+      const res = await fetch("/api/autopublish/gdrive-list", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ folderUrl: gdriveUrl }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+      } else {
+        setGdrivePreview(data.files || []);
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setGdriveLoading(false);
+    }
+  };
+
+  // ─── Google Drive: Import & Publish ────────────────────────────────────────
+  const handleGdriveImport = async () => {
+    if (!gdriveUrl.trim()) return;
+    setGdriveImporting(true);
+    try {
+      const res = await fetch("/api/autopublish/gdrive-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderUrl: gdriveUrl,
+          autoPublish: gdriveAutoPublish,
+          publishMode: gdrivePublishMode,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        alert(`Error: ${data.error}`);
+      } else {
+        alert(data.message);
+        setBotMessages(prev => [...prev, {
+          role: "bot",
+          text: `📁 Google Drive Import: ${data.message}`,
+        }]);
+        setGdriveUrl("");
+        setGdrivePreview([]);
+        setGdriveAutoPublish(false);
+        fetchData();
+        fetchLibrary();
+      }
+    } catch (err: any) {
+      alert(`Error: ${err.message}`);
+    } finally {
+      setGdriveImporting(false);
+    }
+  };
+
   // ─── Bot: Send Command ─────────────────────────────────────────────────────
   const handleBotCommand = async () => {
     if (!botInput.trim() || botLoading) return;
@@ -1538,6 +1606,112 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                   Send →
                 </button>
               </div>
+            </div>
+
+            {/* Google Drive Import */}
+            <div
+              className="rounded-2xl p-5 shadow-sm"
+              style={{ backgroundColor: C.white, border: `1.5px solid ${C.cardBorder}` }}
+            >
+              <h3 className="text-sm font-bold mb-3 flex items-center gap-2" style={{ color: C.text }}>
+                📁 Import from Google Drive
+              </h3>
+              <p className="text-[10px] mb-3" style={{ color: C.textMuted }}>
+                Paste a Google Drive folder link (must be shared as "Anyone with the link can view").
+                The bot will import all videos and optionally publish them to TikTok.
+              </p>
+
+              {/* URL Input */}
+              <div className="flex gap-2 mb-3">
+                <input
+                  type="url"
+                  value={gdriveUrl}
+                  onChange={(e) => setGdriveUrl(e.target.value)}
+                  placeholder="https://drive.google.com/drive/folders/..."
+                  className="flex-1 px-3 py-2.5 rounded-xl text-xs focus:outline-none"
+                  style={{ border: `1.5px solid ${C.cardBorder}`, backgroundColor: C.cream, color: C.text }}
+                />
+                <button
+                  onClick={handleGdrivePreview}
+                  disabled={gdriveLoading || !gdriveUrl.trim()}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-50"
+                  style={{ backgroundColor: C.cyan + "20", color: C.cyan, border: `1.5px solid ${C.cyan}40` }}
+                >
+                  {gdriveLoading ? "⏳" : "👁 Preview"}
+                </button>
+              </div>
+
+              {/* Preview files */}
+              {gdrivePreview.length > 0 && (
+                <div
+                  className="p-3 rounded-xl mb-3 max-h-40 overflow-y-auto"
+                  style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+                >
+                  <div className="text-[10px] font-bold mb-2" style={{ color: C.textMuted }}>
+                    Found {gdrivePreview.length} video(s):
+                  </div>
+                  <div className="space-y-1">
+                    {gdrivePreview.map((file, i) => (
+                      <div key={i} className="flex items-center gap-2 text-[10px]" style={{ color: C.text }}>
+                        <span>🎬</span>
+                        <span className="truncate flex-1">{file.name}</span>
+                        {file.size > 0 && (
+                          <span style={{ color: C.textMuted }}>{(file.size / 1024 / 1024).toFixed(1)}MB</span>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Options */}
+              <div className="grid grid-cols-2 gap-3 mb-3">
+                {/* Auto-publish toggle */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={gdriveAutoPublish}
+                    onChange={(e) => setGdriveAutoPublish(e.target.checked)}
+                    className="w-4 h-4 rounded"
+                  />
+                  <span className="text-[10px] font-semibold" style={{ color: C.text }}>
+                    🚀 Auto-publish after import
+                  </span>
+                </label>
+
+                {/* Publish mode */}
+                {gdriveAutoPublish && (
+                  <select
+                    value={gdrivePublishMode}
+                    onChange={(e) => setGdrivePublishMode(e.target.value as any)}
+                    className="px-2 py-1.5 rounded-lg text-[10px] focus:outline-none"
+                    style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.cream, color: C.text }}
+                  >
+                    <option value="now">Publish all now</option>
+                    <option value="bulk">Bulk (2h intervals)</option>
+                  </select>
+                )}
+              </div>
+
+              {/* Import button */}
+              <button
+                onClick={handleGdriveImport}
+                disabled={gdriveImporting || !gdriveUrl.trim()}
+                className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wide transition-all hover:scale-[1.02] disabled:opacity-50"
+                style={{
+                  background: `linear-gradient(135deg, ${C.cyan}, ${C.pink})`,
+                  color: C.white,
+                }}
+              >
+                {gdriveImporting ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <div className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Importing...
+                  </span>
+                ) : (
+                  gdriveAutoPublish ? "📁 Import & 🚀 Publish" : "📁 Import to Library"
+                )}
+              </button>
             </div>
 
             {/* Bot Tasks History */}
