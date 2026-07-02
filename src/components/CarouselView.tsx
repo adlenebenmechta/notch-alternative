@@ -556,19 +556,98 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const saveToLibrary = useCallback(async () => {
     if (slides.length === 0 || savedToLibrary) return;
 
-    // Save each slide pair as a library entry — prefer texted images when available
+    // For each slide, we need to generate texted versions (image + text overlay)
+    // The text comes from the AI-generated problem_text / solution_text
+    // We use the /api/carousel/add-text endpoint to render text onto images
     const allImages: string[] = [];
+
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      // Check cache for texted versions
+
+      // Check cache first — if user already applied text manually, use that
       const problemCacheKey = `${i}-problem`;
       const solutionCacheKey = `${i}-solution`;
       const textedProblem = textedImageCacheRef.current.get(problemCacheKey);
       const textedSolution = textedImageCacheRef.current.get(solutionCacheKey);
-      // Use texted image if available, otherwise original
-      if (textedProblem || slide.problemImageUrl) allImages.push(textedProblem || slide.problemImageUrl!);
-      if (textedSolution || slide.solutionImageUrl) allImages.push(textedSolution || slide.solutionImageUrl!);
+
+      // For problem image: apply problem_text if not already cached
+      if (textedProblem) {
+        allImages.push(textedProblem);
+      } else if (slide.problemImageUrl && slide.problem.problem_text) {
+        try {
+          const res = await authFetch("/api/carousel/add-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: slide.problemImageUrl,
+              text: slide.problem.problem_text,
+              fontSize: 48,
+              fontColor: "#FFFFFF",
+              strokeColor: "#000000",
+              strokeWidth: 3,
+              position: "bottom",
+              alignment: "center",
+              shadow: true,
+              fontFile: "dejavu-bold",
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.image) {
+              allImages.push(data.image);
+              textedImageCacheRef.current.set(problemCacheKey, data.image);
+              textContentCacheRef.current.set(problemCacheKey, slide.problem.problem_text);
+              continue;
+            }
+          }
+        } catch (e) {
+          console.warn(`[Carousel] Failed to add text to problem slide ${i + 1}:`, e);
+        }
+        allImages.push(slide.problemImageUrl);
+      } else {
+        if (slide.problemImageUrl) allImages.push(slide.problemImageUrl);
+      }
+
+      // For solution image: apply solution_text if not already cached
+      if (textedSolution) {
+        allImages.push(textedSolution);
+      } else if (slide.solutionImageUrl && slide.solution.solution_text) {
+        try {
+          const res = await authFetch("/api/carousel/add-text", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              imageUrl: slide.solutionImageUrl,
+              text: slide.solution.solution_text,
+              fontSize: 48,
+              fontColor: "#FFFFFF",
+              strokeColor: "#000000",
+              strokeWidth: 3,
+              position: "bottom",
+              alignment: "center",
+              shadow: true,
+              fontFile: "dejavu-bold",
+            }),
+          });
+          if (res.ok) {
+            const data = await res.json();
+            if (data.image) {
+              allImages.push(data.image);
+              textedImageCacheRef.current.set(solutionCacheKey, data.image);
+              textContentCacheRef.current.set(solutionCacheKey, slide.solution.solution_text);
+              continue;
+            }
+          }
+        } catch (e) {
+          console.warn(`[Carousel] Failed to add text to solution slide ${i + 1}:`, e);
+        }
+        allImages.push(slide.solutionImageUrl);
+      } else {
+        if (slide.solutionImageUrl) allImages.push(slide.solutionImageUrl);
+      }
     }
+
+    console.log(`[Carousel] Saving to library: ${allImages.length} images (with text overlays applied)`);
 
     // Save to API
     try {
@@ -586,7 +665,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             type: "carousel",
             slideCount: slides.length,
             productUrl,
-            imageUrls: allImages, // ALL image URLs (problem + solution for each slide)
+            imageUrls: allImages, // ALL image URLs with text overlays applied
           },
         }),
       });
@@ -631,8 +710,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const downloadAll = useCallback(async () => {
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
-      const problemUrl = slide.problemImageUrl;
-      const solutionUrl = slide.solutionImageUrl;
+      // Prefer texted images from cache when downloading
+      const textedProblem = textedImageCacheRef.current.get(`${i}-problem`);
+      const textedSolution = textedImageCacheRef.current.get(`${i}-solution`);
+      const problemUrl = textedProblem || slide.problemImageUrl;
+      const solutionUrl = textedSolution || slide.solutionImageUrl;
       if (problemUrl) {
         await downloadImage(problemUrl, `${carouselTitle}-slide${i + 1}-problem.png`);
         await new Promise((r) => setTimeout(r, 400));
