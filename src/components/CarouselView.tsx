@@ -237,6 +237,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [textApplying, setTextApplying] = useState(false);
   const [textedImageUrl, setTextedImageUrl] = useState<string | null>(null); // The image with text applied
 
+  // ─── Per-slide cache for text overlay images and text ────────────────
+  // Key: "slideIndex-problem/solution" (e.g. "0-problem", "2-solution")
+  const textedImageCacheRef = useRef<Map<string, string>>(new Map());
+  const textContentCacheRef = useRef<Map<string, string>>(new Map());
+
   // ─── Download helper ─────────────────────────────────────────────────
   const downloadImage = useCallback(async (imageUrl: string, filename: string) => {
     try {
@@ -299,6 +304,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       const data = await res.json();
       if (data.image) {
         setTextedImageUrl(data.image);
+        // Cache the texted image for this slide so it persists when navigating
+        const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
+        textedImageCacheRef.current.set(cacheKey, data.image);
+        textContentCacheRef.current.set(cacheKey, textOverlayText.trim());
       }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : "Failed to apply text overlay";
@@ -325,6 +334,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     setError("");
     setProgress(5);
     setStepMessage("Analyzing product from URL...");
+    textedImageCacheRef.current.clear(); // Clear text overlay cache for new generation
+    textContentCacheRef.current.clear();
 
     try {
       // Step 1: Analyze product
@@ -542,11 +553,18 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const saveToLibrary = useCallback(async () => {
     if (slides.length === 0 || savedToLibrary) return;
 
-    // Save each slide pair as a library entry
+    // Save each slide pair as a library entry — prefer texted images when available
     const allImages: string[] = [];
-    for (const slide of slides) {
-      if (slide.problemImageUrl) allImages.push(slide.problemImageUrl);
-      if (slide.solutionImageUrl) allImages.push(slide.solutionImageUrl);
+    for (let i = 0; i < slides.length; i++) {
+      const slide = slides[i];
+      // Check cache for texted versions
+      const problemCacheKey = `${i}-problem`;
+      const solutionCacheKey = `${i}-solution`;
+      const textedProblem = textedImageCacheRef.current.get(problemCacheKey);
+      const textedSolution = textedImageCacheRef.current.get(solutionCacheKey);
+      // Use texted image if available, otherwise original
+      if (textedProblem || slide.problemImageUrl) allImages.push(textedProblem || slide.problemImageUrl!);
+      if (textedSolution || slide.solutionImageUrl) allImages.push(textedSolution || slide.solutionImageUrl!);
     }
 
     // Save to API
@@ -596,10 +614,13 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     }
   }, [step, slides, savedToLibrary, saveToLibrary]);
 
-  // Reset text overlay when switching slides or problem/product
+  // Restore text overlay from cache when switching slides or problem/product
   useEffect(() => {
-    setTextedImageUrl(null);
-    setTextOverlayText("");
+    const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
+    const cachedImage = textedImageCacheRef.current.get(cacheKey) || null;
+    const cachedText = textContentCacheRef.current.get(cacheKey) || "";
+    setTextedImageUrl(cachedImage);
+    setTextOverlayText(cachedText);
     setShowTextEditor(false);
   }, [currentSlide, viewingProblem]);
 
@@ -1101,7 +1122,13 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       </button>
                       {textedImageUrl && (
                         <button
-                          onClick={() => setTextedImageUrl(null)}
+                          onClick={() => {
+                            setTextedImageUrl(null);
+                            // Also clear from cache
+                            const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
+                            textedImageCacheRef.current.delete(cacheKey);
+                            textContentCacheRef.current.delete(cacheKey);
+                          }}
                           className="px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
                           style={{ backgroundColor: "#1A1A1A", color: "#EF4444", border: "1.5px solid rgba(220,38,38,0.4)" }}
                         >
