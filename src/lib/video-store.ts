@@ -15,6 +15,7 @@ export interface StoredVideo {
   scenesCount: number;
   provider: string;
   createdAt: string;
+  metadata?: string | null; // JSON string for carousel imageUrls etc.
 }
 
 const STORAGE_PREFIX = "video_library_";

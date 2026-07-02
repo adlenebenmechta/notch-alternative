@@ -473,46 +473,70 @@ export default function UnifiedVideoLibrary({ onBack, onEditVideo, onCaptionVide
             scenesCount: v.scenesCount,
             provider: v.provider,
             createdAt: v.createdAt,
+            metadata: (v as Record<string, unknown>).metadata as string | null || null,
           }))
         : [];
 
-      // Also try API videos
+      // Also try API videos — this is the PRIMARY source
       let apiVideos: VideoItem[] = [];
       if (authFetch) {
         try {
           const res = await authFetch("/api/videos");
           if (res.ok) {
             const data = await res.json();
-            if (Array.isArray(data)) {
-              apiVideos = data.map((v: StoredVideo) => ({
-                id: v.id,
-                title: v.title,
-                videoUrl: v.videoUrl,
-                thumbnailUrl: v.thumbnailUrl,
-                duration: v.duration,
-                scenesCount: v.scenesCount,
-                provider: v.provider || "kie",
-                createdAt: v.createdAt,
-              }));
+            // API returns { videos: [...] } or just [...]
+            const videoArray = Array.isArray(data) ? data : (data.videos || []);
+            if (Array.isArray(videoArray)) {
+              apiVideos = videoArray.map((v: Record<string, unknown>) => ({
+                id: (v.id as string) || "",
+                title: (v.title as string) || "Untitled",
+                videoUrl: (v.videoUrl as string) || "",
+                thumbnailUrl: (v.thumbnailUrl as string) || null,
+                duration: (v.duration as string) || null,
+                scenesCount: (v.scenesCount as number) || 1,
+                provider: (v.provider as string) || "kie",
+                createdAt: (v.createdAt as string) || new Date().toISOString(),
+                metadata: (v.metadata as string) || null,
+              })).filter((v: VideoItem) => v.videoUrl); // Only include items with a URL
             }
+          } else {
+            console.warn(`[Library] API returned ${res.status}`);
           }
-        } catch {
-          // API not available, use localStorage only
+        } catch (e) {
+          console.warn("[Library] API fetch failed, using localStorage only:", e);
         }
       }
 
-      // Merge (deduplicate by id — localStorage takes precedence for captioned URLs)
-      const apiIds = new Set(apiVideos.map((v) => v.id));
+      // Merge: API videos take precedence (they have correct DB IDs), 
+      // but local videos may have metadata that API doesn't
+      const apiById = new Map<string, VideoItem>();
+      for (const v of apiVideos) {
+        apiById.set(v.id, v);
+      }
       const localById = new Map<string, VideoItem>();
       for (const v of localVideos) {
         if (!localById.has(v.id)) localById.set(v.id, v);
       }
-      const uniqueApis = apiVideos.filter((v) => !localById.has(v.id));
-      const merged = [...Array.from(localById.values()), ...uniqueApis];
+      
+      // Start with all API videos (primary)
+      const result = new Map<string, VideoItem>();
+      for (const v of apiVideos) {
+        result.set(v.id, v);
+      }
+      // Add local videos that are NOT in API
+      for (const [id, v] of localById) {
+        if (!result.has(id)) {
+          result.set(id, v);
+        }
+      }
+      
+      const merged = Array.from(result.values());
       merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
+      console.log(`[Library] Loaded ${merged.length} items (${apiVideos.length} from API, ${localVideos.length} from localStorage)`);
       setVideos(merged);
-    } catch {
+    } catch (e) {
+      console.error("[Library] Failed to load:", e);
       setError("Failed to load your library");
     } finally {
       setLoading(false);
