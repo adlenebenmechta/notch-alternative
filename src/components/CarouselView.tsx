@@ -467,16 +467,17 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         completedImages++;
         setProgress(35 + Math.round((completedImages / totalImages) * 60));
 
-        // Generate SOLUTION image — use user-uploaded product image as reference for GPT Image
+        // Generate SOLUTION image — use user-uploaded product image as reference
         try {
           setStepMessage(`Generating product image ${i + 1}/${plan.slides.length}...`);
 
           let solutionImage: string | null = null;
 
-          // If user uploaded a product image, use it as reference for GPT Image
+          // If user uploaded a product image, send it as reference.
+          // The server will try nano-banana-edit first, then Sharp composite fallback
+          // to guarantee the product appears in the solution image.
           if (productImageBase64) {
-            // Generate with GPT Image using the product image as reference
-            console.log(`[Carousel] Using user-uploaded product image as reference for solution slide ${i + 1}`);
+            console.log(`[Carousel] Sending product image as reference for solution slide ${i + 1} (base64 length: ${productImageBase64.length})`);
             const imgRes = await authFetch("/api/carousel/image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -489,14 +490,16 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             if (imgRes.ok) {
               const imgData = await imgRes.json();
               solutionImage = imgData.image;
+              console.log(`[Carousel] Solution image with product reference ready!`);
             } else {
               const errData = await imgRes.json().catch(() => ({ error: "Image generation failed" }));
-              console.warn(`[Carousel] Solution image with reference failed: ${errData.error}`);
+              console.warn(`[Carousel] Solution image with reference failed: ${errData.error} (status: ${imgRes.status})`);
             }
           }
 
           // Fallback: generate without reference if no product image or if ref-based generation failed
           if (!solutionImage) {
+            console.log(`[Carousel] Falling back to no-reference generation for solution slide ${i + 1}`);
             const imgRes = await authFetch("/api/carousel/image", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
@@ -1605,14 +1608,23 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              // Convert to base64
-              const reader = new FileReader();
-              reader.onload = () => {
-                const result = reader.result as string;
+              // Resize to max 1024px before base64 to keep payload small
+              const img = new Image();
+              img.onload = () => {
+                const MAX = 1024;
+                let w = img.width, h = img.height;
+                if (w > MAX || h > MAX) {
+                  if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                  else { w = Math.round(w * MAX / h); h = MAX; }
+                }
+                const canvas = document.createElement('canvas');
+                canvas.width = w; canvas.height = h;
+                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+                const result = canvas.toDataURL('image/png');
                 setProductImageBase64(result);
-                console.log(`[Carousel] Product image uploaded (${(result.length / 1024).toFixed(0)}KB base64)`);
+                console.log(`[Carousel] Product image uploaded & resized to ${w}x${h} (${(result.length / 1024).toFixed(0)}KB base64)`);
               };
-              reader.readAsDataURL(file);
+              img.src = URL.createObjectURL(file);
             }}
           />
 
@@ -1671,11 +1683,20 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 e.stopPropagation();
                 const file = e.dataTransfer.files?.[0];
                 if (file && file.type.startsWith("image/")) {
-                  const reader = new FileReader();
-                  reader.onload = () => {
-                    setProductImageBase64(reader.result as string);
+                  const img = new Image();
+                  img.onload = () => {
+                    const MAX = 1024;
+                    let w = img.width, h = img.height;
+                    if (w > MAX || h > MAX) {
+                      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
+                      else { w = Math.round(w * MAX / h); h = MAX; }
+                    }
+                    const canvas = document.createElement('canvas');
+                    canvas.width = w; canvas.height = h;
+                    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
+                    setProductImageBase64(canvas.toDataURL('image/png'));
                   };
-                  reader.readAsDataURL(file);
+                  img.src = URL.createObjectURL(file);
                 }
               }}
             >

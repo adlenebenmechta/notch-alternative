@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getAuthUser } from '@/lib/auth-server';
+import sharp from 'sharp';
 
 export const maxDuration = 300;
 export const dynamic = 'force-dynamic';
@@ -101,8 +102,6 @@ async function generateSolutionWithProduct(
   solutionPrompt: string
 ): Promise<string> {
   // Build a BOF-style product placement prompt
-  // The prompt tells the model to keep the product visible and place it in the described scene
-  // Remove any people references from the prompt — faces look fake
   const cleanPrompt = removePeopleFromPrompt(solutionPrompt);
   const productPlacementPrompt = `Place this product in the following scene: ${cleanPrompt}. CRITICAL RULES: (1) The product must remain the main focus, clearly visible with its original packaging, label, and branding exactly as shown in the reference image. Do not alter the product's appearance. (2) This image MUST NOT contain any people, faces, hands, or human body parts — product only with environment. (3) This image MUST NOT contain any text, writing, words, letters, typography, signs, labels, logos, or watermarks anywhere in the image. The image must be 100% text-free. No text overlays, no captions, no graphic design elements. Photorealistic, high quality product photography style.`;
 
@@ -121,7 +120,7 @@ async function generateSolutionWithProduct(
         image_urls: [productImageUrl],
         image_size: "9:16",
         output_format: "png",
-        strength: 0.45,   // Same as bof-generate — proven value for product placement
+        strength: 0.45,
       },
     }),
   });
@@ -186,6 +185,134 @@ async function generateProblemImage(prompt: string): Promise<string> {
   return imageUrl;
 }
 
+// ─── Generate SCENE background (no product, no people, no text) ───────────
+async function generateSceneBackground(scenePrompt: string): Promise<string> {
+  const noPeople = removePeopleFromPrompt(scenePrompt);
+  const cleaned = noPeople
+    .replace(/\b(text|typography|lettering|words|font|headline|title|caption|quote)\b/gi, "")
+    .replace(/\b(infographic|illustration|graphic design|cartoon|vector|clip.?art)\b/gi, "")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+  const enhancedPrompt = "Photorealistic professional product photography scene, clean background, DSLR camera, studio lighting. CRITICAL: This image MUST NOT contain any people, faces, hands, or human body parts. CRITICAL: This image MUST NOT contain any text, writing, words, letters, typography, signs, labels, logos, or watermarks. Leave center space for a product to be placed. The image must be 100% text-free and people-free. Only environment and atmosphere: " + cleaned;
+
+  const submitRes = await fetch(KIE_API_URL, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${KIE_API_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "gpt-image-2-text-to-image",
+      input: {
+        prompt: enhancedPrompt,
+        size: "1024x1792",
+      },
+    }),
+  });
+
+  const submitJson = await submitRes.json();
+  if (submitJson.code !== 200) {
+    throw new Error("Scene background submit failed: " + (submitJson.msg || JSON.stringify(submitJson)));
+  }
+
+  const taskId = submitJson.data?.taskId;
+  if (!taskId) {
+    throw new Error("No taskId returned from KIE.ai");
+  }
+
+  console.log(`[Carousel/Image] Scene background task ${taskId} submitted, polling...`);
+  const imageUrl = await pollKieImage(taskId);
+  console.log(`[Carousel/Image] Scene background ready!`);
+  return imageUrl;
+}
+
+// ─── Composite product onto scene using Sharp ──────────────────────────────
+// This is the FALLBACK that guarantees the product appears in the solution image.
+// It downloads the scene image, overlays the product image with proper sizing
+// and a subtle shadow, and returns the result as a base64 data URL.
+async function compositeProductOntoScene(
+  sceneImageUrl: string,
+  productImageBase64: string
+): Promise<string> {
+  console.log(`[Carousel/Image] Compositing product onto scene using Sharp...`);
+
+  // Fetch the scene image
+  const sceneRes = await fetch(sceneImageUrl);
+  if (!sceneRes.ok) throw new Error("Failed to download scene image");
+  const sceneBuffer = Buffer.from(await sceneRes.arrayBuffer());
+
+  // Decode the product base64
+  let productRaw = productImageBase64;
+  if (productRaw.includes(",")) {
+    productRaw = productRaw.split(",")[1];
+  }
+  const productBuffer = Buffer.from(productRaw, "base64");
+
+  // Get scene dimensions
+  const sceneMeta = await sharp(sceneBuffer).metadata();
+  const sceneW = sceneMeta.width || 1024;
+  const sceneH = sceneMeta.height || 1792;
+
+  // Resize product to fit nicely — about 60% of scene width, maintaining aspect ratio
+  const targetProductWidth = Math.round(sceneW * 0.6);
+  const resizedProductBuffer = await sharp(productBuffer)
+    .resize(targetProductWidth, null, { fit: "inside", withoutEnlargement: true })
+    .png()
+    .toBuffer();
+
+  const productMeta = await sharp(resizedProductBuffer).metadata();
+  const productW = productMeta.width || targetProductWidth;
+  const productH = productMeta.height || 400;
+
+  // Create a subtle drop shadow for the product
+  const shadowPadding = 15;
+  const shadowBlur = 12;
+  const shadowOffsetX = 5;
+  const shadowOffsetY = 8;
+
+  // Create shadow buffer (dark ellipse)
+  const shadowW = productW + shadowPadding * 2;
+  const shadowH = productH + shadowPadding * 2;
+  const shadowSvg = `<svg width="${shadowW}" height="${shadowH}">
+    <defs>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feGaussianBlur in="SourceAlpha" stdDeviation="${shadowBlur}" result="blur"/>
+        <feOffset dx="${shadowOffsetX}" dy="${shadowOffsetY}" result="offsetBlur"/>
+        <feFlood flood-color="rgba(0,0,0,0.4)" result="color"/>
+        <feComposite in="color" in2="offsetBlur" operator="in" result="shadow"/>
+      </filter>
+    </defs>
+    <rect x="0" y="0" width="${shadowW}" height="${shadowH}" fill="rgba(0,0,0,0.5)" filter="url(#shadow)" rx="20" ry="20"/>
+  </svg>`;
+
+  const shadowBuffer = await sharp(Buffer.from(shadowSvg))
+    .resize(shadowW, shadowH)
+    .png()
+    .toBuffer();
+
+  // Position: center horizontally, in the lower portion of the image (around 55% from top)
+  const posX = Math.round((sceneW - productW) / 2);
+  const posY = Math.round(sceneH * 0.45);
+
+  // Shadow position (slightly offset)
+  const shadowPosX = posX - shadowPadding;
+  const shadowPosY = posY - shadowPadding;
+
+  // Composite: scene + shadow + product
+  const resultBuffer = await sharp(sceneBuffer)
+    .composite([
+      { input: shadowBuffer, left: shadowPosX, top: shadowPosY, blend: "over" },
+      { input: resizedProductBuffer, left: posX, top: posY, blend: "over" },
+    ])
+    .png()
+    .toBuffer();
+
+  console.log(`[Carousel/Image] Composite done! Product ${productW}x${productH} placed at (${posX},${posY}) on scene ${sceneW}x${sceneH}`);
+
+  // Return as data URL
+  return `data:image/png;base64,${resultBuffer.toString("base64")}`;
+}
+
 // ─── Fallback: ZAI SDK ──────────────────────────────────────────────────────
 async function generateWithZAI(prompt: string): Promise<string | null> {
   try {
@@ -230,7 +357,7 @@ export async function POST(request: NextRequest) {
     }
 
     const hasRef = !!reference_image_base64 && typeof reference_image_base64 === 'string' && reference_image_base64.length > 0;
-    console.log(`[Carousel/Image] Prompt: "${image_prompt.slice(0, 80)}..." | Has reference: ${hasRef}`);
+    console.log(`[Carousel/Image] Prompt: "${image_prompt.slice(0, 80)}..." | Has reference: ${hasRef} (base64 length: ${hasRef ? reference_image_base64.length : 0})`);
 
     let imageUrl: string | null = null;
 
@@ -293,8 +420,25 @@ export async function POST(request: NextRequest) {
         }
       }
 
-      // Step 3: If nano-banana-edit completely fails, fallback to GPT Image
-      // but with a prompt that explicitly mentions the product
+      // Step 3: GUARANTEED FALLBACK — Generate scene + composite product onto it
+      // This ensures the product ALWAYS appears in the solution image.
+      if (!imageUrl) {
+        console.log(`[Carousel/Image] nano-banana-edit failed — using Sharp composite fallback (scene + product overlay)...`);
+        try {
+          // Generate a clean scene background
+          const sceneUrl = await generateSceneBackground(image_prompt.trim());
+          console.log(`[Carousel/Image] Scene background ready, compositing product...`);
+
+          // Composite the product image onto the scene
+          imageUrl = await compositeProductOntoScene(sceneUrl, reference_image_base64);
+          console.log(`[Carousel/Image] Sharp composite fallback succeeded!`);
+        } catch (compositeErr) {
+          const msg = compositeErr instanceof Error ? compositeErr.message : String(compositeErr);
+          console.warn(`[Carousel/Image] Sharp composite fallback failed: ${msg}`);
+        }
+      }
+
+      // Step 4: Last resort — GPT Image without product (this won't have the product but at least gives an image)
       if (!imageUrl) {
         console.log(`[Carousel/Image] All reference methods failed, trying GPT Image as last resort...`);
         try {
