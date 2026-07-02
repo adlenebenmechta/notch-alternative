@@ -116,7 +116,7 @@ interface AutoPublishMachineProps {
 }
 
 export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachineProps) {
-  const { user } = useAuth();
+  const { user, authFetch } = useAuth();
   const [posts, setPosts] = useState<Post[]>([]);
   const [accounts, setAccounts] = useState<TikTokAccount[]>([]);
   const [loading, setLoading] = useState(true);
@@ -151,15 +151,22 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [libPublishing, setLibPublishing] = useState(false);
 
   // ─── Fetch Library Videos ──────────────────────────────────────────────────
-  const { authFetch } = useAuth();
   const fetchLibrary = useCallback(async () => {
     setLibraryLoading(true);
     try {
-      const res = await authFetch("/api/videos");
+      // Use authFetch if available, otherwise fall back to regular fetch
+      const fetchFn = authFetch || fetch;
+      const res = await fetchFn("/api/videos");
+      if (!res.ok) {
+        console.warn("Library fetch returned:", res.status);
+        setLibraryVideos([]);
+        return;
+      }
       const data = await res.json();
       setLibraryVideos(data.videos || []);
     } catch (err) {
       console.error("Library fetch error:", err);
+      setLibraryVideos([]);
     } finally {
       setLibraryLoading(false);
     }
