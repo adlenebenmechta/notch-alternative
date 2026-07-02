@@ -66,6 +66,18 @@ interface Post {
   };
 }
 
+// Bot task from AI automation
+interface BotTask {
+  id: string;
+  command: string;
+  parsedAction: string;
+  status: string;
+  isRecurring: boolean;
+  result: string | null;
+  errorMessage: string | null;
+  createdAt: string;
+}
+
 // Library video from your site's existing video library
 interface LibraryVideo {
   id: string;
@@ -120,7 +132,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [posts, setPosts] = useState<Post[]>([]);
   const [accounts, setAccounts] = useState<TikTokAccount[]>([]);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<"publish" | "posts" | "library" | "accounts" | "setup">("publish");
+  const [activeTab, setActiveTab] = useState<"publish" | "posts" | "library" | "bot" | "accounts" | "setup">("publish");
 
   // Publish form state
   const [videoUrl, setVideoUrl] = useState("");
@@ -149,6 +161,73 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const [libAutoCaption, setLibAutoCaption] = useState(false);
   const [libScheduledAt, setLibScheduledAt] = useState("");
   const [libPublishing, setLibPublishing] = useState(false);
+  // Bot state
+  const [botInput, setBotInput] = useState("");
+  const [botMessages, setBotMessages] = useState<{ role: "user" | "bot"; text: string; postIds?: string[] }[]>([
+    { role: "bot", text: "🤖 Hi! I'm your TikTok automation bot. Tell me what to do!\n\nTry: \"publish 2 videos\" or \"schedule my carousel for tomorrow 8pm\" or \"help\"" },
+  ]);
+  const [botLoading, setBotLoading] = useState(false);
+  const [botTasks, setBotTasks] = useState<BotTask[]>([]);
+
+  // ─── Bot: Send Command ─────────────────────────────────────────────────────
+  const handleBotCommand = async () => {
+    if (!botInput.trim() || botLoading) return;
+    
+    const userMsg = botInput.trim();
+    setBotMessages(prev => [...prev, { role: "user", text: userMsg }]);
+    setBotInput("");
+    setBotLoading(true);
+
+    try {
+      const res = await fetch("/api/autopublish/bot/command", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ command: userMsg }),
+      });
+      const data = await res.json();
+
+      if (data.error) {
+        setBotMessages(prev => [...prev, { role: "bot", text: `❌ Error: ${data.error}` }]);
+      } else {
+        setBotMessages(prev => [...prev, { 
+          role: "bot", 
+          text: data.message,
+          postIds: data.postIds || [],
+        }]);
+        // If posts were created, open the first one in pipeline monitor
+        if (data.postIds && data.postIds.length > 0) {
+          setMonitoringPostId(data.postIds[0]);
+        }
+        fetchData(); // Refresh posts list
+        fetchBotTasks(); // Refresh bot tasks
+      }
+    } catch (err: any) {
+      setBotMessages(prev => [...prev, { role: "bot", text: `❌ Error: ${err.message}` }]);
+    } finally {
+      setBotLoading(false);
+    }
+  };
+
+  // ─── Bot: Fetch Tasks ──────────────────────────────────────────────────────
+  const fetchBotTasks = useCallback(async () => {
+    try {
+      const res = await fetch("/api/autopublish/bot/tasks");
+      const data = await res.json();
+      setBotTasks(data.tasks || []);
+    } catch (err) {
+      console.error("Bot tasks fetch error:", err);
+    }
+  }, []);
+
+  // ─── Bot: Delete Task ──────────────────────────────────────────────────────
+  const handleDeleteBotTask = async (taskId: string) => {
+    try {
+      await fetch(`/api/autopublish/bot/tasks?taskId=${taskId}`, { method: "DELETE" });
+      fetchBotTasks();
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   // ─── Fetch Library Videos ──────────────────────────────────────────────────
   const fetchLibrary = useCallback(async () => {
@@ -351,7 +430,10 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
     if (activeTab === "library") {
       fetchLibrary();
     }
-  }, [activeTab, fetchLibrary]);
+    if (activeTab === "bot") {
+      fetchBotTasks();
+    }
+  }, [activeTab, fetchLibrary, fetchBotTasks]);
 
   // ─── Handlers ────────────────────────────────────────────────────────────
 
@@ -610,6 +692,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
             { id: "publish", label: "Publish New", icon: "🚀" },
             { id: "posts", label: "All Posts", icon: "📋" },
             { id: "library", label: "Library", icon: "📚" },
+            { id: "bot", label: "Bot", icon: "🤖" },
             { id: "accounts", label: "Accounts", icon: "👥" },
             { id: "setup", label: "Setup", icon: "⚙️" },
           ].map((tab) => (
@@ -1332,6 +1415,188 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                     className="w-full px-3 py-2 rounded-lg text-xs focus:outline-none"
                     style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white, color: C.text }}
                   />
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ─── Bot Tab ────────────────────────────────────────────────── */}
+        {activeTab === "bot" && (
+          <div className="space-y-4">
+            {/* Chat Interface */}
+            <div
+              className="rounded-2xl p-5 shadow-sm"
+              style={{ backgroundColor: C.white, border: `1.5px solid ${C.cardBorder}` }}
+            >
+              <div className="flex items-center justify-between mb-3">
+                <h2 className="text-base font-bold flex items-center gap-2" style={{ color: C.text }}>
+                  🤖 Automation Bot
+                </h2>
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full" style={{ backgroundColor: `${C.success}20`, color: C.success }}>
+                  ● Online
+                </span>
+              </div>
+
+              {/* Messages */}
+              <div
+                className="space-y-3 mb-3 max-h-[400px] overflow-y-auto p-2 rounded-xl"
+                style={{ backgroundColor: C.cream }}
+              >
+                {botMessages.map((msg, i) => (
+                  <div
+                    key={i}
+                    className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}
+                  >
+                    <div
+                      className="max-w-[80%] p-3 rounded-2xl text-xs whitespace-pre-wrap"
+                      style={{
+                        backgroundColor: msg.role === "user" ? C.pink : C.white,
+                        color: msg.role === "user" ? C.white : C.text,
+                        border: msg.role === "bot" ? `1px solid ${C.cardBorder}` : "none",
+                        borderTopLeftRadius: msg.role === "bot" ? "4px" : "16px",
+                        borderTopRightRadius: msg.role === "user" ? "4px" : "16px",
+                      }}
+                    >
+                      {msg.text}
+                      {msg.postIds && msg.postIds.length > 0 && (
+                        <button
+                          onClick={() => setMonitoringPostId(msg.postIds![0])}
+                          className="mt-2 block text-[10px] underline opacity-80 hover:opacity-100"
+                        >
+                          📊 View pipeline →
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {botLoading && (
+                  <div className="flex justify-start">
+                    <div
+                      className="p-3 rounded-2xl text-xs"
+                      style={{ backgroundColor: C.white, border: `1px solid ${C.cardBorder}` }}
+                    >
+                      <div className="flex gap-1">
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: C.pink, animationDelay: "0ms" }} />
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: C.pink, animationDelay: "150ms" }} />
+                        <div className="w-2 h-2 rounded-full animate-bounce" style={{ backgroundColor: C.pink, animationDelay: "300ms" }} />
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Quick commands */}
+              <div className="flex flex-wrap gap-1.5 mb-3">
+                {[
+                  "publish 2 videos",
+                  "schedule my carousel for tomorrow 8pm",
+                  "bulk publish 5 videos",
+                  "list",
+                  "help",
+                ].map((cmd) => (
+                  <button
+                    key={cmd}
+                    onClick={() => setBotInput(cmd)}
+                    className="px-2.5 py-1 rounded-lg text-[10px] font-medium transition-all hover:scale-105"
+                    style={{
+                      backgroundColor: C.cream,
+                      border: `1px solid ${C.cardBorder}`,
+                      color: C.textMuted,
+                    }}
+                  >
+                    {cmd}
+                  </button>
+                ))}
+              </div>
+
+              {/* Input */}
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={botInput}
+                  onChange={(e) => setBotInput(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleBotCommand()}
+                  placeholder="Type a command... (e.g. 'publish 2 videos')"
+                  disabled={botLoading}
+                  className="flex-1 px-4 py-2.5 rounded-xl text-xs focus:outline-none disabled:opacity-50"
+                  style={{
+                    border: `1.5px solid ${C.cardBorder}`,
+                    backgroundColor: C.cream,
+                    color: C.text,
+                  }}
+                />
+                <button
+                  onClick={handleBotCommand}
+                  disabled={botLoading || !botInput.trim()}
+                  className="px-5 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+                  style={{
+                    background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                    color: C.white,
+                  }}
+                >
+                  Send →
+                </button>
+              </div>
+            </div>
+
+            {/* Bot Tasks History */}
+            {botTasks.length > 0 && (
+              <div
+                className="rounded-2xl p-5 shadow-sm"
+                style={{ backgroundColor: C.white, border: `1.5px solid ${C.cardBorder}` }}
+              >
+                <h3 className="text-sm font-bold mb-3" style={{ color: C.text }}>
+                  📋 Bot Task History ({botTasks.length})
+                </h3>
+                <div className="space-y-2 max-h-[300px] overflow-y-auto">
+                  {botTasks.map((task) => (
+                    <div
+                      key={task.id}
+                      className="p-3 rounded-xl flex items-start justify-between gap-2"
+                      style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-2 mb-1">
+                          <span
+                            className="text-[9px] font-bold px-2 py-0.5 rounded-full"
+                            style={{
+                              backgroundColor:
+                                task.status === "completed" ? `${C.success}20` :
+                                task.status === "active" ? `${C.cyan}20` :
+                                task.status === "failed" ? `${C.error}20` :
+                                `${C.warning}20`,
+                              color:
+                                task.status === "completed" ? C.success :
+                                task.status === "active" ? C.cyan :
+                                task.status === "failed" ? C.error :
+                                C.warning,
+                            }}
+                          >
+                            {task.status}
+                          </span>
+                          {task.isRecurring && (
+                            <span className="text-[9px] font-bold px-2 py-0.5 rounded-full" style={{ backgroundColor: `${C.pink}20`, color: C.pink }}>
+                              🔁 Recurring
+                            </span>
+                          )}
+                        </div>
+                        <p className="text-[10px] truncate" style={{ color: C.text }}>
+                          {task.command}
+                        </p>
+                        <p className="text-[9px] mt-0.5" style={{ color: C.textMuted }}>
+                          {new Date(task.createdAt).toLocaleString("en-US", { dateStyle: "short", timeStyle: "short" })}
+                        </p>
+                      </div>
+                      <button
+                        onClick={() => handleDeleteBotTask(task.id)}
+                        className="text-[10px] px-2 py-1 rounded hover:opacity-70"
+                        style={{ color: C.error }}
+                      >
+                        🗑
+                      </button>
+                    </div>
+                  ))}
                 </div>
               </div>
             )}
