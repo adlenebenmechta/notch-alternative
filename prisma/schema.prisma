@@ -190,3 +190,28 @@ model BotTask {
   createdAt    DateTime @default(now())
   updatedAt    DateTime @updatedAt
 }
+
+
+// ─── Google Drive Imports ───────────────────────────────────────────────────
+model GoogleDriveImport {
+  id           String   @id @default(cuid())
+  folderUrl    String   // Google Drive folder URL
+  folderId     String?  // Extracted folder ID
+  
+  // Import status
+  status       String   @default("pending") // pending, importing, completed, failed
+  totalFiles   Int      @default(0)
+  importedFiles Int     @default(0)
+  publishedFiles Int    @default(0)
+  
+  // Settings
+  autoPublish  Boolean  @default(false)
+  publishMode  String   @default("now") // now, schedule, bulk
+  
+  // Result
+  errorMessage String?
+  importedVideoIds String? // JSON array of GeneratedVideo IDs
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
