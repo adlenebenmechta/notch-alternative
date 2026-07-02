@@ -301,19 +301,56 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const fetchLibrary = useCallback(async () => {
     setLibraryLoading(true);
     try {
-      // Use authFetch if available, otherwise fall back to regular fetch
-      const fetchFn = authFetch || fetch;
-      const res = await fetchFn("/api/videos");
+      // Get the auth token directly from localStorage (same as auth-provider)
+      let token: string | null = null;
+      try {
+        const stored = localStorage.getItem("auth_session");
+        if (stored) {
+          const session = JSON.parse(stored);
+          token = session.idToken || session.token;
+        }
+      } catch {}
+
+      // Build headers with auth token
+      const headers: Record<string, string> = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const res = await fetch("/api/videos", { headers });
+      
       if (!res.ok) {
-        console.warn("Library fetch returned:", res.status);
+        console.warn("Library fetch returned:", res.status, token ? "(with token)" : "(no token)");
+        // Try authFetch as fallback
+        if (authFetch && !token) {
+          console.log("Trying authFetch fallback...");
+          const res2 = await authFetch("/api/videos");
+          if (res2.ok) {
+            const data2 = await res2.json();
+            setLibraryVideos(data2.videos || []);
+            return;
+          }
+        }
         setLibraryVideos([]);
         return;
       }
+      
       const data = await res.json();
       setLibraryVideos(data.videos || []);
     } catch (err) {
       console.error("Library fetch error:", err);
-      setLibraryVideos([]);
+      // Last resort: try authFetch
+      try {
+        if (authFetch) {
+          const res = await authFetch("/api/videos");
+          const data = await res.json();
+          setLibraryVideos(data.videos || []);
+        }
+      } catch {
+        setLibraryVideos([]);
+      }
     } finally {
       setLibraryLoading(false);
     }
