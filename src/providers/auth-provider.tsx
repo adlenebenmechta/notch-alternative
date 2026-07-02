@@ -79,7 +79,7 @@ interface AuthContextType {
   authFetch: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType | null>(null);
 
 // ─── Sync user with backend ────────────────────────────────────────────────
 
@@ -137,6 +137,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
         setSession(sessionData);
       }
+    } catch (err) {
+      console.error("doSync: unexpected error, using session data as fallback", err);
+      // Fallback: create user from session data so the app doesn't crash
+      const email = sessionData.email || "";
+      setUser({
+        id: sessionData.localId,
+        name: sessionData.displayName || sessionData.email?.split("@")[0] || "User",
+        email,
+        role: isVipUser(email) ? "admin" : "user",
+        plan: isVipUser(email) ? "enterprise" : "free",
+        creditsUsed: 0,
+        creditsLimit: isVipUser(email) ? 999999 : 3,
+      });
+      setSession(sessionData);
     } finally {
       syncLock.current = false;
     }
@@ -176,7 +190,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         // Sync with backend
-        await doSync(idToken, currentSession);
+        try {
+          await doSync(idToken, currentSession);
+        } catch (syncErr) {
+          console.error("initAuth: doSync failed, using session data as fallback", syncErr);
+          // Fallback: create user from session data so the app doesn't crash
+          const email = currentSession.email || "";
+          setUser({
+            id: currentSession.localId,
+            name: currentSession.displayName || currentSession.email?.split("@")[0] || "User",
+            email,
+            role: isVipUser(email) ? "admin" : "user",
+            plan: isVipUser(email) ? "enterprise" : "free",
+            creditsUsed: 0,
+            creditsLimit: isVipUser(email) ? 999999 : 3,
+          });
+          setSession(currentSession);
+        }
       }
 
       setLoading(false);

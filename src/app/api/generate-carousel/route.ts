@@ -183,7 +183,7 @@ async function imageGenerationDirect(config: AIConfig, prompt: string, size: str
 }
 
 // ─── Image generation with fallback to z-ai-web-dev-sdk ────────────────────
-async function imageGeneration(prompt: string, size: string = "768x1344"): Promise<Record<string, unknown> | null> {
+async function imageGeneration(prompt: string, size: string = "768x1344", referenceImageUrl?: string): Promise<Record<string, unknown> | null> {
   // Try 1: Environment variables
   const config = getAIConfig();
   if (config) {
@@ -199,6 +199,23 @@ async function imageGeneration(prompt: string, size: string = "768x1344"): Promi
   const zai = await createZAIFromConfig();
   if (zai) {
     try {
+      // Use image edit API when a reference product image is provided
+      if (referenceImageUrl && referenceImageUrl.trim()) {
+        try {
+          console.log("[Carousel] Using image edit API with reference image for product-aware generation");
+          const result = await zai.images.edit({
+            prompt,
+            image: referenceImageUrl.trim(),
+            size,
+          });
+          return result as unknown as Record<string, unknown>;
+        } catch (editErr) {
+          const msg = editErr instanceof Error ? editErr.message : String(editErr);
+          console.warn("[Carousel] Image edit API failed, falling back to generation:", msg);
+          // Fall through to regular generation
+        }
+      }
+      // Regular generation (no reference image)
       return await zai.images.generations.create({ prompt, size }) as unknown as Record<string, unknown>;
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -210,23 +227,20 @@ async function imageGeneration(prompt: string, size: string = "768x1344"): Promi
 }
 
 // ─── Force image prompt to be photorealistic with NO TEXT ────────────────────
-const IMAGE_PROMPT_PREFIX = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE: ";
+const IMAGE_PROMPT_PREFIX = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY NO LABELS NO BADGES NO OVERLAY TEXT NO SPEECH BUBBLES IN IMAGE: ";
+const IMAGE_PROMPT_SUFFIX = ". CRITICAL REQUIREMENT: This image must contain ZERO text, ZERO words, ZERO letters, ZERO numbers, ZERO labels, ZERO badges, ZERO watermarks, ZERO logos, ZERO typography of ANY kind. No PROBLEM/SOLUTION labels, no slide numbers, no headings, no overlay text, no speech bubbles, no comic-style text. The image must be 100% text-free visual content only.";
 
 function enforcePhotorealisticPrompt(prompt: string): string {
   // Remove any text/typography-related keywords that might cause the AI to generate text
   const cleaned = prompt
-    .replace(/\b(text|typography|lettering|words|font|headline|title|caption|quote)\b/gi, "")
+    .replace(/\b(text|typography|lettering|words|font|headline|title|caption|quote|label|badge|saying|writing|write)\b/gi, "")
     .replace(/\b(infographic|illustration|graphic design|cartoon|vector|clip.?art)\b/gi, "")
+    .replace(/\b(PROBLEM|SOLUTION|\d+\/\d+)\b/g, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  // If the prompt already has photorealistic keywords, just ensure NO TEXT is there
-  if (cleaned.toLowerCase().includes("no text") && cleaned.toLowerCase().includes("photorealistic")) {
-    return cleaned;
-  }
-
-  // Otherwise, prepend the forced prefix
-  return IMAGE_PROMPT_PREFIX + cleaned;
+  // Always prepend the forced prefix and append the anti-text suffix
+  return IMAGE_PROMPT_PREFIX + cleaned + IMAGE_PROMPT_SUFFIX;
 }
 
 // ─── Template-based carousel content generation (fallback) ─────────────────
@@ -425,10 +439,12 @@ const BOFU_CAROUSEL_PROMPT = `أنت خبير في تصميم محتوى كار�
 ## ⛔ قواعد الصور (الأهم — إلزامي جداً)
 - image_prompt يجب أن يصف صورة فوتوغرافية واقعية 100% — NOT illustration, NOT graphic design, NOT infographic, NOT cartoon
 - يجب أن تبدو الصورة كأنها التقطت بكاميرا حقيقية (DSLR quality, professional photography)
-- ⛔ ممنوع تماماً أي نص أو حروف أو كلمات داخل الصورة — NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY في الصورة
+- ⛔ ممنوع تماماً أي نص أو حروف أو كلمات داخل الصورة — NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY, NO LABELS, NO BADGES في الصورة
+- ⛔ ممنوع استخدام كلمات مثل "text saying", "write", "label", "badge", "PROBLEM", "SOLUTION" في image_prompt
 - النص يُعرض كطبقة منفصلة فوق الصورة وليس داخلها
 - وصف الصورة يجب أن يتضمن كلمات مثل: "photorealistic, professional photography, DSLR, realistic, candid, natural lighting"
-- وصف الصورة يجب أن يتضمن: "NO TEXT, NO WORDS, NO LETTERS, NO TYPOGRAPHY IN IMAGE"
+- وصف الصورة يجب أن ينتهي دائماً بـ: "no text, no labels, no words in the image"
+- ⛔ كل image_prompt يجب أن يصف المنتج الفعلي المذكور في وصف المستخدم — الصورة يجب أن تعرض المنتج نفسه في مشاهد مختلفة (على طاولة، في يد شخص، في بيئة استخدام، إلخ)
 
 ## قواعد النص فوق الصورة
 - النص فوق الصورة اختياري وليس إلزامياً
@@ -538,8 +554,8 @@ async function generateSlideContent(
 }
 
 // ─── Generate slide image using built-in AI API ──────────────────────────
-async function generateSlideImageBuiltIn(prompt: string, slideIdx: number, total: number): Promise<string> {
-  const response = await imageGeneration(prompt, "768x1344");
+async function generateSlideImageBuiltIn(prompt: string, slideIdx: number, total: number, referenceImageUrl?: string): Promise<string> {
+  const response = await imageGeneration(prompt, "768x1344", referenceImageUrl);
 
   if (response) {
     const data = (response as Record<string, unknown>)?.data;
@@ -563,7 +579,18 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { idea, kieApiKey, numSlides = 5, language = "en" } = body;
+    const { idea, kieApiKey, numSlides = 5, language = "en", productImageUrl, slideTexts } = body;
+
+    // Validate productImageUrl — must be a URL or base64 data URL, not too large
+    let validProductImageUrl: string | undefined;
+    if (productImageUrl && typeof productImageUrl === "string") {
+      // Limit base64 data URLs to 10MB to avoid body size issues
+      if (productImageUrl.startsWith("data:image/") && productImageUrl.length < 10 * 1024 * 1024) {
+        validProductImageUrl = productImageUrl;
+      } else if (productImageUrl.startsWith("http")) {
+        validProductImageUrl = productImageUrl;
+      }
+    }
 
     if (!idea || idea.trim().length < 5) {
       return NextResponse.json(
@@ -603,7 +630,7 @@ export async function POST(req: NextRequest) {
           );
         } else {
           console.log(`[Carousel] Slide ${i + 1}/${slides.length}: generating with built-in AI API...`);
-          imageUrl = await generateSlideImageBuiltIn(slide.imagePrompt, i, slides.length);
+          imageUrl = await generateSlideImageBuiltIn(slide.imagePrompt, i, slides.length, validProductImageUrl);
           console.log(`[Carousel] Slide ${i + 1}/${slides.length}: image ready!`);
         }
         slidesWithImages.push({
@@ -626,10 +653,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       success: true,
       carouselTitle,
-      slides: slidesWithImages.map(s => ({
+      slides: slidesWithImages.map((s, i) => ({
         ...s,
         slideType: s.slideType || "value",
-        headerText: s.headerText ?? null,
+        // If user provided custom text for this slide, use it as headerText (overrides AI text)
+        headerText: ((Array.isArray(slideTexts) && slideTexts[i]?.trim()) || s.headerText) ?? null,
         bodyText: s.bodyText ?? null,
         textPosition: s.textPosition || "bottom",
       })),
