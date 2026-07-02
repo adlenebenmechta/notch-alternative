@@ -217,6 +217,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [viewingProblem, setViewingProblem] = useState(true); // Toggle between problem/solution view
 
   const [savedToLibrary, setSavedToLibrary] = useState(false);
+  const [savingToLibrary, setSavingToLibrary] = useState(false);
   const [autoPublishTikTok, setAutoPublishTikTok] = useState(false);
   const [publishStates, setPublishStates] = useState<Record<number, "idle" | "publishing" | "published" | "failed">>({});
   const abortRef = useRef(false);
@@ -605,6 +606,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   // ─── Save to Library ────────────────────────────────────────────────
   const saveToLibrary = useCallback(async () => {
     if (slides.length === 0 || savedToLibrary) return;
+    setSavingToLibrary(true);
 
     // For each slide, we need to generate texted versions (image + text overlay)
     // The text comes from the AI-generated problem_text / solution_text
@@ -699,6 +701,43 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
     console.log(`[Carousel] Saving to library: ${allImages.length} images (with text overlays applied)`);
 
+    // Upload data URLs to persistent storage so they survive page refresh
+    const uploadedImages: string[] = [];
+    for (let i = 0; i < allImages.length; i++) {
+      const imgUrl = allImages[i];
+      if (imgUrl && !imgUrl.startsWith("http")) {
+        try {
+          const blob = await (await fetch(imgUrl)).blob();
+          const file = new File([blob], `carousel_slide_${i}_${Date.now()}.png`, { type: "image/png" });
+          const fd = new FormData();
+          fd.append("avatar", file);
+          let uploaded = false;
+          for (let attempt = 1; attempt <= 3; attempt++) {
+            try {
+              const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+              const upData = await upRes.json();
+              if (upData.success && upData.avatarUrl) {
+                uploadedImages.push(upData.avatarUrl);
+                uploaded = true;
+                break;
+              }
+            } catch (e) {
+              console.warn(`[Carousel] Upload slide ${i} attempt ${attempt} error:`, e);
+            }
+            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+          }
+          if (!uploaded) uploadedImages.push(imgUrl); // Fallback to data URL
+        } catch (e) {
+          console.warn(`[Carousel] Failed to upload slide ${i}:`, e);
+          uploadedImages.push(imgUrl);
+        }
+      } else {
+        uploadedImages.push(imgUrl);
+      }
+    }
+
+    const finalImages = uploadedImages;
+
     // Save to API
     try {
       await authFetch("/api/videos", {
@@ -706,8 +745,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           title: `Carousel: ${carouselTitle}`,
-          videoUrl: allImages[0] || "",
-          thumbnailUrl: allImages[0] || null,
+          videoUrl: finalImages[0] || "",
+          thumbnailUrl: finalImages[0] || null,
           duration: null,
           scenesCount: slides.length,
           provider: "carousel",
@@ -715,7 +754,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             type: "carousel",
             slideCount: slides.length,
             productUrl,
-            imageUrls: allImages, // ALL image URLs with text overlays applied
+            imageUrls: finalImages, // ALL image URLs with text overlays applied, uploaded to persistent storage
           },
         }),
       });
@@ -728,23 +767,21 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       saveVideoToStorage(userEmail, {
         id: "carousel_" + Date.now(),
         title: `Carousel: ${carouselTitle}`,
-        videoUrl: allImages[0] || "",
-        thumbnailUrl: allImages[0] || null,
+        videoUrl: finalImages[0] || "",
+        thumbnailUrl: finalImages[0] || null,
         duration: null,
         scenesCount: slides.length,
         provider: "carousel",
         createdAt: new Date().toISOString(),
+        metadata: JSON.stringify({ type: "carousel", slideCount: slides.length, productUrl, imageUrls: finalImages }),
       });
     }
     setSavedToLibrary(true);
+    setSavingToLibrary(false);
   }, [slides, carouselTitle, productUrl, savedToLibrary, userEmail, authFetch]);
 
-  // Auto-save to library when complete
-  useEffect(() => {
-    if (step === "complete" && slides.length > 0 && !savedToLibrary) {
-      saveToLibrary();
-    }
-  }, [step, slides, savedToLibrary, saveToLibrary]);
+  // REMOVED: Auto-save was saving before text overlays were applied.
+  // User now clicks "Save to Library" button manually to ensure text is included.
 
   // Restore text overlay from cache when switching slides or problem/product
   useEffect(() => {
@@ -1524,18 +1561,45 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </div>
             </div>
 
-            {/* Library Saved Indicator */}
-            {savedToLibrary && (
-              <div className="mt-3 text-center">
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium" style={{ color: C.green }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    {/* ─── Save to Library Button ─────────────────────────────── */}
+            <button
+              onClick={async () => {
+                setSavedToLibrary(false);
+                await saveToLibrary();
+              }}
+              disabled={savingToLibrary}
+              className="w-full mt-4 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: savedToLibrary ? `${C.green}20` : C.pink,
+                color: savedToLibrary ? C.green : C.white,
+                border: savedToLibrary ? `1.5px solid ${C.green}40` : "none",
+                boxShadow: savedToLibrary ? "none" : `0 4px 20px ${C.pink}30`,
+              }}
+            >
+              {savingToLibrary ? (
+                <>
+                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Saving to Library...
+                </>
+              ) : savedToLibrary ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                     <polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
-                  Saved to library
-                </span>
-              </div>
-            )}
+                  Saved to Library
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  Save to Library
+                </>
+              )}
+            </button>
           </div>
         </main>
       </div>
