@@ -164,3 +164,29 @@ model Analytics {
   recordedAt DateTime @default(now())
   post       Post     @relation(fields: [postId], references: [id], onDelete: Cascade)
 }
+
+
+// ─── Bot Tasks (AI-powered automation) ──────────────────────────────────────
+model BotTask {
+  id           String   @id @default(cuid())
+  userId       String?  // optional: link to user
+  
+  // Command info
+  command      String   // original natural language command
+  parsedAction String   // AI-parsed action type: "publish_now", "schedule", "bulk_publish", "auto_publish_new"
+  parsedData   String?  // JSON string with parsed parameters
+  
+  // Execution
+  status       String   @default("pending") // pending, in_progress, completed, failed, cancelled
+  result       String?  // JSON string with execution result
+  errorMessage String?
+  
+  // For recurring automations
+  isRecurring  Boolean  @default(false)
+  cronSchedule String?  // for recurring tasks
+  lastRunAt    DateTime?
+  nextRunAt    DateTime?
+  
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
