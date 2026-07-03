@@ -1966,7 +1966,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           {/* Settings Row */}
           <div className="flex flex-wrap items-end gap-4 mt-6 mb-5">
             {/* Number of Carousels */}
-            <div className="flex-1 min-w-[220px]">
+            <div className="flex-1 min-w-[180px]">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
@@ -1980,54 +1980,28 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   Carousels
                 </label>
               </div>
-              <div className="flex items-center gap-2">
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <button
-                    key={n}
-                    onClick={() => setNumSlides(n)}
-                    className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all duration-200"
-                    style={{
-                      backgroundColor: numSlides === n ? C.pink : "#F9FAFB",
-                      color: numSlides === n ? C.white : C.textMuted,
-                      border: `1.5px solid ${numSlides === n ? C.pink : "#E5E7EB"}`,
-                    }}
-                  >
-                    {n}
-                  </button>
-                ))}
-                {/* Custom number input */}
-                <div className="flex items-center gap-1 ml-1">
-                  <button
-                    onClick={() => setNumSlides(Math.max(1, numSlides - 1))}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-200"
-                    style={{ backgroundColor: "#F9FAFB", border: "1.5px solid #E5E7EB", color: C.textMuted }}
-                  >
-                    −
-                  </button>
-                  <input
-                    type="number"
-                    min={1}
-                    max={20}
-                    value={numSlides}
-                    onChange={(e) => {
-                      const val = parseInt(e.target.value);
-                      if (!isNaN(val) && val >= 1 && val <= 20) setNumSlides(val);
-                    }}
-                    className="w-10 h-7 text-center text-xs font-bold rounded-lg focus:outline-none"
-                    style={{ border: `1.5px solid ${C.pink}40`, color: C.text, backgroundColor: "#F9FAFB" }}
-                  />
-                  <button
-                    onClick={() => setNumSlides(Math.min(20, numSlides + 1))}
-                    className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold transition-all duration-200"
-                    style={{ backgroundColor: "#F9FAFB", border: "1.5px solid #E5E7EB", color: C.textMuted }}
-                  >
-                    +
-                  </button>
-                </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="number"
+                  min={1}
+                  max={20}
+                  value={numSlides}
+                  onChange={(e) => {
+                    const val = parseInt(e.target.value);
+                    if (!isNaN(val) && val >= 1 && val <= 20) setNumSlides(val);
+                    else if (e.target.value === "") setNumSlides(1);
+                  }}
+                  className="w-16 px-3 py-2.5 rounded-xl text-sm font-bold text-center focus:outline-none transition-all duration-200"
+                  style={{
+                    border: `1.5px solid ${C.pink}`,
+                    color: C.pink,
+                    backgroundColor: `${C.pink}08`,
+                  }}
+                />
+                <p className="text-[10px]" style={{ color: C.textMuted }}>
+                  {numSlides} carousel{numSlides > 1 ? 's' : ''} × 2 images = {numSlides * 2} total
+                </p>
               </div>
-              <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
-                {numSlides} carousel{numSlides > 1 ? 's' : ''} × 2 images each = {numSlides * 2} total
-              </p>
             </div>
 
             {/* Language */}
