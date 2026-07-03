@@ -1965,7 +1965,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
           {/* Settings Row */}
           <div className="flex flex-wrap items-end gap-4 mt-6 mb-5">
-            {/* Number of Carousels */}
+            {/* Number of Slides */}
             <div className="flex-1 min-w-[180px]">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
@@ -1977,19 +1977,19 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   </svg>
                 </div>
                 <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-                  Carousels
+                  Slides
                 </label>
               </div>
               <div className="flex items-center gap-3">
                 <input
                   type="number"
-                  min={1}
-                  max={20}
+                  min={2}
+                  max={15}
                   value={numSlides}
                   onChange={(e) => {
                     const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 1 && val <= 20) setNumSlides(val);
-                    else if (e.target.value === "") setNumSlides(1);
+                    if (!isNaN(val) && val >= 2 && val <= 15) setNumSlides(val);
+                    else if (e.target.value === "") setNumSlides(2);
                   }}
                   className="w-16 px-3 py-2.5 rounded-xl text-sm font-bold text-center focus:outline-none transition-all duration-200"
                   style={{
@@ -1999,7 +1999,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   }}
                 />
                 <p className="text-[10px]" style={{ color: C.textMuted }}>
-                  {numSlides} carousel{numSlides > 1 ? 's' : ''} × 2 images = {numSlides * 2} total
+                  AI picks structure: Hook → Pain → Solution → CTA etc.
                 </p>
               </div>
             </div>
