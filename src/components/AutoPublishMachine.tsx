@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback } from "react";
 import { useAuth } from "@/providers/auth-provider";
+import { loadVideosFromStorage, type StoredVideo } from "@/lib/video-store";
 import PipelineMonitor from "@/components/PipelineMonitor";
 
 // ─── Colors (matching existing design) ─────────────────────────────────────
@@ -301,60 +302,140 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
   const fetchLibrary = useCallback(async () => {
     setLibraryLoading(true);
     try {
-      // Get the auth token directly from localStorage (same as auth-provider)
-      let token: string | null = null;
+      // 1) Always load from localStorage first (works offline, survives DB issues)
+      const userEmail = user?.email || "";
+      const localVideos: LibraryVideo[] = userEmail
+        ? loadVideosFromStorage(userEmail).map((v: StoredVideo) => ({
+            id: v.id,
+            title: v.title,
+            videoUrl: v.videoUrl,
+            thumbnailUrl: v.thumbnailUrl,
+            duration: v.duration,
+            scenesCount: v.scenesCount,
+            provider: v.provider,
+            metadata: v.metadata || null,
+            createdAt: v.createdAt,
+          }))
+        : [];
+
+      // 2) Try API as primary source
+      let apiVideos: LibraryVideo[] = [];
       try {
-        const stored = localStorage.getItem("auth_session");
-        if (stored) {
-          const session = JSON.parse(stored);
-          token = session.idToken || session.token;
+        // Get the auth token directly from localStorage (same as auth-provider)
+        let token: string | null = null;
+        try {
+          const stored = localStorage.getItem("auth_session");
+          if (stored) {
+            const session = JSON.parse(stored);
+            token = session.idToken || session.token;
+          }
+        } catch {}
+
+        // Build headers with auth token
+        const headers: Record<string, string> = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
         }
-      } catch {}
 
-      // Build headers with auth token
-      const headers: Record<string, string> = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const res = await fetch("/api/videos", { headers });
-      
-      if (!res.ok) {
-        console.warn("Library fetch returned:", res.status, token ? "(with token)" : "(no token)");
-        // Try authFetch as fallback
-        if (authFetch && !token) {
-          console.log("Trying authFetch fallback...");
-          const res2 = await authFetch("/api/videos");
-          if (res2.ok) {
-            const data2 = await res2.json();
-            setLibraryVideos(data2.videos || []);
-            return;
+        const res = await fetch("/api/videos", { headers });
+        
+        if (res.ok) {
+          const data = await res.json();
+          const videoArray = data.videos || [];
+          if (Array.isArray(videoArray)) {
+            apiVideos = videoArray.map((v: Record<string, unknown>) => ({
+              id: (v.id as string) || "",
+              title: (v.title as string) || "Untitled",
+              videoUrl: (v.videoUrl as string) || "",
+              thumbnailUrl: (v.thumbnailUrl as string) || null,
+              duration: (v.duration as string) || null,
+              scenesCount: (v.scenesCount as number) || 1,
+              provider: (v.provider as string) || "kie",
+              metadata: (v.metadata as string) || null,
+              createdAt: (v.createdAt as string) || new Date().toISOString(),
+            })).filter((v: LibraryVideo) => v.videoUrl);
+          }
+        } else {
+          console.warn("Library fetch returned:", res.status, token ? "(with token)" : "(no token)");
+          // Try authFetch as fallback
+          if (authFetch && !token) {
+            try {
+              const res2 = await authFetch("/api/videos");
+              if (res2.ok) {
+                const data2 = await res2.json();
+                const arr2 = data2.videos || [];
+                if (Array.isArray(arr2)) {
+                  apiVideos = arr2.map((v: Record<string, unknown>) => ({
+                    id: (v.id as string) || "",
+                    title: (v.title as string) || "Untitled",
+                    videoUrl: (v.videoUrl as string) || "",
+                    thumbnailUrl: (v.thumbnailUrl as string) || null,
+                    duration: (v.duration as string) || null,
+                    scenesCount: (v.scenesCount as number) || 1,
+                    provider: (v.provider as string) || "kie",
+                    metadata: (v.metadata as string) || null,
+                    createdAt: (v.createdAt as string) || new Date().toISOString(),
+                  })).filter((v: LibraryVideo) => v.videoUrl);
+                }
+              }
+            } catch {}
           }
         }
-        setLibraryVideos([]);
-        return;
+      } catch (err) {
+        console.warn("Library API fetch failed, using localStorage only:", err);
+        // Last resort: try authFetch
+        try {
+          if (authFetch) {
+            const res = await authFetch("/api/videos");
+            if (res.ok) {
+              const data = await res.json();
+              const arr = data.videos || [];
+              if (Array.isArray(arr)) {
+                apiVideos = arr.map((v: Record<string, unknown>) => ({
+                  id: (v.id as string) || "",
+                  title: (v.title as string) || "Untitled",
+                  videoUrl: (v.videoUrl as string) || "",
+                  thumbnailUrl: (v.thumbnailUrl as string) || null,
+                  duration: (v.duration as string) || null,
+                  scenesCount: (v.scenesCount as number) || 1,
+                  provider: (v.provider as string) || "kie",
+                  metadata: (v.metadata as string) || null,
+                  createdAt: (v.createdAt as string) || new Date().toISOString(),
+                })).filter((v: LibraryVideo) => v.videoUrl);
+              }
+            }
+          }
+        } catch {}
       }
-      
-      const data = await res.json();
-      setLibraryVideos(data.videos || []);
+
+      // 3) Merge: API videos take precedence (have correct DB IDs),
+      //    but add local videos that aren't in API (local-only items)
+      const result = new Map<string, LibraryVideo>();
+      for (const v of apiVideos) {
+        result.set(v.id, v);
+      }
+      // Add API videos by URL too (for dedup with local entries)
+      const apiUrls = new Set(apiVideos.map((v) => v.videoUrl));
+      for (const v of localVideos) {
+        if (!result.has(v.id) && !apiUrls.has(v.videoUrl)) {
+          result.set(v.id, v);
+        }
+      }
+
+      const merged = Array.from(result.values());
+      merged.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+      console.log(`[AutoPublish Library] Loaded ${merged.length} items (${apiVideos.length} from API, ${localVideos.length} from localStorage)`);
+      setLibraryVideos(merged);
     } catch (err) {
       console.error("Library fetch error:", err);
-      // Last resort: try authFetch
-      try {
-        if (authFetch) {
-          const res = await authFetch("/api/videos");
-          const data = await res.json();
-          setLibraryVideos(data.videos || []);
-        }
-      } catch {
-        setLibraryVideos([]);
-      }
+      setLibraryVideos([]);
     } finally {
       setLibraryLoading(false);
     }
-  }, [authFetch]);
+  }, [user, authFetch]);
 
   // ─── Publish from Library Form ─────────────────────────────────────────────
   const handlePublishFromLibraryForm = async () => {
