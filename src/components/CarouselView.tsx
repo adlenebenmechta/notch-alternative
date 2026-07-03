@@ -1009,14 +1009,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         <main
           className="overflow-y-auto p-4"
           style={{ height: "calc(100vh - 56px)" }}
-          onTouchStart={handleTouchStart}
-          onTouchEnd={handleTouchEnd}
         >
           <div className="w-full max-w-sm mx-auto">
             {/* Slide Image */}
             <div
               className="relative rounded-3xl overflow-hidden"
               style={{ aspectRatio: "9/16", backgroundColor: "#1A1A1A", border: "2px solid #333333", boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
             >
               {currentLoading ? (
                 <div className="w-full h-full flex items-center justify-center">
