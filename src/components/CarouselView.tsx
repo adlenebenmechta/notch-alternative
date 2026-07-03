@@ -608,13 +608,13 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     if (slides.length === 0 || savedToLibrary) return;
     setSavingToLibrary(true);
 
-    // For each slide, we need to generate texted versions (image + text overlay)
-    // The text comes from the AI-generated problem_text / solution_text
-    // We use the /api/carousel/add-text endpoint to render text onto images
-    const allImages: string[] = [];
+    // ─── Each slide (problem + solution) is saved as a SEPARATE carousel in the library ───
+    // If the user chose 2 carousels, we save 2 library entries, each with 2 images.
+    console.log(`[Carousel] Saving ${slides.length} separate carousel(s) to library...`);
 
     for (let i = 0; i < slides.length; i++) {
       const slide = slides[i];
+      const slideImages: string[] = [];
 
       // Check cache first — if user already applied text manually, use that
       const problemCacheKey = `${i}-problem`;
@@ -624,7 +624,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
       // For problem image: apply problem_text if not already cached
       if (textedProblem) {
-        allImages.push(textedProblem);
+        slideImages.push(textedProblem);
       } else if (slide.problemImageUrl && slide.problem.problem_text) {
         try {
           const res = await authFetch("/api/carousel/add-text", {
@@ -646,23 +646,22 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           if (res.ok) {
             const data = await res.json();
             if (data.image) {
-              allImages.push(data.image);
+              slideImages.push(data.image);
               textedImageCacheRef.current.set(problemCacheKey, data.image);
               textContentCacheRef.current.set(problemCacheKey, slide.problem.problem_text);
-              continue;
             }
           }
         } catch (e) {
           console.warn(`[Carousel] Failed to add text to problem slide ${i + 1}:`, e);
         }
-        allImages.push(slide.problemImageUrl);
+        if (slideImages.length === 0 && slide.problemImageUrl) slideImages.push(slide.problemImageUrl);
       } else {
-        if (slide.problemImageUrl) allImages.push(slide.problemImageUrl);
+        if (slide.problemImageUrl) slideImages.push(slide.problemImageUrl);
       }
 
       // For solution image: apply solution_text if not already cached
       if (textedSolution) {
-        allImages.push(textedSolution);
+        slideImages.push(textedSolution);
       } else if (slide.solutionImageUrl && slide.solution.solution_text) {
         try {
           const res = await authFetch("/api/carousel/add-text", {
@@ -684,98 +683,105 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           if (res.ok) {
             const data = await res.json();
             if (data.image) {
-              allImages.push(data.image);
+              slideImages.push(data.image);
               textedImageCacheRef.current.set(solutionCacheKey, data.image);
               textContentCacheRef.current.set(solutionCacheKey, slide.solution.solution_text);
-              continue;
             }
           }
         } catch (e) {
           console.warn(`[Carousel] Failed to add text to solution slide ${i + 1}:`, e);
         }
-        allImages.push(slide.solutionImageUrl);
+        // Only push raw solution if we didn't already add a texted version
+        if (slideImages.length < 2 && slide.solutionImageUrl) slideImages.push(slide.solutionImageUrl);
       } else {
-        if (slide.solutionImageUrl) allImages.push(slide.solutionImageUrl);
+        if (slide.solutionImageUrl) slideImages.push(slide.solutionImageUrl);
       }
-    }
 
-    console.log(`[Carousel] Saving to library: ${allImages.length} images (with text overlays applied)`);
-
-    // Upload data URLs to persistent storage so they survive page refresh
-    const uploadedImages: string[] = [];
-    for (let i = 0; i < allImages.length; i++) {
-      const imgUrl = allImages[i];
-      if (imgUrl && !imgUrl.startsWith("http")) {
-        try {
-          const blob = await (await fetch(imgUrl)).blob();
-          const file = new File([blob], `carousel_slide_${i}_${Date.now()}.png`, { type: "image/png" });
-          const fd = new FormData();
-          fd.append("avatar", file);
-          let uploaded = false;
-          for (let attempt = 1; attempt <= 3; attempt++) {
-            try {
-              const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
-              const upData = await upRes.json();
-              if (upData.success && upData.avatarUrl) {
-                uploadedImages.push(upData.avatarUrl);
-                uploaded = true;
-                break;
+      // Upload data URLs to persistent storage so they survive page refresh
+      const uploadedImages: string[] = [];
+      for (let j = 0; j < slideImages.length; j++) {
+        const imgUrl = slideImages[j];
+        if (imgUrl && !imgUrl.startsWith("http")) {
+          try {
+            const blob = await (await fetch(imgUrl)).blob();
+            const file = new File([blob], `carousel_${i+1}_slide_${j}_${Date.now()}.png`, { type: "image/png" });
+            const fd = new FormData();
+            fd.append("avatar", file);
+            let uploaded = false;
+            for (let attempt = 1; attempt <= 3; attempt++) {
+              try {
+                const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
+                const upData = await upRes.json();
+                if (upData.success && upData.avatarUrl) {
+                  uploadedImages.push(upData.avatarUrl);
+                  uploaded = true;
+                  break;
+                }
+              } catch (e) {
+                console.warn(`[Carousel] Upload carousel ${i+1} image ${j} attempt ${attempt} error:`, e);
               }
-            } catch (e) {
-              console.warn(`[Carousel] Upload slide ${i} attempt ${attempt} error:`, e);
+              if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
             }
-            if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
+            if (!uploaded) uploadedImages.push(imgUrl); // Fallback to data URL
+          } catch (e) {
+            console.warn(`[Carousel] Failed to upload carousel ${i+1} image ${j}:`, e);
+            uploadedImages.push(imgUrl);
           }
-          if (!uploaded) uploadedImages.push(imgUrl); // Fallback to data URL
-        } catch (e) {
-          console.warn(`[Carousel] Failed to upload slide ${i}:`, e);
+        } else {
           uploadedImages.push(imgUrl);
         }
-      } else {
-        uploadedImages.push(imgUrl);
       }
-    }
 
-    const finalImages = uploadedImages;
+      const finalImages = uploadedImages;
+      const carouselLabel = slides.length > 1
+        ? `Carousel: ${carouselTitle} (${i + 1}/${slides.length})`
+        : `Carousel: ${carouselTitle}`;
 
-    // Save to API
-    try {
-      await authFetch("/api/videos", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          title: `Carousel: ${carouselTitle}`,
+      console.log(`[Carousel] Saving carousel ${i + 1}/${slides.length}: ${finalImages.length} images`);
+
+      // Save this individual carousel to API
+      try {
+        await authFetch("/api/videos", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            title: carouselLabel,
+            videoUrl: finalImages[0] || "",
+            thumbnailUrl: finalImages[0] || null,
+            duration: null,
+            scenesCount: 1, // 1 carousel = 1 slide (2 images: problem + solution)
+            provider: "carousel",
+            metadata: {
+              type: "carousel",
+              slideCount: 1,
+              carouselIndex: i + 1,
+              totalCarousels: slides.length,
+              productUrl,
+              imageUrls: finalImages, // 2 images for this carousel
+            },
+          }),
+        });
+      } catch {
+        // Continue to localStorage
+      }
+
+      // Save this individual carousel to localStorage
+      if (userEmail) {
+        saveVideoToStorage(userEmail, {
+          id: `carousel_${i}_${Date.now()}`,
+          title: carouselLabel,
           videoUrl: finalImages[0] || "",
           thumbnailUrl: finalImages[0] || null,
           duration: null,
-          scenesCount: slides.length,
+          scenesCount: 1,
           provider: "carousel",
-          metadata: {
-            type: "carousel",
-            slideCount: slides.length,
-            productUrl,
-            imageUrls: finalImages, // ALL image URLs with text overlays applied, uploaded to persistent storage
-          },
-        }),
-      });
-    } catch {
-      // Continue to localStorage
+          createdAt: new Date().toISOString(),
+          metadata: JSON.stringify({ type: "carousel", slideCount: 1, carouselIndex: i + 1, totalCarousels: slides.length, productUrl, imageUrls: finalImages }),
+        });
+      }
     }
 
-    // Save to localStorage
-    if (userEmail) {
-      saveVideoToStorage(userEmail, {
-        id: "carousel_" + Date.now(),
-        title: `Carousel: ${carouselTitle}`,
-        videoUrl: finalImages[0] || "",
-        thumbnailUrl: finalImages[0] || null,
-        duration: null,
-        scenesCount: slides.length,
-        provider: "carousel",
-        createdAt: new Date().toISOString(),
-        metadata: JSON.stringify({ type: "carousel", slideCount: slides.length, productUrl, imageUrls: finalImages }),
-      });
-    }
+    console.log(`[Carousel] Done! Saved ${slides.length} separate carousel(s) to library.`);
     setSavedToLibrary(true);
     setSavingToLibrary(false);
   }, [slides, carouselTitle, productUrl, savedToLibrary, userEmail, authFetch]);
@@ -825,10 +831,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const handlePublishAllToTikTok = async () => {
     const readySlides = slides.filter(s => s.problemImageUrl && s.solutionImageUrl);
     if (readySlides.length === 0) {
-      alert("No slides ready to publish. Generate images first.");
+      alert("No carousels ready to publish. Generate images first.");
       return;
     }
-    if (!confirm(`Publish ${readySlides.length} slide(s) to TikTok?`)) return;
+    if (!confirm(`Publish ${readySlides.length} carousel(s) to TikTok?`)) return;
 
     for (const slide of readySlides) {
       try {
@@ -1469,7 +1475,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               {savingToLibrary ? (
                 <>
                   <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Saving to Library...
+                  Saving {slides.length} Carousels...
                 </>
               ) : savedToLibrary ? (
                 <>
@@ -1477,7 +1483,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                     <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
                     <polyline points="22 4 12 14.01 9 11.01" />
                   </svg>
-                  Saved to Library
+                  {slides.length} Carousels Saved!
                 </>
               ) : (
                 <>
@@ -1486,7 +1492,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                     <polyline points="17 21 17 13 7 13 7 21" />
                     <polyline points="7 3 7 8 15 8" />
                   </svg>
-                  Save to Library
+                  Save {slides.length} Carousel{slides.length > 1 ? 's' : ''} to Library
                 </>
               )}
             </button>
@@ -1507,7 +1513,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <polyline points="7 10 12 15 17 10" />
                   <line x1="12" y1="15" x2="12" y2="3" />
                 </svg>
-                Download All Slides ({slides.length * 2} images)
+                Download All ({slides.length} carousel{slides.length > 1 ? 's' : ''}, {slides.length * 2} images)
               </span>
             </button>
 
@@ -1529,7 +1535,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       TikTok Auto-Publish
                     </div>
                     <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
-                      Publish each slide as a TikTok photo carousel (2 images per post)
+                      Publish each carousel (2 images) as a TikTok photo post
                     </div>
                   </div>
                 </div>
@@ -1569,7 +1575,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
                     <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
-                  Publish All Slides to TikTok ({slides.filter(s => s.problemImageUrl && s.solutionImageUrl).length} ready)
+                  Publish All Carousels to TikTok ({slides.filter(s => s.problemImageUrl && s.solutionImageUrl).length} ready)
                 </span>
               </button>
 
@@ -1768,7 +1774,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           {[
             { num: "1", title: "Paste Link", desc: "Add your product URL", color: C.pink },
             { num: "2", title: "AI Analyzes", desc: "DeepSeek extracts features", color: C.gold },
-            { num: "3", title: "Get Slides", desc: "Problem → Product images", color: "#22C55E" },
+            { num: "3", title: "Get Carousels", desc: "Problem → Solution pairs", color: "#22C55E" },
           ].map((item) => (
             <div
               key={item.num}
@@ -1959,7 +1965,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
           {/* Settings Row */}
           <div className="flex flex-wrap items-end gap-4 mt-6 mb-5">
-            {/* Number of Slides */}
+            {/* Number of Carousels */}
             <div className="flex-1 min-w-[180px]">
               <div className="flex items-center gap-2 mb-2">
                 <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
@@ -1971,7 +1977,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   </svg>
                 </div>
                 <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-                  Slides
+                  Carousels
                 </label>
               </div>
               <div className="flex items-center gap-2">
@@ -1991,7 +1997,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 ))}
               </div>
               <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
-                {numSlides * 2} images total (problem + product per slide)
+                {numSlides} carousel{numSlides > 1 ? 's' : ''} × 2 images each = {numSlides * 2} total
               </p>
             </div>
 
@@ -2087,7 +2093,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                 <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
               </svg>
-              Generate Carousel ({numSlides} slides, {numSlides * 2} images)
+              Generate {numSlides} Carousel{numSlides > 1 ? 's' : ''} ({numSlides * 2} images)
             </span>
           </button>
         </div>
@@ -2098,7 +2104,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           style={{ backgroundColor: C.white, border: "1px solid #F3F4F6" }}
         >
           <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: C.gold }}>
-            How Each Slide Works
+            How Each Carousel Works
           </p>
           <div className="flex items-start gap-4">
             {/* Problem */}
