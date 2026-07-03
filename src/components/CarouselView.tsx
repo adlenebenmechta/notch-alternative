@@ -1007,7 +1007,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
         {/* Slide Display */}
         <main
-          className="flex items-center justify-center min-h-[calc(100vh-56px)] p-4"
+          className="overflow-y-auto p-4"
+          style={{ height: "calc(100vh - 56px)" }}
           onTouchStart={handleTouchStart}
           onTouchEnd={handleTouchEnd}
         >
@@ -1451,10 +1452,49 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </button>
             </div>
 
+            {/* ─── Save to Library Button ─────────────────────────────── */}
+            <button
+              onClick={async () => {
+                await saveToLibrary();
+              }}
+              disabled={savingToLibrary || savedToLibrary}
+              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2"
+              style={{
+                backgroundColor: savedToLibrary ? `${C.green}20` : C.pink,
+                color: savedToLibrary ? C.green : C.white,
+                border: savedToLibrary ? `1.5px solid ${C.green}40` : "none",
+                boxShadow: savedToLibrary ? "none" : `0 4px 20px ${C.pink}30`,
+              }}
+            >
+              {savingToLibrary ? (
+                <>
+                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Saving to Library...
+                </>
+              ) : savedToLibrary ? (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                    <polyline points="22 4 12 14.01 9 11.01" />
+                  </svg>
+                  Saved to Library
+                </>
+              ) : (
+                <>
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
+                    <polyline points="17 21 17 13 7 13 7 21" />
+                    <polyline points="7 3 7 8 15 8" />
+                  </svg>
+                  Save to Library
+                </>
+              )}
+            </button>
+
             {/* Download All Button */}
             <button
               onClick={downloadAll}
-              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
+              className="w-full mt-3 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
               style={{
                 background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
                 color: C.white,
@@ -1560,46 +1600,6 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 })}
               </div>
             </div>
-
-                    {/* ─── Save to Library Button ─────────────────────────────── */}
-            <button
-              onClick={async () => {
-                setSavedToLibrary(false);
-                await saveToLibrary();
-              }}
-              disabled={savingToLibrary}
-              className="w-full mt-4 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: savedToLibrary ? `${C.green}20` : C.pink,
-                color: savedToLibrary ? C.green : C.white,
-                border: savedToLibrary ? `1.5px solid ${C.green}40` : "none",
-                boxShadow: savedToLibrary ? "none" : `0 4px 20px ${C.pink}30`,
-              }}
-            >
-              {savingToLibrary ? (
-                <>
-                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Saving to Library...
-                </>
-              ) : savedToLibrary ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                  Saved to Library
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Save to Library
-                </>
-              )}
-            </button>
           </div>
         </main>
       </div>
