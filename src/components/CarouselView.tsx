@@ -2,8 +2,6 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/providers/auth-provider";
-import { saveVideoToStorage } from "@/lib/video-store";
-import SlidePublisher from "@/components/SlidePublisher";
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
@@ -17,934 +15,540 @@ const C = {
   lightGold: "#FBF5EB",
   white: "#FFFFFF",
   cream: "#FFF8F0",
-  red: "#EF4444",
-  green: "#22C55E",
 };
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
-interface ProblemSolutionImages {
-  problemImageUrl: string | null;
-  solutionImageUrl: string | null;
+interface Slide {
+  slideNumber: number;
+  slideType: string; // "hero" | "quote" | "comparison" | "product"
+  title: string;
+  body: string;
+  imagePrompt: string;
+  imageUrl: string | null;
+  headerText: string | null;
+  bodyText: string | null;
+  textPosition: "top" | "center" | "bottom";
+  status: "done" | "image_failed";
+  error?: string;
+  textOverlayUrl?: string | null;
 }
 
-interface CarouselSlide {
-  slide_number: number;
-  problem: {
-    image_prompt: string;
-    problem_text: string | null;
-  };
-  solution: {
-    image_prompt: string;
-    solution_text: string | null;
-  };
+interface CarouselData {
+  carouselTitle: string;
+  slides: Slide[];
 }
-
-interface ProductInfo {
-  productName: string;
-  productDescription: string;
-  features: string[];
-  problems: string[];
-  benefits: string[];
-  targetAudience: string;
-  productImages?: string[];
-}
-
-interface GeneratedSlide extends CarouselSlide, ProblemSolutionImages {
-  problemLoading?: boolean;
-  solutionLoading?: boolean;
-  problemError?: string;
-  solutionError?: string;
-}
-
-type Step = "idle" | "analyzing" | "planning" | "generating" | "complete" | "error";
 
 interface CarouselViewProps {
   onBack: () => void;
   isAdmin?: boolean;
 }
 
-// ─── Proxy-load an external image to avoid CORS issues ────────────────────────
-// Uses /api/proxy-image?url=... to fetch external images through our server
-async function loadProxiedImage(imageUrl: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
+// ─── Slide type colors/icons ───────────────────────────────────────────────
+const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
+  hero: { color: "#E461AD", bg: "#E461AD25", label: "Hero Shot", emoji: "🎯" },
+  quote: { color: "#3B82F6", bg: "#3B82F625", label: "Quote", emoji: "💬" },
+  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
+  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
+};
 
-    // For external URLs, try loading directly first (works if CORS headers present)
-    // If that fails, use a proxy approach via canvas
-    const isExternal = imageUrl.startsWith("http");
+// ─── Word wrap helper ────────────────────────────────────────────────────────
+function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number, fontSize?: number): string[] {
+  if (fontSize) {
+    ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+  }
+  const words = text.split(" ");
+  const lines: string[] = [];
+  let currentLine = "";
 
-    img.onload = () => resolve(img);
-    img.onerror = () => {
-      if (isExternal) {
-        // Try loading without CORS for display (won't work for canvas export but shows the image)
-        const fallbackImg = new Image();
-        fallbackImg.crossOrigin = "anonymous";
-        fallbackImg.onload = () => resolve(fallbackImg);
-        fallbackImg.onerror = () => reject(new Error("Failed to load image"));
-        // Try with no-cors as last resort — at least it displays
-        fallbackImg.src = imageUrl;
-      } else {
-        reject(new Error("Failed to load image"));
-      }
-    };
-
-    img.src = imageUrl;
-  });
+  for (const word of words) {
+    const testLine = currentLine ? currentLine + " " + word : currentLine + word;
+    const metrics = ctx.measureText(testLine);
+    if (metrics.width > maxWidth && currentLine) {
+      lines.push(currentLine);
+      currentLine = word;
+    } else {
+      currentLine = testLine;
+    }
+  }
+  if (currentLine) lines.push(currentLine);
+  return lines;
 }
 
-// ─── Format product image to 9:16 vertical with background ──────────────────
-// Takes a product image (any aspect ratio) and renders it centered on a 9:16 canvas
-// with a matching blurred background fill. Uses server proxy for CORS bypass.
-function formatProductImageTo9x16(imageUrl: string): Promise<string> {
+// ─── Canvas: Render text overlay on image (Skill style) ────────────────────
+// Bold white rounded font with solid black outline, ~22% from top
+function renderTextOnImage(
+  imageUrl: string,
+  headerText: string | null,
+  bodyText: string | null,
+  _textPosition: string,
+  slideIndex: number,
+  totalSlides: number
+): Promise<string> {
   return new Promise((resolve, reject) => {
     const img = new Image();
     img.crossOrigin = "anonymous";
-
-    // Use our server proxy to bypass CORS for external images
-    const isExternal = imageUrl.startsWith("http");
-    const proxiedUrl = isExternal ? `/api/proxy-image?url=${encodeURIComponent(imageUrl)}` : imageUrl;
-
     img.onload = () => {
-      const targetW = 768;
-      const targetH = 1344; // 9:16 ratio
       const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
+      canvas.width = img.naturalWidth || 768;
+      canvas.height = img.naturalHeight || 1344;
       const ctx = canvas.getContext("2d");
       if (!ctx) {
         reject(new Error("Canvas context not available"));
         return;
       }
 
-      // Fill background with a blurred/scaled version
-      ctx.drawImage(img, 0, 0, targetW, targetH);
-      ctx.filter = "blur(30px) brightness(0.5)";
-      ctx.drawImage(img, -10, -10, targetW + 20, targetH + 20);
-      ctx.filter = "none";
+      // Draw the original image
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
 
-      // Add semi-transparent overlay
-      ctx.fillStyle = "rgba(0,0,0,0.3)";
-      ctx.fillRect(0, 0, targetW, targetH);
+      const hasHeader = headerText && headerText.trim() !== "";
+      const hasBody = bodyText && bodyText.trim() !== "";
+      const hasText = !!(hasHeader || hasBody);
 
-      // Calculate centered product image size (fit within canvas with padding)
-      const padding = targetW * 0.08;
-      const availW = targetW - padding * 2;
-      const availH = targetH * 0.75; // Leave room for text at bottom
-      const imgAspect = img.naturalWidth / img.naturalHeight;
-      const availAspect = availW / availH;
+      if (hasText) {
+        const maxWidth = canvas.width * 0.85;
+        const outlineWidth = Math.max(4, canvas.width * 0.008);
 
-      let drawW: number, drawH: number;
-      if (imgAspect > availAspect) {
-        // Image is wider — fit to width
-        drawW = availW;
-        drawH = availW / imgAspect;
-      } else {
-        // Image is taller — fit to height
-        drawH = availH;
-        drawW = availH * imgAspect;
+        // ─── Position: ~22% from top ───
+        const baseY = canvas.height * 0.22;
+
+        // Draw header text (bold, white, rounded, with black outline)
+        if (hasHeader) {
+          const headerLen = headerText!.length;
+          let headerFontSize: number;
+          if (headerLen <= 20) headerFontSize = canvas.width * 0.09;
+          else if (headerLen <= 40) headerFontSize = canvas.width * 0.07;
+          else headerFontSize = canvas.width * 0.058;
+          headerFontSize = Math.max(headerFontSize, 32);
+
+          ctx.font = `bold ${headerFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+          ctx.textAlign = "center";
+
+          // Handle multi-line headers (e.g. ❌/✅ comparison)
+          const headerLines = headerText!.split("\n");
+          const lineHeight = headerFontSize * 1.45;
+
+          // Draw solid black outline first (stroke)
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = outlineWidth * 2;
+          ctx.lineJoin = "round";
+          ctx.miterLimit = 2;
+
+          for (let i = 0; i < headerLines.length; i++) {
+            const lineText = headerLines[i];
+            const subLines = wrapText(ctx, lineText, maxWidth);
+            for (let j = 0; j < subLines.length; j++) {
+              const y = baseY + (i * lineHeight) + (j * lineHeight);
+              ctx.strokeText(subLines[j], canvas.width / 2, y);
+            }
+          }
+
+          // Then draw white fill
+          ctx.fillStyle = "#FFFFFF";
+          for (let i = 0; i < headerLines.length; i++) {
+            const lineText = headerLines[i];
+            const subLines = wrapText(ctx, lineText, maxWidth);
+            for (let j = 0; j < subLines.length; j++) {
+              const y = baseY + (i * lineHeight) + (j * lineHeight);
+              ctx.fillText(subLines[j], canvas.width / 2, y);
+            }
+          }
+
+          // Draw body text below header
+          if (hasBody) {
+            const bodyFontSize = headerFontSize * 0.65;
+            ctx.font = `bold ${bodyFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            const bodyLines = wrapText(ctx, bodyText!, maxWidth);
+            const bodyLineHeight = bodyFontSize * 1.4;
+            const bodyStartY = baseY + headerLines.length * lineHeight + 12;
+
+            // Black outline
+            ctx.strokeStyle = "#000000";
+            ctx.lineWidth = outlineWidth * 1.5;
+            ctx.lineJoin = "round";
+            ctx.miterLimit = 2;
+
+            for (let i = 0; i < bodyLines.length; i++) {
+              ctx.strokeText(bodyLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
+            }
+
+            // White fill
+            ctx.fillStyle = "#FFFFFF";
+            for (let i = 0; i < bodyLines.length; i++) {
+              ctx.fillText(bodyLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
+            }
+          }
+        } else if (hasBody) {
+          // Only body text
+          const bodyLen = bodyText!.length;
+          let fontSize: number;
+          if (bodyLen <= 20) fontSize = canvas.width * 0.08;
+          else if (bodyLen <= 50) fontSize = canvas.width * 0.065;
+          else fontSize = canvas.width * 0.055;
+          fontSize = Math.max(fontSize, 28);
+
+          ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+          ctx.textAlign = "center";
+
+          const bodyLines = wrapText(ctx, bodyText!, maxWidth);
+          const lineHeight = fontSize * 1.4;
+
+          // Black outline
+          ctx.strokeStyle = "#000000";
+          ctx.lineWidth = outlineWidth * 1.5;
+          ctx.lineJoin = "round";
+          ctx.miterLimit = 2;
+
+          for (let i = 0; i < bodyLines.length; i++) {
+            ctx.strokeText(bodyLines[i], canvas.width / 2, baseY + i * lineHeight);
+          }
+
+          // White fill
+          ctx.fillStyle = "#FFFFFF";
+          for (let i = 0; i < bodyLines.length; i++) {
+            ctx.fillText(bodyLines[i], canvas.width / 2, baseY + i * lineHeight);
+          }
+        }
       }
 
-      const drawX = (targetW - drawW) / 2;
-      const drawY = (targetH * 0.45 - drawH) / 2; // Center in upper portion
-
-      // Draw subtle shadow behind product image
-      ctx.shadowColor = "rgba(0,0,0,0.5)";
-      ctx.shadowBlur = 20;
-      ctx.shadowOffsetX = 0;
-      ctx.shadowOffsetY = 5;
-
-      // Draw white background behind product image
-      const bgPad = 8;
-      ctx.fillStyle = "#FFFFFF";
-      ctx.fillRect(drawX - bgPad, drawY - bgPad, drawW + bgPad * 2, drawH + bgPad * 2);
-
-      // Reset shadow
-      ctx.shadowColor = "transparent";
+      // ─── Slide number badge ───
+      ctx.shadowColor = "rgba(0,0,0,0)";
       ctx.shadowBlur = 0;
+      const badgeText = `${slideIndex + 1}/${totalSlides}`;
+      const badgeFontSize = canvas.width * 0.035;
+      ctx.font = `bold ${badgeFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
 
-      // Draw the product image
-      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+      const badgePadding = badgeFontSize * 0.6;
+      const badgeTextWidth = ctx.measureText(badgeText).width;
+      const badgeW = badgeTextWidth + badgePadding * 2;
+      const badgeH = badgeFontSize + badgePadding * 1.2;
+      const badgeX = canvas.width * 0.05;
+      const badgeY = canvas.height * 0.05;
+
+      // Badge background
+      ctx.fillStyle = "rgba(0,0,0,0.55)";
+      const badgeRadius = badgeH / 2;
+      ctx.beginPath();
+      ctx.moveTo(badgeX + badgeRadius, badgeY);
+      ctx.lineTo(badgeX + badgeW - badgeRadius, badgeY);
+      ctx.quadraticCurveTo(badgeX + badgeW, badgeY, badgeX + badgeW, badgeY + badgeRadius);
+      ctx.lineTo(badgeX + badgeW, badgeY + badgeH - badgeRadius);
+      ctx.quadraticCurveTo(badgeX + badgeW, badgeY + badgeH, badgeX + badgeW - badgeRadius, badgeY + badgeH);
+      ctx.lineTo(badgeX + badgeRadius, badgeY + badgeH);
+      ctx.quadraticCurveTo(badgeX, badgeY + badgeH, badgeX, badgeY + badgeH - badgeRadius);
+      ctx.lineTo(badgeX, badgeY + badgeRadius);
+      ctx.quadraticCurveTo(badgeX, badgeY, badgeX + badgeRadius, badgeY);
+      ctx.closePath();
+      ctx.fill();
+
+      // Badge text
+      ctx.fillStyle = "#FFFFFF";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(badgeText, badgeX + badgeW / 2, badgeY + badgeH / 2);
 
       resolve(canvas.toDataURL("image/png"));
     };
-
-    img.onerror = () => {
-      // If proxy also fails, just return the raw URL (it will display in <img> but won't have 9:16 formatting)
-      console.warn("[Carousel] Product image load failed (even via proxy), using raw URL");
-      resolve(imageUrl);
-    };
-
-    img.src = proxiedUrl;
+    img.onerror = () => reject(new Error("Failed to load image for text overlay"));
+    img.src = imageUrl;
   });
-}
-
-// ─── Copy text to clipboard ────────────────────────────────────────────────
-async function copyToClipboard(text: string): Promise<boolean> {
-  try {
-    await navigator.clipboard.writeText(text);
-    return true;
-  } catch {
-    return false;
-  }
 }
 
 // ─── Carousel View Component ───────────────────────────────────────────────
 
 export default function CarouselView({ onBack, isAdmin = false }: CarouselViewProps) {
-  const { user, authFetch } = useAuth();
-  const userEmail = user?.email || "";
+  const { authFetch } = useAuth();
 
   // ─── States ──────────────────────────────────────────────────────────
-  const [productUrl, setProductUrl] = useState("");
-  const [numSlides, setNumSlides] = useState(3);
+  const [idea, setIdea] = useState("");
+  const [numCarousels, setNumCarousels] = useState(1);
   const [language, setLanguage] = useState<"en" | "ar" | "fr">("en");
-  const [userInstructions, setUserInstructions] = useState("");
 
-  const [step, setStep] = useState<Step>("idle");
-  const [stepMessage, setStepMessage] = useState("");
+  const [generating, setGenerating] = useState(false);
+  const [generationStep, setGenerationStep] = useState("");
   const [error, setError] = useState("");
-  const [progress, setProgress] = useState(0);
 
-  const [productImageBase64, setProductImageBase64] = useState<string | null>(null); // User-uploaded product image (base64) for solution slides
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [productInfo, setProductInfo] = useState<ProductInfo | null>(null);
-  const [productImages, setProductImages] = useState<string[]>([]);
-  const [carouselTitle, setCarouselTitle] = useState("");
-  const [slides, setSlides] = useState<GeneratedSlide[]>([]);
+  // Multiple carousels result
+  const [carousels, setCarousels] = useState<CarouselData[]>([]);
+  const [currentCarousel, setCurrentCarousel] = useState(0);
   const [currentSlide, setCurrentSlide] = useState(0);
-  const [viewingProblem, setViewingProblem] = useState(true); // Toggle between problem/solution view
+  const [applyingOverlay, setApplyingOverlay] = useState(false);
 
-  const [savedToLibrary, setSavedToLibrary] = useState(false);
-  const [savingToLibrary, setSavingToLibrary] = useState(false);
-  const [autoPublishTikTok, setAutoPublishTikTok] = useState(false);
-  const [publishStates, setPublishStates] = useState<Record<number, "idle" | "publishing" | "published" | "failed">>({});
-  const abortRef = useRef(false);
+  const [showResult, setShowResult] = useState(false);
+  const carouselRef = useRef<HTMLDivElement>(null);
 
-  // ─── Text Editor States ──────────────────────────────────────────────
-  const [showTextEditor, setShowTextEditor] = useState(false);
-  const [textOverlayText, setTextOverlayText] = useState("");
-  const [textFontSize, setTextFontSize] = useState(48);
-  const [textFontColor, setTextFontColor] = useState("#FFFFFF");
-  const [textStrokeColor, setTextStrokeColor] = useState("#000000");
-  const [textStrokeWidth, setTextStrokeWidth] = useState(3);
-  const [textPosition, setTextPosition] = useState<"top" | "center" | "bottom" | "custom">("bottom");
-  const [textCustomX, setTextCustomX] = useState(50);
-  const [textCustomY, setTextCustomY] = useState(82);
-  const [textAlignment, setTextAlignment] = useState<"left" | "center" | "right">("center");
-  const [textShadow, setTextShadow] = useState(true);
-  const [textFont, setTextFont] = useState("dejavu-bold");
-  const [textApplying, setTextApplying] = useState(false);
-  const [textedImageUrl, setTextedImageUrl] = useState<string | null>(null); // The image with text applied
+  // ─── Apply text overlay to all slides in all carousels ──────────────
+  const applyTextOverlay = useCallback(async (rawCarousels: CarouselData[]) => {
+    setApplyingOverlay(true);
+    setGenerationStep("Applying text overlay...");
 
-  // ─── Per-slide cache for text overlay images and text ────────────────
-  // Key: "slideIndex-problem/solution" (e.g. "0-problem", "2-solution")
-  const textedImageCacheRef = useRef<Map<string, string>>(new Map());
-  const textContentCacheRef = useRef<Map<string, string>>(new Map());
+    const updated = rawCarousels.map((carousel, cIdx) => ({
+      ...carousel,
+      slides: carousel.slides.map((slide, sIdx) => {
+        // Return as-is, we'll update async
+        return slide;
+      }),
+    }));
 
-  // ─── Download helper ─────────────────────────────────────────────────
-  const downloadImage = useCallback(async (imageUrl: string, filename: string) => {
+    // Apply overlay sequentially to avoid canvas memory issues
+    for (let c = 0; c < updated.length; c++) {
+      for (let s = 0; s < updated[c].slides.length; s++) {
+        const slide = updated[c].slides[s];
+        const hasHeader = slide.headerText && slide.headerText.trim() !== "";
+        const hasBody = slide.bodyText && slide.bodyText.trim() !== "";
+        if (slide.imageUrl && (hasHeader || hasBody)) {
+          try {
+            const overlayUrl = await renderTextOnImage(
+              slide.imageUrl!,
+              slide.headerText,
+              slide.bodyText,
+              slide.textPosition || "top",
+              s,
+              updated[c].slides.length
+            );
+            updated[c].slides[s] = { ...updated[c].slides[s], textOverlayUrl: overlayUrl };
+          } catch (err) {
+            console.error(`[Carousel] Text overlay failed for carousel ${c + 1} slide ${s + 1}:`, err);
+            updated[c].slides[s] = { ...updated[c].slides[s], textOverlayUrl: null };
+          }
+        }
+      }
+    }
+
+    setCarousels(updated);
+    setApplyingOverlay(false);
+    setGenerationStep("");
+  }, []);
+
+  // ─── Handle Generate ─────────────────────────────────────────────────
+  const handleGenerate = async () => {
+    if (!idea.trim()) return;
+
+    setGenerating(true);
+    setError("");
+    setCarousels([]);
+    setCurrentCarousel(0);
+    setCurrentSlide(0);
+    setShowResult(false);
+    setGenerationStep("Generating carousel content with AI...");
+
     try {
-      if (imageUrl.startsWith("data:")) {
+      const res = await authFetch("/api/generate-carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idea: idea.trim(),
+          kieApiKey: "",
+          numCarousels,
+          language,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.error || "Generation failed");
+      }
+
+      // Parse carousels from new format
+      const rawCarousels: CarouselData[] = (data.carousels || []).map((c: Record<string, unknown>) => ({
+        carouselTitle: (c.carouselTitle as string) || idea.slice(0, 30),
+        slides: ((c.slides || []) as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
+          ...s,
+          textOverlayUrl: null,
+        })) as Slide[],
+      }));
+
+      // Fallback: if old format (single carousel with slides array at top level)
+      if (rawCarousels.length === 0 && data.slides && Array.isArray(data.slides)) {
+        rawCarousels.push({
+          carouselTitle: data.carouselTitle || idea.slice(0, 30),
+          slides: (data.slides as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
+            ...s,
+            textOverlayUrl: null,
+          })) as Slide[],
+        });
+      }
+
+      setCarousels(rawCarousels);
+      setShowResult(true);
+      setGenerationStep("");
+
+      // Auto-apply text overlay from AI response
+      const hasAnyText = rawCarousels.some(c =>
+        c.slides.some(s =>
+          (s.headerText && s.headerText.trim()) || (s.bodyText && s.bodyText.trim())
+        )
+      );
+      if (hasAnyText) {
+        await applyTextOverlay(rawCarousels);
+      }
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      setError(msg);
+    } finally {
+      setGenerating(false);
+    }
+  };
+
+  // ─── Download Slide Image ────────────────────────────────────────────
+  const downloadSlide = async (slide: Slide, carouselIdx: number, slideIdx: number) => {
+    const downloadUrl = slide.textOverlayUrl || slide.imageUrl;
+    if (!downloadUrl) return;
+
+    try {
+      if (downloadUrl.startsWith("data:")) {
         const a = document.createElement("a");
-        a.href = imageUrl;
-        a.download = filename;
+        a.href = downloadUrl;
+        a.download = `carousel-${carouselIdx + 1}-slide-${slideIdx + 1}.png`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         return;
       }
-      const res = await fetch(imageUrl);
-      const blob = await res.blob();
+
+      const imgRes = await fetch(downloadUrl);
+      const blob = await imgRes.blob();
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = filename;
+      a.download = `carousel-${carouselIdx + 1}-slide-${slideIdx + 1}.png`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch {
-      window.open(imageUrl, "_blank");
-    }
-  }, []);
-
-  // ─── Apply Text Overlay via FFmpeg ──────────────────────────────────
-  const applyTextOverlay = useCallback(async () => {
-    const slide = slides[currentSlide];
-    const baseImageUrl = viewingProblem ? slide.problemImageUrl : slide.solutionImageUrl;
-    if (!baseImageUrl || !textOverlayText.trim()) return;
-
-    setTextApplying(true);
-    try {
-      const res = await authFetch("/api/carousel/add-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl: baseImageUrl,
-          text: textOverlayText.trim(),
-          fontSize: textFontSize,
-          fontColor: textFontColor,
-          strokeColor: textStrokeColor,
-          strokeWidth: textStrokeWidth,
-          position: textPosition,
-          x: textCustomX,
-          y: textCustomY,
-          alignment: textAlignment,
-          shadow: textShadow,
-          fontFile: textFont,
-        }),
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({ error: "Failed to apply text" }));
-        throw new Error(err.error || "Failed to apply text");
-      }
-
-      const data = await res.json();
-      if (data.image) {
-        setTextedImageUrl(data.image);
-        // Cache the texted image for this slide so it persists when navigating
-        const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
-        textedImageCacheRef.current.set(cacheKey, data.image);
-        textContentCacheRef.current.set(cacheKey, textOverlayText.trim());
-      }
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "Failed to apply text overlay";
-      console.error("[Carousel] Text overlay error:", msg);
-      alert("Failed to apply text: " + msg);
-    } finally {
-      setTextApplying(false);
-    }
-  }, [slides, currentSlide, viewingProblem, textOverlayText, textFontSize, textFontColor, textStrokeColor, textStrokeWidth, textPosition, textCustomX, textCustomY, textAlignment, textShadow, textFont, authFetch]);
-
-  // ─── Ensure texted image is available for a given slide ───────────────
-  // If the texted image is already in the cache, return it.
-  // Otherwise, call /api/carousel/add-text to render text onto the image.
-  const ensureTextedImage = useCallback(async (
-    slideIndex: number,
-    type: "problem" | "solution"
-  ): Promise<string | null> => {
-    const cacheKey = `${slideIndex}-${type}`;
-    const cached = textedImageCacheRef.current.get(cacheKey);
-    if (cached) return cached;
-
-    const slide = slides[slideIndex];
-    if (!slide) return null;
-
-    const imageUrl = type === "problem" ? slide.problemImageUrl : slide.solutionImageUrl;
-    const text = type === "problem" ? slide.problem.problem_text : slide.solution.solution_text;
-
-    if (!imageUrl || !text) return imageUrl || null;
-
-    try {
-      const res = await authFetch("/api/carousel/add-text", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          imageUrl,
-          text,
-          fontSize: 48,
-          fontColor: "#FFFFFF",
-          strokeColor: "#000000",
-          strokeWidth: 3,
-          position: "bottom",
-          alignment: "center",
-          shadow: true,
-          fontFile: "dejavu-bold",
-        }),
-      });
-      if (res.ok) {
-        const data = await res.json();
-        if (data.image) {
-          textedImageCacheRef.current.set(cacheKey, data.image);
-          textContentCacheRef.current.set(cacheKey, text);
-          return data.image;
-        }
-      }
-    } catch (e) {
-      console.warn(`[Carousel] ensureTextedImage failed for slide ${slideIndex} ${type}:`, e);
-    }
-    return imageUrl;
-  }, [slides, authFetch]);
-
-  // ─── Main Generation Pipeline ────────────────────────────────────────
-  const handleGenerate = useCallback(async () => {
-    if (!productUrl.trim()) return;
-    abortRef.current = false;
-
-    // Pre-flight auth check
-    if (!user?.email) {
-      setError("You must be logged in to generate carousels. Please sign in and try again.");
-      return;
-    }
-    console.log("[Carousel] Starting generation for user:", user.email);
-
-    setStep("analyzing");
-    setError("");
-    setProgress(5);
-    setStepMessage("Analyzing product from URL...");
-    textedImageCacheRef.current.clear(); // Clear text overlay cache for new generation
-    textContentCacheRef.current.clear();
-
-    try {
-      // Step 1: Analyze product
-      const analyzeRes = await authFetch("/api/carousel/analyze-product", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productUrl: productUrl.trim(),
-          numSlides,
-          userInstructions: userInstructions.trim(),
-        }),
-      });
-
-      if (!analyzeRes.ok) {
-        const errData = await analyzeRes.json();
-        throw new Error(errData.error || "Product analysis failed");
-      }
-
-      const analyzeData = await analyzeRes.json();
-      const pInfo: ProductInfo = analyzeData.productInfo;
-      setProductInfo(pInfo);
-      // Store extracted product images for use in solution slides
-      const extractedImages: string[] = analyzeData.productImages || [];
-      setProductImages(extractedImages);
-      console.log(`[Carousel] Got ${extractedImages.length} product images for solution slides`);
-      setProgress(20);
-      setStep("planning");
-      setStepMessage("DeepSeek is creating your carousel plan...");
-
-      if (abortRef.current) return;
-
-      // Step 2: Generate slide plan
-      const planRes = await authFetch("/api/carousel/generate-slides", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          productInfo: pInfo,
-          numSlides,
-          userInstructions: userInstructions.trim(),
-          language,
-        }),
-      });
-
-      if (!planRes.ok) {
-        const errData = await planRes.json();
-        throw new Error(errData.error || "Slide planning failed");
-      }
-
-      const planData = await planRes.json();
-      const plan = planData.plan;
-
-      // Normalize: map old field names (header_text/body_text) to new (problem_text/solution_text)
-      for (const s of plan.slides) {
-        if (s.problem && !s.problem.problem_text) {
-          s.problem.problem_text = (s.problem as Record<string, unknown>).header_text as string || (s.problem as Record<string, unknown>).body_text as string || null;
-        }
-        if (s.solution && !s.solution.solution_text) {
-          s.solution.solution_text = (s.solution as Record<string, unknown>).header_text as string || (s.solution as Record<string, unknown>).body_text as string || "sorry if they sold out";
-        }
-      }
-
-      setCarouselTitle(plan.carousel_title || pInfo.productName || "Carousel");
-      setProgress(35);
-      setStep("generating");
-      setStepMessage("Generating images...");
-
-      if (abortRef.current) return;
-
-      // Step 3: Initialize slides
-      const initialSlides: GeneratedSlide[] = plan.slides.map((s: CarouselSlide) => ({
-        ...s,
-        problemImageUrl: null,
-        solutionImageUrl: null,
-        problemLoading: true,
-        solutionLoading: true,
-      }));
-      setSlides(initialSlides);
-
-      // Step 4: Generate images for each slide
-      const totalImages = plan.slides.length * 2; // problem + solution per slide
-      let completedImages = 0;
-
-      for (let i = 0; i < plan.slides.length; i++) {
-        if (abortRef.current) {
-          setStep("error");
-          setError("Generation cancelled");
-          return;
-        }
-
-        const slide = plan.slides[i];
-
-        // Generate PROBLEM image
-        try {
-          setStepMessage(`Generating problem image ${i + 1}/${plan.slides.length}...`);
-          const imgRes = await authFetch("/api/carousel/image", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ image_prompt: slide.problem.image_prompt }),
-          });
-
-          if (imgRes.ok) {
-            const imgData = await imgRes.json();
-            // No text overlay — images are clean, text is shown separately
-            setSlides((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, problemImageUrl: imgData.image, problemLoading: false }
-                  : s
-              )
-            );
-          } else {
-            const errData = await imgRes.json().catch(() => ({ error: "Image generation failed" }));
-            setSlides((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, problemLoading: false, problemError: errData.error || "Image generation failed" }
-                  : s
-              )
-            );
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Image generation failed";
-          setSlides((prev) =>
-            prev.map((s, idx) =>
-              idx === i ? { ...s, problemLoading: false, problemError: msg } : s
-            )
-          );
-        }
-        completedImages++;
-        setProgress(35 + Math.round((completedImages / totalImages) * 60));
-
-        // Generate SOLUTION image — use user-uploaded product image as reference
-        try {
-          setStepMessage(`Generating product image ${i + 1}/${plan.slides.length}...`);
-
-          let solutionImage: string | null = null;
-
-          // If user uploaded a product image, send it as reference.
-          // The server will try nano-banana-edit first, then Sharp composite fallback
-          // to guarantee the product appears in the solution image.
-          if (productImageBase64) {
-            console.log(`[Carousel] Sending product image as reference for solution slide ${i + 1} (base64 length: ${productImageBase64.length})`);
-            const imgRes = await authFetch("/api/carousel/image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                image_prompt: slide.solution.image_prompt,
-                reference_image_base64: productImageBase64,
-              }),
-            });
-
-            if (imgRes.ok) {
-              const imgData = await imgRes.json();
-              solutionImage = imgData.image;
-              console.log(`[Carousel] Solution image with product reference ready!`);
-            } else {
-              const errData = await imgRes.json().catch(() => ({ error: "Image generation failed" }));
-              console.warn(`[Carousel] Solution image with reference failed: ${errData.error} (status: ${imgRes.status})`);
-            }
-          }
-
-          // Fallback: generate without reference if no product image or if ref-based generation failed
-          if (!solutionImage) {
-            console.log(`[Carousel] Falling back to no-reference generation for solution slide ${i + 1}`);
-            const imgRes = await authFetch("/api/carousel/image", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ image_prompt: slide.solution.image_prompt }),
-            });
-
-            if (imgRes.ok) {
-              const imgData = await imgRes.json();
-              solutionImage = imgData.image;
-            }
-          }
-
-          if (solutionImage) {
-            // No text overlay — images are clean, text is shown separately
-            setSlides((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, solutionImageUrl: solutionImage, solutionLoading: false }
-                  : s
-              )
-            );
-          } else {
-            setSlides((prev) =>
-              prev.map((s, idx) =>
-                idx === i
-                  ? { ...s, solutionLoading: false, solutionError: "No product image available" }
-                  : s
-              )
-            );
-          }
-        } catch (err: unknown) {
-          const msg = err instanceof Error ? err.message : "Solution image failed";
-          setSlides((prev) =>
-            prev.map((s, idx) =>
-              idx === i ? { ...s, solutionLoading: false, solutionError: msg } : s
-            )
-          );
-        }
-        completedImages++;
-        setProgress(35 + Math.round((completedImages / totalImages) * 60));
-      }
-
-      setProgress(100);
-      setStep("complete");
-      setStepMessage("");
-    } catch (err: unknown) {
-      const msg = err instanceof Error ? err.message : "An unknown error occurred";
-      setError(msg);
-      setStep("error");
-    }
-  }, [productUrl, numSlides, userInstructions, language, authFetch, user, productImageBase64]);
-
-  // ─── Save to Library ────────────────────────────────────────────────
-  const saveToLibrary = useCallback(async () => {
-    if (slides.length === 0 || savedToLibrary) return;
-    setSavingToLibrary(true);
-
-    // ─── Each slide (problem + solution) is saved as a SEPARATE carousel in the library ───
-    // If the user chose 2 carousels, we save 2 library entries, each with 2 images.
-    console.log(`[Carousel] Saving ${slides.length} separate carousel(s) to library...`);
-
-    for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i];
-      const slideImages: string[] = [];
-
-      // Check cache first — if user already applied text manually, use that
-      const problemCacheKey = `${i}-problem`;
-      const solutionCacheKey = `${i}-solution`;
-      const textedProblem = textedImageCacheRef.current.get(problemCacheKey);
-      const textedSolution = textedImageCacheRef.current.get(solutionCacheKey);
-
-      // For problem image: apply problem_text if not already cached
-      if (textedProblem) {
-        slideImages.push(textedProblem);
-      } else if (slide.problemImageUrl && slide.problem.problem_text) {
-        try {
-          const res = await authFetch("/api/carousel/add-text", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageUrl: slide.problemImageUrl,
-              text: slide.problem.problem_text,
-              fontSize: 48,
-              fontColor: "#FFFFFF",
-              strokeColor: "#000000",
-              strokeWidth: 3,
-              position: "bottom",
-              alignment: "center",
-              shadow: true,
-              fontFile: "dejavu-bold",
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.image) {
-              slideImages.push(data.image);
-              textedImageCacheRef.current.set(problemCacheKey, data.image);
-              textContentCacheRef.current.set(problemCacheKey, slide.problem.problem_text);
-            }
-          }
-        } catch (e) {
-          console.warn(`[Carousel] Failed to add text to problem slide ${i + 1}:`, e);
-        }
-        if (slideImages.length === 0 && slide.problemImageUrl) slideImages.push(slide.problemImageUrl);
-      } else {
-        if (slide.problemImageUrl) slideImages.push(slide.problemImageUrl);
-      }
-
-      // For solution image: apply solution_text if not already cached
-      if (textedSolution) {
-        slideImages.push(textedSolution);
-      } else if (slide.solutionImageUrl && slide.solution.solution_text) {
-        try {
-          const res = await authFetch("/api/carousel/add-text", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              imageUrl: slide.solutionImageUrl,
-              text: slide.solution.solution_text,
-              fontSize: 48,
-              fontColor: "#FFFFFF",
-              strokeColor: "#000000",
-              strokeWidth: 3,
-              position: "bottom",
-              alignment: "center",
-              shadow: true,
-              fontFile: "dejavu-bold",
-            }),
-          });
-          if (res.ok) {
-            const data = await res.json();
-            if (data.image) {
-              slideImages.push(data.image);
-              textedImageCacheRef.current.set(solutionCacheKey, data.image);
-              textContentCacheRef.current.set(solutionCacheKey, slide.solution.solution_text);
-            }
-          }
-        } catch (e) {
-          console.warn(`[Carousel] Failed to add text to solution slide ${i + 1}:`, e);
-        }
-        // Only push raw solution if we didn't already add a texted version
-        if (slideImages.length < 2 && slide.solutionImageUrl) slideImages.push(slide.solutionImageUrl);
-      } else {
-        if (slide.solutionImageUrl) slideImages.push(slide.solutionImageUrl);
-      }
-
-      // Upload data URLs to persistent storage so they survive page refresh
-      const uploadedImages: string[] = [];
-      for (let j = 0; j < slideImages.length; j++) {
-        const imgUrl = slideImages[j];
-        if (imgUrl && !imgUrl.startsWith("http")) {
-          try {
-            const blob = await (await fetch(imgUrl)).blob();
-            const file = new File([blob], `carousel_${i+1}_slide_${j}_${Date.now()}.png`, { type: "image/png" });
-            const fd = new FormData();
-            fd.append("avatar", file);
-            let uploaded = false;
-            for (let attempt = 1; attempt <= 3; attempt++) {
-              try {
-                const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
-                const upData = await upRes.json();
-                if (upData.success && upData.avatarUrl) {
-                  uploadedImages.push(upData.avatarUrl);
-                  uploaded = true;
-                  break;
-                }
-              } catch (e) {
-                console.warn(`[Carousel] Upload carousel ${i+1} image ${j} attempt ${attempt} error:`, e);
-              }
-              if (attempt < 3) await new Promise(r => setTimeout(r, attempt * 1000));
-            }
-            if (!uploaded) uploadedImages.push(imgUrl); // Fallback to data URL
-          } catch (e) {
-            console.warn(`[Carousel] Failed to upload carousel ${i+1} image ${j}:`, e);
-            uploadedImages.push(imgUrl);
-          }
-        } else {
-          uploadedImages.push(imgUrl);
-        }
-      }
-
-      const finalImages = uploadedImages;
-      const carouselLabel = slides.length > 1
-        ? `Carousel: ${carouselTitle} (${i + 1}/${slides.length})`
-        : `Carousel: ${carouselTitle}`;
-
-      console.log(`[Carousel] Saving carousel ${i + 1}/${slides.length}: ${finalImages.length} images`);
-
-      // Save this individual carousel to API
-      try {
-        await authFetch("/api/videos", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            title: carouselLabel,
-            videoUrl: finalImages[0] || "",
-            thumbnailUrl: finalImages[0] || null,
-            duration: null,
-            scenesCount: 1, // 1 carousel = 1 slide (2 images: problem + solution)
-            provider: "carousel",
-            metadata: {
-              type: "carousel",
-              slideCount: 1,
-              carouselIndex: i + 1,
-              totalCarousels: slides.length,
-              productUrl,
-              imageUrls: finalImages, // 2 images for this carousel
-            },
-          }),
-        });
-      } catch {
-        // Continue to localStorage
-      }
-
-      // Save this individual carousel to localStorage
-      if (userEmail) {
-        saveVideoToStorage(userEmail, {
-          id: `carousel_${i}_${Date.now()}`,
-          title: carouselLabel,
-          videoUrl: finalImages[0] || "",
-          thumbnailUrl: finalImages[0] || null,
-          duration: null,
-          scenesCount: 1,
-          provider: "carousel",
-          createdAt: new Date().toISOString(),
-          metadata: JSON.stringify({ type: "carousel", slideCount: 1, carouselIndex: i + 1, totalCarousels: slides.length, productUrl, imageUrls: finalImages }),
-        });
-      }
-    }
-
-    console.log(`[Carousel] Done! Saved ${slides.length} separate carousel(s) to library.`);
-    setSavedToLibrary(true);
-    setSavingToLibrary(false);
-  }, [slides, carouselTitle, productUrl, savedToLibrary, userEmail, authFetch]);
-
-  // REMOVED: Auto-save was saving before text overlays were applied.
-  // User now clicks "Save to Library" button manually to ensure text is included.
-
-  // Restore text overlay from cache when switching slides or problem/product
-  useEffect(() => {
-    const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
-    const cachedImage = textedImageCacheRef.current.get(cacheKey) || null;
-    const cachedText = textContentCacheRef.current.get(cacheKey) || "";
-    setTextedImageUrl(cachedImage);
-    setTextOverlayText(cachedText);
-    setShowTextEditor(false);
-  }, [currentSlide, viewingProblem]);
-
-  // ─── Download All ───────────────────────────────────────────────────
-  const downloadAll = useCallback(async () => {
-    for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i];
-      // Prefer texted images from cache when downloading
-      const textedProblem = textedImageCacheRef.current.get(`${i}-problem`);
-      const textedSolution = textedImageCacheRef.current.get(`${i}-solution`);
-      const problemUrl = textedProblem || slide.problemImageUrl;
-      const solutionUrl = textedSolution || slide.solutionImageUrl;
-      if (problemUrl) {
-        await downloadImage(problemUrl, `${carouselTitle}-slide${i + 1}-problem.png`);
-        await new Promise((r) => setTimeout(r, 400));
-      }
-      if (solutionUrl) {
-        await downloadImage(solutionUrl, `${carouselTitle}-slide${i + 1}-product.png`);
-        await new Promise((r) => setTimeout(r, 400));
-      }
-    }
-  }, [slides, carouselTitle, downloadImage]);
-
-  // ─── Touch / Swipe ──────────────────────────────────────────────────
-  const touchStartX = useRef(0);
-  // ─── TikTok Auto-Publish Helpers ─────────────────────────────────────
-  // Track publish state for each slide
-  const handlePublishStateChange = useCallback((slideNum: number, state: "idle" | "publishing" | "published" | "failed") => {
-    setPublishStates(prev => ({ ...prev, [slideNum]: state }));
-  }, []);
-
-  // Publish all slides at once
-  const handlePublishAllToTikTok = async () => {
-    const readySlides = slides.filter(s => s.problemImageUrl && s.solutionImageUrl);
-    if (readySlides.length === 0) {
-      alert("No carousels ready to publish. Generate images first.");
-      return;
-    }
-    if (!confirm(`Publish ${readySlides.length} carousel(s) to TikTok?`)) return;
-
-    for (const slide of readySlides) {
-      try {
-        // Use texted images from cache when available
-        const slideIdx = slides.indexOf(slide);
-        const textedProblem = slideIdx >= 0 ? textedImageCacheRef.current.get(`${slideIdx}-problem`) : null;
-        const textedSolution = slideIdx >= 0 ? textedImageCacheRef.current.get(`${slideIdx}-solution`) : null;
-        let problemUrl = textedProblem || slide.problemImageUrl!;
-        let solutionUrl = textedSolution || slide.solutionImageUrl!;
-
-        // Upload data URLs to get persistent HTTP URLs (TikTok API requires HTTP)
-        if (problemUrl.startsWith("data:")) {
-          try {
-            const blob = await (await fetch(problemUrl)).blob();
-            const file = new File([blob], `texted_problem_${slide.slide_number}.png`, { type: "image/png" });
-            const fd = new FormData();
-            fd.append("avatar", file);
-            const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
-            const upData = await upRes.json();
-            if (upData.success && upData.avatarUrl) problemUrl = upData.avatarUrl;
-          } catch (e) {
-            console.warn("[Carousel] Upload texted problem failed, using original:", e);
-            problemUrl = slide.problemImageUrl!;
-          }
-        }
-        if (solutionUrl.startsWith("data:")) {
-          try {
-            const blob = await (await fetch(solutionUrl)).blob();
-            const file = new File([blob], `texted_solution_${slide.slide_number}.png`, { type: "image/png" });
-            const fd = new FormData();
-            fd.append("avatar", file);
-            const upRes = await fetch("/api/upload-avatar", { method: "POST", body: fd });
-            const upData = await upRes.json();
-            if (upData.success && upData.avatarUrl) solutionUrl = upData.avatarUrl;
-          } catch (e) {
-            console.warn("[Carousel] Upload texted solution failed, using original:", e);
-            solutionUrl = slide.solutionImageUrl!;
-          }
-        }
-
-        await fetch("/api/autopublish/publish-carousel", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            imageUrls: [problemUrl, solutionUrl],
-            caption: `${carouselTitle} - Slide ${slide.slide_number} 🔥`,
-            hashtags: ["fyp", "viral", "carousel", "ai"],
-            aiDescription: `Slide ${slide.slide_number}`,
-            externalId: `carousel_${slide.slide_number}_${Date.now()}`,
-            autoCaption: false,
-          }),
-        });
-        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "published" }));
-      } catch (err) {
-        setPublishStates(prev => ({ ...prev, [slide.slide_number]: "failed" }));
-      }
-      // Small delay between publishes to avoid rate limiting
-      await new Promise(r => setTimeout(r, 1500));
+      window.open(downloadUrl, "_blank");
     }
   };
 
+  // ─── Download all slides for a carousel ──────────────────────────────
+  const downloadAllSlides = async (carouselIdx: number) => {
+    const carousel = carousels[carouselIdx];
+    if (!carousel) return;
+    for (let i = 0; i < carousel.slides.length; i++) {
+      if (carousel.slides[i].imageUrl) {
+        await downloadSlide(carousel.slides[i], carouselIdx, i);
+        await new Promise((r) => setTimeout(r, 500));
+      }
+    }
+  };
+
+  // ─── Touch / Swipe handling ──────────────────────────────────────────
+  const touchStartX = useRef(0);
   const handleTouchStart = (e: React.TouchEvent) => {
     touchStartX.current = e.touches[0].clientX;
   };
   const handleTouchEnd = (e: React.TouchEvent) => {
     const diff = touchStartX.current - e.changedTouches[0].clientX;
     if (Math.abs(diff) > 50) {
-      if (diff > 0 && currentSlide < slides.length - 1) {
+      const carousel = carousels[currentCarousel];
+      if (!carousel) return;
+      if (diff > 0 && currentSlide < carousel.slides.length - 1) {
         setCurrentSlide(currentSlide + 1);
-        setViewingProblem(true);
       } else if (diff < 0 && currentSlide > 0) {
         setCurrentSlide(currentSlide - 1);
-        setViewingProblem(true);
       }
     }
   };
 
+  // ─── Save carousel to library ────────────────────────────────────────
+  const saveCarouselToLibrary = async (carouselIdx: number) => {
+    const carousel = carousels[carouselIdx];
+    if (!carousel) return;
+
+    const totalSlides = carousel.slides.length;
+    for (let i = 0; i < totalSlides; i++) {
+      const slide = carousel.slides[i];
+      const downloadUrl = slide.textOverlayUrl || slide.imageUrl;
+      if (!downloadUrl) continue;
+
+      try {
+        // Convert data URL to blob if needed
+        let imageBlob: Blob;
+        if (downloadUrl.startsWith("data:")) {
+          const res = await fetch(downloadUrl);
+          imageBlob = await res.blob();
+        } else {
+          const res = await fetch(downloadUrl);
+          imageBlob = await res.blob();
+        }
+
+        // Upload to API
+        const formData = new FormData();
+        formData.append("file", imageBlob, `carousel-${carouselIdx + 1}-slide-${i + 1}.png`);
+        formData.append("title", `Carousel: ${carousel.carouselTitle} (${i + 1}/${totalSlides})`);
+        formData.append("type", "carousel");
+        if (isAdmin) formData.append("isAdmin", "true");
+
+        const uploadRes = await authFetch("/api/videos/upload", {
+          method: "POST",
+          body: formData,
+        });
+
+        if (uploadRes.ok) {
+          const uploadData = await uploadRes.json();
+          // Also save to localStorage
+          const { saveVideoToStorage } = await import("@/lib/video-store");
+          saveVideoToStorage({
+            id: uploadData.video?.id || `local-${Date.now()}-${carouselIdx}-${i}`,
+            title: `Carousel: ${carousel.carouselTitle} (${i + 1}/${totalSlides})`,
+            type: "carousel",
+            url: uploadData.video?.url || downloadUrl,
+            thumbnailUrl: uploadData.video?.thumbnailUrl || downloadUrl,
+            createdAt: new Date().toISOString(),
+          });
+        }
+      } catch (err) {
+        console.error(`[Carousel] Failed to save slide ${i + 1} to library:`, err);
+      }
+    }
+
+    alert(`Carousel "${carousel.carouselTitle}" saved to library! (${totalSlides} slides)`);
+  };
+
+  // ─── Examples ────────────────────────────────────────────────────────
+  const examples = [
+    "5 tips to grow your Instagram in 2025",
+    "How AI is changing digital marketing",
+    "Healthy morning routine for productivity",
+    "Top 7 mistakes entrepreneurs make",
+    "The psychology of viral content",
+  ];
+
+  // ─── Current helpers ────────────────────────────────────────────────
+  const activeCarousel = carousels[currentCarousel];
+  const activeSlide = activeCarousel?.slides[currentSlide];
+
   // ═══════════════════════════════════════════════════════════════════════
   // RESULT VIEW
   // ═══════════════════════════════════════════════════════════════════════
-  if (step === "complete" && slides.length > 0) {
-    const slide = slides[currentSlide];
-    const baseImageUrl = viewingProblem
-      ? slide.problemImageUrl
-      : slide.solutionImageUrl;
-    const currentDisplayUrl = textedImageUrl || baseImageUrl;
-    const currentLoading = viewingProblem ? slide.problemLoading : slide.solutionLoading;
-    const currentError = viewingProblem ? slide.problemError : slide.solutionError;
-    const currentText = viewingProblem ? slide.problem.problem_text : slide.solution.solution_text;
+  if (showResult && carousels.length > 0 && activeSlide) {
+    const displayUrl = activeSlide.textOverlayUrl || activeSlide.imageUrl;
+    const slideTypeMeta = SLIDE_TYPE_META[activeSlide.slideType] || { color: "#A0A0A0", bg: "#A0A0A015", label: activeSlide.slideType, emoji: "📌" };
 
     return (
       <div className="min-h-screen" style={{ backgroundColor: C.dark }}>
-        {/* Top Bar */}
+        {/* ─── Top Bar ──────────────────────────────────────────── */}
         <header
           className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-3"
           style={{
             backgroundColor: `${C.dark}ee`,
             backdropFilter: "blur(12px)",
-            borderBottom: "1px solid #222222",
+            borderBottom: `1px solid #222222`,
           }}
         >
           <button
             onClick={() => {
-              setStep("idle");
-              setSlides([]);
-              setProductInfo(null);
-              setSavedToLibrary(false);
+              setShowResult(false);
+              setCarousels([]);
             }}
             className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
-            style={{ backgroundColor: "#1A1A1A", color: "#E0E0E0", border: "1.5px solid #333333" }}
+            style={{
+              backgroundColor: "#1A1A1A",
+              color: "#E0E0E0",
+              border: `1.5px solid #333333`,
+            }}
           >
             <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
               <path d="M10 3L5 8l5 5" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -953,34 +557,65 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           </button>
 
           <div className="flex items-center gap-2">
-            <span className="text-xs font-bold uppercase tracking-wider" style={{ color: "#E0E0E0" }}>
-              {currentSlide + 1} / {slides.length}
+            {/* Carousel selector */}
+            {carousels.length > 1 && (
+              <div className="flex items-center gap-1">
+                {carousels.map((_, i) => (
+                  <button
+                    key={i}
+                    onClick={() => { setCurrentCarousel(i); setCurrentSlide(0); }}
+                    className="rounded-full transition-all duration-200"
+                    style={{
+                      width: i === currentCarousel ? "24px" : "8px",
+                      height: "8px",
+                      backgroundColor: i === currentCarousel ? C.gold : "#555555",
+                    }}
+                  />
+                ))}
+              </div>
+            )}
+
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${C.gold}25` }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="3" />
+                <path d="M9 9h6M9 13h4" />
+              </svg>
+            </div>
+            <span className="text-xs font-bold tracking-wider" style={{ color: "#E0E0E0" }}>
+              {currentSlide + 1}/{activeCarousel!.slides.length}
             </span>
-            {/* Problem/Product toggle */}
-            <button
-              onClick={() => setViewingProblem(!viewingProblem)}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
+
+            {/* Slide type badge */}
+            <span
+              className="px-2 py-0.5 rounded-full text-[9px] font-bold uppercase tracking-wider"
               style={{
-                backgroundColor: viewingProblem ? "rgba(220,38,38,0.2)" : "rgba(34,197,94,0.2)",
-                color: viewingProblem ? "#EF4444" : "#22C55E",
-                border: `1.5px solid ${viewingProblem ? "rgba(220,38,38,0.4)" : "rgba(34,197,94,0.4)"}`,
+                backgroundColor: slideTypeMeta.bg,
+                color: slideTypeMeta.color,
               }}
             >
-              <span className="w-2 h-2 rounded-full" style={{ backgroundColor: viewingProblem ? "#EF4444" : "#22C55E" }} />
-              {viewingProblem ? "Problem" : "Product"}
-            </button>
+              {slideTypeMeta.emoji} {slideTypeMeta.label}
+            </span>
+
+            {/* Carousel title */}
+            {carousels.length > 1 && (
+              <span className="hidden sm:inline text-[10px] font-semibold max-w-[120px] truncate" style={{ color: "#888" }}>
+                {activeCarousel!.carouselTitle}
+              </span>
+            )}
           </div>
 
-          {currentDisplayUrl && (
+          {displayUrl && (
             <button
-              onClick={() =>
-                downloadImage(
-                  currentDisplayUrl,
-                  `${carouselTitle}-slide${currentSlide + 1}-${viewingProblem ? "problem" : "product"}.png`
-                )
-              }
+              onClick={() => downloadSlide(activeSlide, currentCarousel, currentSlide)}
               className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
-              style={{ backgroundColor: `${C.pink}20`, color: C.pink, border: `1.5px solid ${C.pink}40` }}
+              style={{
+                backgroundColor: `${C.pink}20`,
+                color: C.pink,
+                border: `1.5px solid ${C.pink}40`,
+              }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -990,440 +625,125 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               Save
             </button>
           )}
-
-          {/* Per-slide TikTok publish button */}
-          {step === "complete" && slides[currentSlide] && (
-            <div className="ml-2">
-              <SlidePublisher
-                slideNumber={slides[currentSlide].slide_number}
-                problemImageUrl={slides[currentSlide].problemImageUrl}
-                solutionImageUrl={slides[currentSlide].solutionImageUrl}
-                textedProblemUrl={textedImageCacheRef.current.get(`${currentSlide}-problem`) || null}
-                textedSolutionUrl={textedImageCacheRef.current.get(`${currentSlide}-solution`) || null}
-                problemText={slides[currentSlide].problem.problem_text}
-                solutionText={slides[currentSlide].solution.solution_text}
-                carouselTitle={carouselTitle}
-                autoPublish={autoPublishTikTok}
-                onPublishStateChange={handlePublishStateChange}
-                authFetch={authFetch}
-              />
-            </div>
-          )}
         </header>
 
-        {/* Slide Display */}
+        {/* ─── Applying overlay indicator ─────────────────────────── */}
+        {applyingOverlay && (
+          <div className="fixed top-16 left-1/2 -translate-x-1/2 z-50 px-5 py-2.5 rounded-full text-xs font-bold flex items-center gap-2"
+            style={{ backgroundColor: `${C.gold}`, color: C.white, boxShadow: `0 4px 20px ${C.gold}40` }}>
+            <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+            Applying text overlay...
+          </div>
+        )}
+
+        {/* ─── Slide Display ─────────────────────────────────────── */}
         <main
-          className="overflow-y-auto p-4"
-          style={{ height: "calc(100vh - 56px)" }}
+          className="flex items-center justify-center min-h-[calc(100vh-56px)] p-4"
+          onTouchStart={handleTouchStart}
+          onTouchEnd={handleTouchEnd}
         >
           <div className="w-full max-w-sm mx-auto">
+            {/* Carousel title */}
+            {carousels.length > 1 && (
+              <div className="mb-3 text-center">
+                <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: C.gold }}>
+                  Carousel {currentCarousel + 1} of {carousels.length}
+                </span>
+                <p className="text-xs font-semibold mt-0.5" style={{ color: "#ccc" }}>
+                  {activeCarousel!.carouselTitle}
+                </p>
+              </div>
+            )}
+
             {/* Slide Image */}
             <div
               className="relative rounded-3xl overflow-hidden"
-              style={{ aspectRatio: "9/16", backgroundColor: "#1A1A1A", border: "2px solid #333333", boxShadow: "0 8px 40px rgba(0,0,0,0.5)" }}
-              onTouchStart={handleTouchStart}
-              onTouchEnd={handleTouchEnd}
+              style={{
+                aspectRatio: "3/4",
+                backgroundColor: "#1A1A1A",
+                border: `2px solid #333333`,
+                boxShadow: `0 8px 40px rgba(0,0,0,0.5)`,
+              }}
             >
-              {currentLoading ? (
-                <div className="w-full h-full flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-12 h-12 rounded-full border-3 border-t-transparent animate-spin mx-auto mb-3" style={{ borderColor: `${viewingProblem ? C.red : C.green}33`, borderTopColor: viewingProblem ? C.red : C.green }} />
-                    <p className="text-xs font-medium" style={{ color: "#A0A0A0" }}>
-                    Generating {viewingProblem ? "problem" : "product"} image...
-                    </p>
-                  </div>
-                </div>
-              ) : currentDisplayUrl ? (
-                <img src={currentDisplayUrl} alt={viewingProblem ? "Problem" : "Product"} className="w-full h-full object-cover" />
+              {displayUrl ? (
+                <img
+                  src={displayUrl}
+                  alt={activeSlide.title}
+                  className="w-full h-full object-cover"
+                />
               ) : (
                 <div className="w-full h-full flex items-center justify-center p-8">
                   <div className="text-center">
-                    <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: "rgba(220,38,38,0.15)" }}>
-                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <div
+                      className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4"
+                      style={{ backgroundColor: `${C.pink}15` }}
+                    >
+                      <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                         <circle cx="12" cy="12" r="10" />
                         <line x1="15" y1="9" x2="9" y2="15" />
                         <line x1="9" y1="9" x2="15" y2="15" />
                       </svg>
                     </div>
-                    <p className="text-sm font-medium" style={{ color: "#E0E0E0" }}>Image failed to generate</p>
-                    <p className="text-xs mt-2" style={{ color: "#888888" }}>{currentError || "Unknown error"}</p>
+                    <p className="text-sm font-medium" style={{ color: "#E0E0E0" }}>
+                      Image failed to generate
+                    </p>
+                    <p className="text-xs mt-2" style={{ color: "#888888" }}>
+                      {activeSlide.error || "Unknown error"}
+                    </p>
                   </div>
                 </div>
               )}
 
-              {/* Type indicator badge */}
-              {currentDisplayUrl && !currentLoading && (
+              {/* Text overlay badge */}
+              {activeSlide.textOverlayUrl && (
                 <div
-                  className="absolute top-4 left-4 px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5"
-                  style={{
-                    backgroundColor: viewingProblem ? "rgba(220,38,38,0.85)" : "rgba(34,197,94,0.85)",
-                    color: C.white,
-                  }}
+                  className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                  style={{ backgroundColor: `${C.pink}cc`, color: C.white }}
                 >
-                  <span className="w-2 h-2 rounded-full bg-white" />
-                  {viewingProblem ? "Problem" : "Product"}
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 7 4 4 20 4 20 7" />
+                    <line x1="9.5" y1="20" x2="14.5" y2="20" />
+                    <line x1="12" y1="4" x2="12" y2="20" />
+                  </svg>
+                  Text
                 </div>
               )}
             </div>
 
-            {/* Text Editor Panel — FFmpeg overlay with full control */}
-            {currentDisplayUrl && !currentLoading && (
-              <div className="mt-4 px-2">
-                {/* Toggle Text Editor */}
-                <button
-                  onClick={() => {
-                    if (!showTextEditor && !textOverlayText && currentText) {
-                      setTextOverlayText(currentText || "");
-                    }
-                    setShowTextEditor(!showTextEditor);
-                  }}
-                  className="w-full flex items-center justify-between px-4 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
-                  style={{
-                    backgroundColor: showTextEditor ? `${C.pink}20` : "#1A1A1A",
-                    color: showTextEditor ? C.pink : "#E0E0E0",
-                    border: `1.5px solid ${showTextEditor ? `${C.pink}40` : "#333333"}`,
-                  }}
-                >
-                  <span className="flex items-center gap-2">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <polyline points="4 7 4 4 20 4 20 7" />
-                      <line x1="9" y1="20" x2="15" y2="20" />
-                      <line x1="12" y1="4" x2="12" y2="20" />
-                    </svg>
-                    {showTextEditor ? "Close Text Editor" : "Add Text Overlay"}
-                  </span>
-                  <span style={{ transform: showTextEditor ? "rotate(180deg)" : "rotate(0deg)", transition: "transform 0.2s" }}>
-                    <svg width="12" height="12" viewBox="0 0 16 16" fill="none">
-                      <path d="M4 6l4 4 4-4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                    </svg>
-                  </span>
-                </button>
-
-                {showTextEditor && (
-                  <div className="mt-3 space-y-3" style={{ animation: "fadeIn 0.2s ease-out" }}>
-                    {/* Text Input */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                        Text (use Enter for new line)
-                      </label>
-                      <textarea
-                        value={textOverlayText}
-                        onChange={(e) => setTextOverlayText(e.target.value)}
-                        placeholder={currentText || "Type your text here..."}
-                        rows={3}
-                        className="w-full px-3 py-2 rounded-xl text-sm font-medium resize-none outline-none transition-all duration-200"
-                        style={{
-                          backgroundColor: "#111111",
-                          color: C.white,
-                          border: "1.5px solid #333333",
-                        }}
-                        onFocus={(e) => { e.target.style.borderColor = C.pink; }}
-                        onBlur={(e) => { e.target.style.borderColor = "#333333"; }}
-                      />
-                    </div>
-
-                    {/* Font Size + Font Family Row */}
-                    <div className="flex gap-2">
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                          Font Size: {textFontSize}px
-                        </label>
-                        <input
-                          type="range"
-                          min={20}
-                          max={120}
-                          value={textFontSize}
-                          onChange={(e) => setTextFontSize(Number(e.target.value))}
-                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                          style={{ background: `linear-gradient(to right, ${C.pink} ${(textFontSize - 20) / 100 * 100}%, #333333 ${(textFontSize - 20) / 100 * 100}%)` }}
-                        />
-                      </div>
-                      <div className="w-32">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                          Font
-                        </label>
-                        <select
-                          value={textFont}
-                          onChange={(e) => setTextFont(e.target.value)}
-                          className="w-full px-2 py-1.5 rounded-lg text-[11px] font-medium outline-none"
-                          style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
-                        >
-                          <option value="dejavu-bold">DejaVu Bold</option>
-                          
-                          <option value="tinos-bold">Tinos Bold</option>
-                          
-                          <option value="carlito-bold">Carlito Bold</option>
-                          
-                          <option value="noto-sans-sc">Noto Sans SC</option>
-                        </select>
-                      </div>
-                    </div>
-
-                    {/* Colors Row */}
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                          Text Color
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={textFontColor}
-                            onChange={(e) => setTextFontColor(e.target.value)}
-                            className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                            style={{ backgroundColor: "transparent" }}
-                          />
-                          <input
-                            type="text"
-                            value={textFontColor}
-                            onChange={(e) => setTextFontColor(e.target.value)}
-                            className="flex-1 px-2 py-1 rounded-lg text-[11px] font-mono outline-none"
-                            style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
-                          />
-                        </div>
-                      </div>
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                          Stroke Color
-                        </label>
-                        <div className="flex items-center gap-2">
-                          <input
-                            type="color"
-                            value={textStrokeColor}
-                            onChange={(e) => setTextStrokeColor(e.target.value)}
-                            className="w-8 h-8 rounded-lg cursor-pointer border-0 p-0"
-                            style={{ backgroundColor: "transparent" }}
-                          />
-                          <input
-                            type="text"
-                            value={textStrokeColor}
-                            onChange={(e) => setTextStrokeColor(e.target.value)}
-                            className="flex-1 px-2 py-1 rounded-lg text-[11px] font-mono outline-none"
-                            style={{ backgroundColor: "#111111", color: C.white, border: "1.5px solid #333333" }}
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Stroke Width + Shadow Row */}
-                    <div className="flex gap-3">
-                      <div className="flex-1">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                          Stroke Width: {textStrokeWidth}px
-                        </label>
-                        <input
-                          type="range"
-                          min={0}
-                          max={10}
-                          value={textStrokeWidth}
-                          onChange={(e) => setTextStrokeWidth(Number(e.target.value))}
-                          className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                          style={{ background: `linear-gradient(to right, ${C.pink} ${textStrokeWidth * 10}%, #333333 ${textStrokeWidth * 10}%)` }}
-                        />
-                      </div>
-                      <div className="flex items-end pb-1">
-                        <button
-                          onClick={() => setTextShadow(!textShadow)}
-                          className="px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
-                          style={{
-                            backgroundColor: textShadow ? `${C.pink}20` : "#111111",
-                            color: textShadow ? C.pink : "#666666",
-                            border: `1.5px solid ${textShadow ? `${C.pink}40` : "#333333"}`,
-                          }}
-                        >
-                          Shadow {textShadow ? "ON" : "OFF"}
-                        </button>
-                      </div>
-                    </div>
-
-                    {/* Position Presets */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                        Position
-                      </label>
-                      <div className="flex gap-1.5">
-                        {(["top", "center", "bottom", "custom"] as const).map((pos) => (
-                          <button
-                            key={pos}
-                            onClick={() => setTextPosition(pos)}
-                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
-                            style={{
-                              backgroundColor: textPosition === pos ? `${C.pink}20` : "#111111",
-                              color: textPosition === pos ? C.pink : "#666666",
-                              border: `1.5px solid ${textPosition === pos ? `${C.pink}40` : "#333333"}`,
-                            }}
-                          >
-                            {pos}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Custom X/Y Sliders (only when "custom" position) */}
-                    {textPosition === "custom" && (
-                      <div className="flex gap-3">
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                            X: {textCustomX}%
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={textCustomX}
-                            onChange={(e) => setTextCustomX(Number(e.target.value))}
-                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                            style={{ background: `linear-gradient(to right, ${C.pink} ${textCustomX}%, #333333 ${textCustomX}%)` }}
-                          />
-                        </div>
-                        <div className="flex-1">
-                          <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                            Y: {textCustomY}%
-                          </label>
-                          <input
-                            type="range"
-                            min={0}
-                            max={100}
-                            value={textCustomY}
-                            onChange={(e) => setTextCustomY(Number(e.target.value))}
-                            className="w-full h-1.5 rounded-full appearance-none cursor-pointer"
-                            style={{ background: `linear-gradient(to right, ${C.pink} ${textCustomY}%, #333333 ${textCustomY}%)` }}
-                          />
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Alignment */}
-                    <div>
-                      <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#888888" }}>
-                        Alignment
-                      </label>
-                      <div className="flex gap-1.5">
-                        {(["left", "center", "right"] as const).map((al) => (
-                          <button
-                            key={al}
-                            onClick={() => setTextAlignment(al)}
-                            className="flex-1 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all duration-200"
-                            style={{
-                              backgroundColor: textAlignment === al ? `${C.pink}20` : "#111111",
-                              color: textAlignment === al ? C.pink : "#666666",
-                              border: `1.5px solid ${textAlignment === al ? `${C.pink}40` : "#333333"}`,
-                            }}
-                          >
-                            {al}
-                          </button>
-                        ))}
-                      </div>
-                    </div>
-
-                    {/* Apply / Reset Buttons */}
-                    <div className="flex gap-2 pt-1">
-                      <button
-                        onClick={applyTextOverlay}
-                        disabled={textApplying || !textOverlayText.trim()}
-                        className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 disabled:opacity-30"
-                        style={{
-                          background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
-                          color: C.white,
-                        }}
-                      >
-                        {textApplying ? (
-                          <span className="flex items-center justify-center gap-2">
-                            <span className="w-3 h-3 rounded-full border-2 border-t-transparent animate-spin" style={{ borderColor: `${C.white}44`, borderTopColor: C.white }} />
-                            Applying...
-                          </span>
-                        ) : (
-                          <span className="flex items-center justify-center gap-1.5">
-                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                              <polyline points="20 6 9 17 4 12" />
-                            </svg>
-                            Apply Text
-                          </span>
-                        )}
-                      </button>
-                      {textedImageUrl && (
-                        <button
-                          onClick={() => {
-                            setTextedImageUrl(null);
-                            // Also clear from cache
-                            const cacheKey = `${currentSlide}-${viewingProblem ? "problem" : "solution"}`;
-                            textedImageCacheRef.current.delete(cacheKey);
-                            textContentCacheRef.current.delete(cacheKey);
-                          }}
-                          className="px-4 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
-                          style={{ backgroundColor: "#1A1A1A", color: "#EF4444", border: "1.5px solid rgba(220,38,38,0.4)" }}
-                        >
-                          Reset
-                        </button>
-                      )}
-                    </div>
-
-                    {/* Quick text suggestions */}
-                    {currentText && !textOverlayText && (
-                      <div className="pt-1">
-                        <label className="block text-[10px] font-bold uppercase tracking-wider mb-1.5" style={{ color: "#555555" }}>
-                          Suggested text — tap to use
-                        </label>
-                        <button
-                          onClick={() => setTextOverlayText(currentText)}
-                          className="w-full px-3 py-2 rounded-xl text-xs text-left font-medium transition-all duration-200"
-                          style={{
-                            backgroundColor: "#111111",
-                            color: "#AAAAAA",
-                            border: "1px dashed #333333",
-                          }}
-                        >
-                          {currentText}
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {/* Problem/Product Toggle Buttons */}
-            <div className="flex items-center gap-2 mt-4">
-              <button
-                onClick={() => setViewingProblem(true)}
-                className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: viewingProblem ? "rgba(220,38,38,0.2)" : "#1A1A1A",
-                  color: viewingProblem ? "#EF4444" : "#666666",
-                  border: `1.5px solid ${viewingProblem ? "rgba(220,38,38,0.4)" : "#333333"}`,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <circle cx="12" cy="12" r="10" />
-                  <line x1="15" y1="9" x2="9" y2="15" />
-                  <line x1="9" y1="9" x2="15" y2="15" />
-                </svg>
-                Problem
-              </button>
-              <button
-                onClick={() => setViewingProblem(false)}
-                className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-2"
-                style={{
-                  backgroundColor: !viewingProblem ? "rgba(34,197,94,0.2)" : "#1A1A1A",
-                  color: !viewingProblem ? "#22C55E" : "#666666",
-                  border: `1.5px solid ${!viewingProblem ? "rgba(34,197,94,0.4)" : "#333333"}`,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                  <polyline points="22 4 12 14.01 9 11.01" />
-                </svg>
-                Product
-              </button>
+            {/* Slide Text Content */}
+            <div className="mt-5 px-2">
+              {activeSlide.headerText && (
+                <h2 className="text-lg font-black mb-2" style={{ color: C.white }}>
+                  {activeSlide.headerText.split("\n").map((line, i) => (
+                    <React.Fragment key={i}>
+                      {i > 0 && <br />}
+                      {line}
+                    </React.Fragment>
+                  ))}
+                </h2>
+              )}
+              {activeSlide.bodyText && (
+                <p className="text-sm leading-relaxed" style={{ color: "#A0A0A0" }}>
+                  {activeSlide.bodyText}
+                </p>
+              )}
+              {!activeSlide.headerText && !activeSlide.bodyText && (
+                <p className="text-xs italic" style={{ color: "#666666" }}>
+                  Clean image — no text overlay
+                </p>
+              )}
             </div>
 
-            {/* Navigation */}
-            <div className="flex items-center justify-between mt-5">
+            {/* Navigation: Carousel selector (if multiple) + Slide arrows */}
+            <div className="flex items-center justify-between mt-6">
               <button
-                onClick={() => { setCurrentSlide(Math.max(0, currentSlide - 1)); setViewingProblem(true); }}
+                onClick={() => setCurrentSlide(Math.max(0, currentSlide - 1))}
                 disabled={currentSlide === 0}
                 className="flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 disabled:opacity-20"
-                style={{ backgroundColor: "#1A1A1A", border: "1.5px solid #333333" }}
+                style={{
+                  backgroundColor: "#1A1A1A",
+                  border: "1.5px solid #333333",
+                }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M10 3L5 8l5 5" stroke={C.white} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1432,25 +752,28 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
               {/* Slide dots */}
               <div className="flex items-center gap-1.5">
-                {slides.map((_, i) => (
+                {activeCarousel!.slides.map((s, i) => (
                   <button
                     key={i}
-                    onClick={() => { setCurrentSlide(i); setViewingProblem(true); }}
+                    onClick={() => setCurrentSlide(i)}
                     className="rounded-full transition-all duration-200"
                     style={{
                       width: i === currentSlide ? "24px" : "8px",
                       height: "8px",
-                      backgroundColor: i === currentSlide ? C.pink : "#444444",
+                      backgroundColor: i === currentSlide ? (SLIDE_TYPE_META[s.slideType]?.color || C.pink) : "#444444",
                     }}
                   />
                 ))}
               </div>
 
               <button
-                onClick={() => { setCurrentSlide(Math.min(slides.length - 1, currentSlide + 1)); setViewingProblem(true); }}
-                disabled={currentSlide === slides.length - 1}
+                onClick={() => setCurrentSlide(Math.min(activeCarousel!.slides.length - 1, currentSlide + 1))}
+                disabled={currentSlide === activeCarousel!.slides.length - 1}
                 className="flex items-center justify-center w-10 h-10 rounded-full transition-all duration-200 disabled:opacity-20"
-                style={{ backgroundColor: "#1A1A1A", border: "1.5px solid #333333" }}
+                style={{
+                  backgroundColor: "#1A1A1A",
+                  border: "1.5px solid #333333",
+                }}
               >
                 <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
                   <path d="M6 3l5 5-5 5" stroke={C.white} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1458,153 +781,75 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </button>
             </div>
 
-            {/* ─── Save to Library Button ─────────────────────────────── */}
-            <button
-              onClick={async () => {
-                await saveToLibrary();
-              }}
-              disabled={savingToLibrary || savedToLibrary}
-              className="w-full mt-5 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300 flex items-center justify-center gap-2"
-              style={{
-                backgroundColor: savedToLibrary ? `${C.green}20` : C.pink,
-                color: savedToLibrary ? C.green : C.white,
-                border: savedToLibrary ? `1.5px solid ${C.green}40` : "none",
-                boxShadow: savedToLibrary ? "none" : `0 4px 20px ${C.pink}30`,
-              }}
-            >
-              {savingToLibrary ? (
-                <>
-                  <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-                  Saving {slides.length} Carousels...
-                </>
-              ) : savedToLibrary ? (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                  {slides.length} Carousels Saved!
-                </>
-              ) : (
-                <>
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z" />
-                    <polyline points="17 21 17 13 7 13 7 21" />
-                    <polyline points="7 3 7 8 15 8" />
-                  </svg>
-                  Save {slides.length} Carousel{slides.length > 1 ? 's' : ''} to Library
-                </>
-              )}
-            </button>
+            {/* Carousel navigation (if multiple carousels) */}
+            {carousels.length > 1 && (
+              <div className="flex items-center justify-between mt-4 px-2">
+                <button
+                  onClick={() => { setCurrentCarousel(Math.max(0, currentCarousel - 1)); setCurrentSlide(0); }}
+                  disabled={currentCarousel === 0}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 disabled:opacity-20"
+                  style={{ backgroundColor: "#1A1A1A", color: C.gold, border: "1.5px solid #333" }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M10 3L5 8l5 5" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                  Prev Carousel
+                </button>
 
-            {/* Download All Button */}
-            <button
-              onClick={downloadAll}
-              className="w-full mt-3 py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
-              style={{
-                background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
-                color: C.white,
-                boxShadow: `0 4px 20px ${C.pink}30`,
-              }}
-            >
-              <span className="inline-flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-                Download All ({slides.length} carousel{slides.length > 1 ? 's' : ''}, {slides.length * 2} images)
-              </span>
-            </button>
+                <span className="text-[10px] font-bold" style={{ color: "#888" }}>
+                  {currentCarousel + 1} / {carousels.length}
+                </span>
 
-            {/* ─── TikTok Auto-Publish Controls ────────────────────────── */}
-            <div
-              className="mt-4 p-4 rounded-2xl"
-              style={{
-                backgroundColor: "rgba(228, 97, 173, 0.08)",
-                border: "1.5px solid rgba(228, 97, 173, 0.25)",
-              }}
-            >
-              <div className="flex items-center justify-between gap-3 flex-wrap mb-3">
-                <div className="flex items-center gap-2">
-                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none">
-                    <path d="M19 7.5c-1.5 0-3-1-3-3 0-.5.1-1 .3-1.4-2.7-.4-5.5-.1-8 1C4 6 1.5 10.5 1.5 15.5c0 4 3 7.5 7 7.5 4.5 0 7-3.5 7-7 0-1.5-.5-3-1.5-4 .8.3 1.7.5 2.5.5 1.5 0 3-.5 4-1.5-.5-2-1.5-3.5-3.5-3.5z" stroke="#E461AD" strokeWidth="1.8" fill="none" />
-                  </svg>
-                  <div>
-                    <div className="text-sm font-bold" style={{ color: C.white }}>
-                      TikTok Auto-Publish
-                    </div>
-                    <div className="text-[10px]" style={{ color: "#9CA3AF" }}>
-                      Publish each carousel (2 images) as a TikTok photo post
-                    </div>
-                  </div>
-                </div>
-
-                {/* Auto-publish toggle */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <span className="text-[10px] font-bold uppercase tracking-wider" style={{ color: "#9CA3AF" }}>
-                    Auto-publish
-                  </span>
-                  <div
-                    className="relative w-10 h-5 rounded-full transition-colors"
-                    style={{
-                      backgroundColor: autoPublishTikTok ? C.pink : "rgba(156, 163, 175, 0.3)",
-                    }}
-                    onClick={() => setAutoPublishTikTok(!autoPublishTikTok)}
-                  >
-                    <div
-                      className="absolute top-0.5 w-4 h-4 rounded-full bg-white transition-transform"
-                      style={{
-                        transform: autoPublishTikTok ? "translateX(22px)" : "translateX(2px)",
-                      }}
-                    />
-                  </div>
-                </label>
+                <button
+                  onClick={() => { setCurrentCarousel(Math.min(carousels.length - 1, currentCarousel + 1)); setCurrentSlide(0); }}
+                  disabled={currentCarousel === carousels.length - 1}
+                  className="flex items-center gap-1 px-3 py-2 rounded-xl text-[10px] font-bold uppercase tracking-wider transition-all duration-200 disabled:opacity-20"
+                  style={{ backgroundColor: "#1A1A1A", color: C.gold, border: "1.5px solid #333" }}
+                >
+                  Next Carousel
+                  <svg width="12" height="12" viewBox="0 0 16 16" fill="none"><path d="M6 3l5 5-5 5" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" /></svg>
+                </button>
               </div>
+            )}
 
-              {/* Publish All button */}
+            {/* Action Buttons */}
+            <div className="space-y-2.5 mt-5">
+              {/* Save to Library */}
               <button
-                onClick={handlePublishAllToTikTok}
-                className="w-full py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all hover:scale-[1.02]"
+                onClick={() => saveCarouselToLibrary(currentCarousel)}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
                 style={{
-                  background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
-                  color: C.white,
+                  backgroundColor: "#1A1A1A",
+                  color: C.gold,
+                  border: `1.5px solid ${C.gold}40`,
+                  boxShadow: `0 4px 20px ${C.gold}15`,
                 }}
               >
-                <span className="flex items-center justify-center gap-2">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
-                    <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+                <span className="inline-flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M19 21l-7-5-7 5V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2z" />
                   </svg>
-                  Publish All Carousels to TikTok ({slides.filter(s => s.problemImageUrl && s.solutionImageUrl).length} ready)
+                  Save to Library
                 </span>
               </button>
 
-              {/* Per-slide publish status */}
-              <div className="mt-3 flex flex-wrap gap-1.5">
-                {slides.map((s, i) => {
-                  const state = publishStates[s.slide_number] || "idle";
-                  const ready = !!(s.problemImageUrl && s.solutionImageUrl);
-                  const colors = {
-                    idle: ready ? C.pink : "rgba(156, 163, 175, 0.3)",
-                    publishing: C.cyan,
-                    published: C.green,
-                    failed: C.red,
-                  };
-                  return (
-                    <div
-                      key={i}
-                      className="px-2 py-1 rounded text-[9px] font-bold"
-                      style={{
-                        backgroundColor: `${colors[state]}20`,
-                        color: colors[state],
-                      }}
-                      title={`Slide ${s.slide_number}: ${state}`}
-                    >
-                      {state === "publishing" ? "⏳" : state === "published" ? "✅" : state === "failed" ? "❌" : ready ? "⏸" : "⏳"} {s.slide_number}
-                    </div>
-                  );
-                })}
-              </div>
+              {/* Download All */}
+              <button
+                onClick={() => downloadAllSlides(currentCarousel)}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
+                style={{
+                  background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+                  color: C.white,
+                  boxShadow: `0 4px 20px ${C.pink}30`,
+                }}
+              >
+                <span className="inline-flex items-center gap-2">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="7 10 12 15 17 10" />
+                    <line x1="12" y1="15" x2="12" y2="3" />
+                  </svg>
+                  Download All Slides
+                </span>
+              </button>
             </div>
           </div>
         </main>
@@ -1613,117 +858,27 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   }
 
   // ═══════════════════════════════════════════════════════════════════════
-  // GENERATING / PROGRESS VIEW
-  // ═══════════════════════════════════════════════════════════════════════
-  if (step === "analyzing" || step === "planning" || step === "generating") {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.cream }}>
-        <div className="w-full max-w-md mx-auto px-6">
-          <div
-            className="rounded-3xl p-8 text-center"
-            style={{ backgroundColor: C.white, border: "1.5px solid #F3F4F6", boxShadow: "0 4px 24px rgba(0,0,0,0.06)" }}
-          >
-            {/* Progress spinner */}
-            <div className="relative w-20 h-20 mx-auto mb-6">
-              <div className="absolute inset-0 rounded-full" style={{ border: "3px solid #F3F4F6" }} />
-              <div
-                className="absolute inset-0 rounded-full border-3 border-t-transparent animate-spin"
-                style={{ borderColor: `${C.pink}33`, borderTopColor: C.pink }}
-              />
-              <div className="absolute inset-0 flex items-center justify-center">
-                <span className="text-lg font-black" style={{ color: C.pink }}>{progress}%</span>
-              </div>
-            </div>
-
-            {/* Step indicator */}
-            <div className="flex items-center justify-center gap-2 mb-4">
-              {["analyzing", "planning", "generating"].map((s, i) => {
-                const isActive = step === s;
-                const isDone = ["analyzing", "planning", "generating"].indexOf(step) > i;
-                return (
-                  <div key={s} className="flex items-center gap-2">
-                    <div
-                      className="w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold transition-all duration-300"
-                      style={{
-                        backgroundColor: isDone ? C.green : isActive ? C.pink : "#E5E7EB",
-                        color: isDone || isActive ? C.white : "#9CA3AF",
-                      }}
-                    >
-                      {isDone ? (
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                          <polyline points="20 6 9 17 4 12" />
-                        </svg>
-                      ) : (
-                        i + 1
-                      )}
-                    </div>
-                    {i < 2 && (
-                      <div className="w-8 h-0.5" style={{ backgroundColor: isDone ? C.green : "#E5E7EB" }} />
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-
-            <p className="text-sm font-semibold mb-2" style={{ color: C.dark }}>
-              {step === "analyzing" && "Analyzing your product..."}
-              {step === "planning" && "Creating carousel plan..."}
-              {step === "generating" && "Generating slide images..."}
-            </p>
-            <p className="text-xs" style={{ color: C.textMuted }}>
-              {stepMessage || "This may take 2-5 minutes..."}
-            </p>
-
-            {/* Product info preview */}
-            {productInfo && step !== "analyzing" && (
-              <div className="mt-5 pt-5" style={{ borderTop: "1px solid #F3F4F6" }}>
-                <p className="text-xs font-bold uppercase tracking-wider mb-2" style={{ color: C.gold }}>
-                  Product Detected
-                </p>
-                <p className="text-sm font-semibold" style={{ color: C.dark }}>
-                  {productInfo.productName}
-                </p>
-                {productInfo.productDescription && (
-                  <p className="text-xs mt-1" style={{ color: C.textMuted }}>
-                    {productInfo.productDescription.slice(0, 100)}
-                    {productInfo.productDescription.length > 100 ? "..." : ""}
-                  </p>
-                )}
-              </div>
-            )}
-
-            {/* Cancel button */}
-            <button
-              onClick={() => {
-                abortRef.current = true;
-                setStep("idle");
-                setError("");
-                setStepMessage("");
-              }}
-              className="mt-6 px-6 py-2.5 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200"
-              style={{ backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
-  // ═══════════════════════════════════════════════════════════════════════
   // INPUT VIEW
+  // ═══════════════════════════════════════════════════════════════════════
   return (
     <div className="min-h-screen" style={{ backgroundColor: C.cream }}>
-      {/* Top Bar */}
+      {/* ─── Top Bar ──────────────────────────────────────────── */}
       <header
         className="sticky top-0 z-50 flex items-center justify-between px-4 sm:px-6 py-3"
-        style={{ backgroundColor: `${C.white}ee`, backdropFilter: "blur(12px)", borderBottom: "1px solid #F3F4F6" }}
+        style={{
+          backgroundColor: `${C.white}ee`,
+          backdropFilter: "blur(12px)",
+          borderBottom: `1px solid #F3F4F6`,
+        }}
       >
         <button
           onClick={onBack}
           className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
-          style={{ backgroundColor: C.white, color: C.text, border: `1.5px solid ${C.lightPink}` }}
+          style={{
+            backgroundColor: C.white,
+            color: C.text,
+            border: `1.5px solid ${C.lightPink}`,
+          }}
         >
           <svg width="16" height="16" viewBox="0 0 16 16" fill="none">
             <path d="M10 3L5 8l5 5" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
@@ -1732,14 +887,20 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         </button>
 
         <div className="flex items-center gap-2">
-          <div className="w-8 h-8 rounded-lg flex items-center justify-center" style={{ backgroundColor: C.gold, boxShadow: `0 2px 10px ${C.gold}40` }}>
+          <div
+            className="w-8 h-8 rounded-lg flex items-center justify-center"
+            style={{ backgroundColor: C.gold, boxShadow: `0 2px 10px ${C.gold}40` }}
+          >
             <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
               <rect x="3" y="3" width="18" height="18" rx="3" />
               <path d="M9 9h6M9 13h4" />
               <circle cx="18" cy="6" r="2" fill="white" stroke="none" />
             </svg>
           </div>
-          <span className="text-sm font-black uppercase tracking-wider hidden sm:inline" style={{ color: C.dark }}>
+          <span
+            className="text-sm font-black uppercase tracking-wider hidden sm:inline"
+            style={{ color: C.dark }}
+          >
             Carousel Machine
           </span>
         </div>
@@ -1747,228 +908,52 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         <div className="w-[100px]" />
       </header>
 
-      {/* Main Content */}
+      {/* ─── Main Content ─────────────────────────────────────── */}
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8 sm:py-12">
         {/* Hero Section */}
         <div className="text-center mb-8 sm:mb-12">
-          <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5" style={{ backgroundColor: `${C.gold}18` }}>
+          <div
+            className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-5"
+            style={{ backgroundColor: `${C.gold}18` }}
+          >
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.gold }} />
             <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: C.gold }}>
-              AI-Powered Problem/Product
+              Nano Banana 2
             </span>
           </div>
 
-          <h1 className="text-3xl sm:text-5xl font-black uppercase tracking-tight mb-4 leading-tight" style={{ color: C.dark }}>
+          <h1
+            className="text-3xl sm:text-5xl font-black uppercase tracking-tight mb-4 leading-tight"
+            style={{ color: C.dark }}
+          >
             AI Viral{" "}
             <span style={{ color: C.pink }}>Carousel</span>{" "}
             Machine
           </h1>
 
           <p className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style={{ color: C.textMuted }}>
-            Paste your product link, choose the number of slides, and let DeepSeek AI create stunning Problem/Product carousels — clean images, you add the text.
+            Turn any idea into scroll-stopping carousels. Each carousel: Hero → Quote → Comparison → Product. Nano Banana 2 model, text baked in.
           </p>
-        </div>
-
-        {/* How it works */}
-        <div className="grid grid-cols-3 gap-3 mb-8">
-          {[
-            { num: "1", title: "Paste Link", desc: "Add your product URL", color: C.pink },
-            { num: "2", title: "AI Analyzes", desc: "DeepSeek extracts features", color: C.gold },
-            { num: "3", title: "Get Carousels", desc: "Problem → Solution pairs", color: "#22C55E" },
-          ].map((item) => (
-            <div
-              key={item.num}
-              className="rounded-2xl p-4 text-center"
-              style={{ backgroundColor: C.white, border: "1px solid #F3F4F6" }}
-            >
-              <div
-                className="w-8 h-8 rounded-full flex items-center justify-center mx-auto mb-2 text-sm font-black"
-                style={{ backgroundColor: `${item.color}15`, color: item.color }}
-              >
-                {item.num}
-              </div>
-              <h3 className="text-xs font-bold mb-1" style={{ color: C.dark }}>{item.title}</h3>
-              <p className="text-[10px]" style={{ color: C.textMuted }}>{item.desc}</p>
-            </div>
-          ))}
         </div>
 
         {/* Main Input Card */}
         <div
           className="rounded-3xl p-6 sm:p-8 mb-6"
-          style={{ backgroundColor: C.white, border: "1.5px solid #F3F4F6", boxShadow: "0 4px 24px rgba(0,0,0,0.04)" }}
+          style={{
+            backgroundColor: C.white,
+            border: `1.5px solid #F3F4F6`,
+            boxShadow: `0 4px 24px rgba(0,0,0,0.04)`,
+          }}
         >
-          {/* Product URL Input */}
-          <div className="flex items-center gap-2 mb-4">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-              </svg>
-            </div>
-            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-              Product Link
-            </label>
-          </div>
-
-          <input
-            type="url"
-            value={productUrl}
-            onChange={(e) => setProductUrl(e.target.value)}
-            placeholder="https://www.amazon.com/dp/B0... or any product page"
-            className="w-full px-5 py-4 rounded-2xl text-sm outline-none transition-all duration-200"
-            style={{
-              backgroundColor: `${C.lightPink}30`,
-              border: `1.5px solid ${productUrl ? `${C.pink}40` : "#F3F4F6"}`,
-              color: C.text,
-              boxShadow: productUrl ? `0 0 0 3px ${C.pink}10` : "none",
-            }}
-          />
-
-          <p className="text-[11px] mt-2" style={{ color: C.textMuted }}>
-            We'll analyze the product page and extract features, benefits, and target audience
-          </p>
-
-          {/* Product Image Upload */}
-          <div className="flex items-center gap-2 mt-6 mb-3">
-            <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.green}12` }}>
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                <circle cx="8.5" cy="8.5" r="1.5" />
-                <polyline points="21 15 16 10 5 21" />
-              </svg>
-            </div>
-            <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-              Product Image <span style={{ color: C.textMuted }}>(for product slides)</span>
-            </label>
-          </div>
-
-          {/* Hidden file input */}
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept="image/*"
-            className="hidden"
-            onChange={(e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              // Resize to max 1024px before base64 to keep payload small
-              const img = new Image();
-              img.onload = () => {
-                const MAX = 1024;
-                let w = img.width, h = img.height;
-                if (w > MAX || h > MAX) {
-                  if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-                  else { w = Math.round(w * MAX / h); h = MAX; }
-                }
-                const canvas = document.createElement('canvas');
-                canvas.width = w; canvas.height = h;
-                canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-                const result = canvas.toDataURL('image/png');
-                setProductImageBase64(result);
-                console.log(`[Carousel] Product image uploaded & resized to ${w}x${h} (${(result.length / 1024).toFixed(0)}KB base64)`);
-              };
-              img.src = URL.createObjectURL(file);
-            }}
-          />
-
-          {/* Upload zone or preview */}
-          {productImageBase64 ? (
-            <div
-              className="rounded-2xl p-4 flex items-center gap-4 cursor-pointer transition-all duration-200 hover:shadow-md"
-              style={{ backgroundColor: `${C.green}06`, border: `1.5px solid ${C.green}30` }}
-              onClick={() => fileInputRef.current?.click()}
-            >
-              <img
-                src={productImageBase64}
-                alt="Product preview"
-                className="w-16 h-16 rounded-xl object-cover"
-                style={{ border: "2px solid #E5E7EB", boxShadow: "0 2px 8px rgba(0,0,0,0.1)" }}
-              />
-              <div className="flex-1">
-                <p className="text-xs font-bold" style={{ color: C.green }}>Product image uploaded ✓</p>
-                <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
-                  This image will be used as reference to place your product in the product slides
-                </p>
-                <p className="text-[10px] mt-1 font-semibold" style={{ color: C.pink }}>
-                  Click to change image
-                </p>
-              </div>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  setProductImageBase64(null);
-                  if (fileInputRef.current) fileInputRef.current.value = "";
-                }}
-                className="w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200"
-                style={{ backgroundColor: "#FEF2F2", border: "1px solid #FECACA" }}
-              >
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <line x1="18" y1="6" x2="6" y2="18" />
-                  <line x1="6" y1="6" x2="18" y2="18" />
-                </svg>
-              </button>
-            </div>
-          ) : (
-            <div
-              className="rounded-2xl p-6 flex flex-col items-center justify-center cursor-pointer transition-all duration-200 hover:shadow-md"
-              style={{
-                backgroundColor: `${C.green}04`,
-                border: `2px dashed ${C.green}30`,
-                minHeight: "120px",
-              }}
-              onClick={() => fileInputRef.current?.click()}
-              onDragOver={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-              }}
-              onDrop={(e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                const file = e.dataTransfer.files?.[0];
-                if (file && file.type.startsWith("image/")) {
-                  const img = new Image();
-                  img.onload = () => {
-                    const MAX = 1024;
-                    let w = img.width, h = img.height;
-                    if (w > MAX || h > MAX) {
-                      if (w > h) { h = Math.round(h * MAX / w); w = MAX; }
-                      else { w = Math.round(w * MAX / h); h = MAX; }
-                    }
-                    const canvas = document.createElement('canvas');
-                    canvas.width = w; canvas.height = h;
-                    canvas.getContext('2d')!.drawImage(img, 0, 0, w, h);
-                    setProductImageBase64(canvas.toDataURL('image/png'));
-                  };
-                  img.src = URL.createObjectURL(file);
-                }
-              }}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mb-3" style={{ backgroundColor: `${C.green}12` }}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.green} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-              </div>
-              <p className="text-xs font-bold" style={{ color: C.text }}>
-                Upload your product image
-              </p>
-              <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
-                Click or drag & drop • PNG, JPG, WebP
-              </p>
-              <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
-                Optional: GPT Image will use it as reference to create product slides featuring your product
-              </p>
-            </div>
-          )}
-
-          {/* Settings Row */}
-          <div className="flex flex-wrap items-end gap-4 mt-6 mb-5">
-            {/* Number of Slides */}
-            <div className="flex-1 min-w-[180px]">
+          {/* ─── Settings Row ──────────────────────────────────── */}
+          <div className="flex flex-wrap items-end gap-4 mb-5">
+            {/* Number of Carousels */}
+            <div className="flex-1 min-w-[140px]">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${C.pink}12` }}
+                >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <rect x="3" y="3" width="7" height="7" />
                     <rect x="14" y="3" width="7" height="7" />
@@ -1977,37 +962,34 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   </svg>
                 </div>
                 <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-                  Slides
+                  Carousels
                 </label>
               </div>
-              <div className="flex items-center gap-3">
-                <input
-                  type="number"
-                  min={2}
-                  max={15}
-                  value={numSlides}
-                  onChange={(e) => {
-                    const val = parseInt(e.target.value);
-                    if (!isNaN(val) && val >= 2 && val <= 15) setNumSlides(val);
-                    else if (e.target.value === "") setNumSlides(2);
-                  }}
-                  className="w-16 px-3 py-2.5 rounded-xl text-sm font-bold text-center focus:outline-none transition-all duration-200"
-                  style={{
-                    border: `1.5px solid ${C.pink}`,
-                    color: C.pink,
-                    backgroundColor: `${C.pink}08`,
-                  }}
-                />
-                <p className="text-[10px]" style={{ color: C.textMuted }}>
-                  AI picks structure: Hook → Pain → Solution → CTA etc.
-                </p>
-              </div>
+              <input
+                type="number"
+                min={1}
+                max={10}
+                value={numCarousels}
+                onChange={(e) => {
+                  const val = parseInt(e.target.value);
+                  if (!isNaN(val) && val >= 1 && val <= 10) setNumCarousels(val);
+                  else if (e.target.value === "") setNumCarousels(1);
+                }}
+                className="w-20 px-3 py-2.5 rounded-xl text-sm font-bold text-center focus:outline-none transition-all duration-200"
+                style={{ border: `1.5px solid ${C.pink}`, color: C.pink, backgroundColor: `${C.pink}08` }}
+              />
+              <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
+                Each has 4 slides (Hero+Quote+Compare+Product)
+              </p>
             </div>
 
             {/* Language */}
             <div className="min-w-[140px]">
               <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
+                <div
+                  className="w-6 h-6 rounded-lg flex items-center justify-center"
+                  style={{ backgroundColor: `${C.pink}12` }}
+                >
                   <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
                     <circle cx="12" cy="12" r="10" />
                     <line x1="2" y1="12" x2="22" y2="12" />
@@ -2041,165 +1023,235 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             </div>
           </div>
 
-          {/* User Instructions */}
-          <div className="flex items-center gap-2 mb-3">
-            <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.gold}12` }}>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+          {/* ─── Skill Info Badge ────────────────────────────── */}
+          <div
+            className="mb-5 rounded-2xl p-3 flex items-start gap-3"
+            style={{
+              backgroundColor: `${C.gold}08`,
+              border: `1px dashed ${C.gold}30`,
+            }}
+          >
+            <div
+              className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0"
+              style={{ backgroundColor: `${C.gold}15` }}
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="12" y1="16" x2="12" y2="12" />
+                <line x1="12" y1="8" x2="12.01" y2="8" />
+              </svg>
+            </div>
+            <div>
+              <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.gold }}>
+                Locked Settings
+              </p>
+              <p className="text-[10px] leading-relaxed mt-0.5" style={{ color: C.textMuted }}>
+                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product as reference (tin/pack always matches)
+                <br />
+                Text: <b>Bold white rounded + black outline</b> • ~22% from top
+                <br />
+                Sequence: 🎯 Hero → 💬 Quote → ❌/✅ Comparison → 📦 Product (pure white)
+              </p>
+            </div>
+          </div>
+
+          {/* ─── Idea Input ────────────────────────────────────── */}
+          <div className="flex items-center gap-2 mb-4">
+            <div
+              className="w-7 h-7 rounded-lg flex items-center justify-center"
+              style={{ backgroundColor: `${C.pink}12` }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                 <path d="M12 3H5a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
                 <path d="M18.375 2.625a1 1 0 0 1 3 3l-9.013 9.014a2 2 0 0 1-.853.505l-2.873.84a.5.5 0 0 1-.62-.62l.84-2.873a2 2 0 0 1 .506-.852z" />
               </svg>
             </div>
             <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-              Additional Instructions <span style={{ color: C.textMuted }}>(optional)</span>
+              What&apos;s your product/idea?
             </label>
           </div>
 
           <textarea
-            value={userInstructions}
-            onChange={(e) => setUserInstructions(e.target.value)}
-            placeholder="e.g. Focus on eco-friendly benefits, target moms aged 25-40, emphasize the time-saving aspect..."
-            rows={3}
-            className="w-full px-4 py-3 rounded-2xl text-sm outline-none resize-none transition-all duration-200"
+            value={idea}
+            onChange={(e) => setIdea(e.target.value)}
+            placeholder="e.g. Anti-aging face cream, Protein powder brand, SaaS tool for marketers..."
+            rows={4}
+            className="w-full px-5 py-4 rounded-2xl text-sm outline-none resize-none transition-all duration-200"
             style={{
-              backgroundColor: `${C.lightGold}30`,
-              border: `1.5px solid ${userInstructions ? `${C.gold}40` : "#F3F4F6"}`,
+              backgroundColor: `${C.lightPink}30`,
+              border: `1.5px solid ${idea ? `${C.pink}40` : "#F3F4F6"}`,
               color: C.text,
+              boxShadow: idea ? `0 0 0 3px ${C.pink}10` : "none",
+            }}
+            onFocus={(e) => {
+              e.target.style.borderColor = `${C.pink}50`;
+              e.target.style.boxShadow = `0 0 0 3px ${C.pink}10`;
+            }}
+            onBlur={(e) => {
+              e.target.style.borderColor = idea ? `${C.pink}40` : "#F3F4F6";
+              e.target.style.boxShadow = idea ? `0 0 0 3px ${C.pink}10` : "none";
             }}
           />
 
-          {/* Error Message */}
+          <div className="flex items-center justify-between mt-3">
+            <p className="text-[11px]" style={{ color: C.textMuted }}>
+              {idea.length > 0 ? `${idea.length} characters` : "Describe your product for best results"}
+            </p>
+          </div>
+
+          {/* ─── Error Message ─────────────────────────────────── */}
           {error && (
-            <div className="mt-4 px-4 py-3 rounded-xl text-sm" style={{ backgroundColor: "#FEF2F2", color: "#DC2626", border: "1px solid #FECACA" }}>
+            <div
+              className="mt-4 px-4 py-3 rounded-xl text-sm"
+              style={{
+                backgroundColor: "#FEF2F2",
+                color: "#DC2626",
+                border: "1px solid #FECACA",
+              }}
+            >
               {error}
-              <button
-                onClick={() => setError("")}
-                className="ml-3 underline text-xs"
-              >
-                Dismiss
-              </button>
             </div>
           )}
 
           {/* Generate Button */}
           <button
             onClick={handleGenerate}
-            disabled={!productUrl.trim() || step !== "idle"}
+            disabled={!idea.trim() || generating}
             className="w-full mt-5 py-4 rounded-2xl text-sm font-black uppercase tracking-wider transition-all duration-300 disabled:opacity-35 disabled:cursor-not-allowed"
             style={{
-              background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
+              background: generating
+                ? `linear-gradient(135deg, ${C.pink}90, ${C.gold}90)`
+                : `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
               color: C.white,
-              boxShadow: productUrl.trim() && step === "idle" ? `0 6px 24px ${C.pink}35` : "none",
-              transform: productUrl.trim() && step === "idle" ? "scale(1)" : "scale(0.98)",
+              boxShadow: idea.trim() && !generating ? `0 6px 24px ${C.pink}35` : "none",
+              transform: idea.trim() && !generating ? "scale(1)" : "scale(0.98)",
             }}
           >
-            <span className="inline-flex items-center gap-2">
-              <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
-              </svg>
-              Generate {numSlides} Carousel{numSlides > 1 ? 's' : ''} ({numSlides * 2} images)
-            </span>
+            {generating ? (
+              <span className="inline-flex items-center gap-3">
+                <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                {generationStep || "Generating..."}
+              </span>
+            ) : (
+              <span className="inline-flex items-center gap-2">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
+                </svg>
+                Generate {numCarousels} Carousel{numCarousels > 1 ? "s" : ""}
+              </span>
+            )}
           </button>
         </div>
 
-        {/* Slide Preview Explanation */}
-        <div
-          className="rounded-2xl p-5 mb-6"
-          style={{ backgroundColor: C.white, border: "1px solid #F3F4F6" }}
-        >
-          <p className="text-xs font-bold uppercase tracking-wider mb-4" style={{ color: C.gold }}>
-            How Each Carousel Works
-          </p>
-          <div className="flex items-start gap-4">
-            {/* Problem */}
-            <div className="flex-1 rounded-xl p-4" style={{ backgroundColor: "rgba(220,38,38,0.06)", border: "1px dashed rgba(220,38,38,0.2)" }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(220,38,38,0.15)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <circle cx="12" cy="12" r="10" />
-                    <line x1="15" y1="9" x2="9" y2="15" />
-                    <line x1="9" y1="9" x2="15" y2="15" />
-                  </svg>
-                </div>
-                <span className="text-xs font-bold uppercase" style={{ color: "#EF4444" }}>Problem</span>
-              </div>
-              <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>
-                "If you are..." style image showing the pain point. Dark tones, messy environment — no faces, no text on image. You add the text yourself!
-              </p>
-            </div>
-
-            {/* Arrow */}
-            <div className="flex items-center pt-6">
-              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="5" y1="12" x2="19" y2="12" />
-                <polyline points="12 5 19 12 12 19" />
-              </svg>
-            </div>
-
-            {/* Product */}
-            <div className="flex-1 rounded-xl p-4" style={{ backgroundColor: "rgba(34,197,94,0.06)", border: "1px dashed rgba(34,197,94,0.2)" }}>
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-6 h-6 rounded-full flex items-center justify-center" style={{ backgroundColor: "rgba(34,197,94,0.15)" }}>
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                    <polyline points="22 4 12 14.01 9 11.01" />
-                  </svg>
-                </div>
-                <span className="text-xs font-bold uppercase" style={{ color: "#22C55E" }}>Product</span>
-              </div>
-              <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>
-                Your product front & center with "sorry if they sold out" text. Bright tones, clean setup — no faces, no text on image. Copy & paste the text yourself!
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Feature Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          {[
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
-                  <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
-                </svg>
-              ),
-              title: "Product Analysis",
-              desc: "DeepSeek AI reads your product page and extracts key features & benefits",
-            },
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
-                </svg>
-              ),
-              title: "Problem / Product",
-              desc: "\"If you are...\" then product + \"sorry if they sold out\" — proven viral format",
-            },
-            {
-              icon: (
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="7 10 12 15 17 10" />
-                  <line x1="12" y1="15" x2="12" y2="3" />
-                </svg>
-              ),
-              title: "Clean Images",
-              desc: "No AI text or faces — you write text your way. Download 9:16 vertical for Instagram & TikTok",
-            },
-          ].map((feature, i) => (
+        {/* ─── Generating Progress ────────────────────────────── */}
+        {generating && (
+          <div
+            className="rounded-2xl p-6 text-center animate-pulse"
+            style={{
+              backgroundColor: C.white,
+              border: `1.5px solid ${C.pink}20`,
+            }}
+          >
             <div
-              key={i}
-              className="rounded-2xl p-4 text-center transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
-              style={{ backgroundColor: C.white, border: "1px solid #F3F4F6" }}
-            >
-              <div className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3" style={{ backgroundColor: `${C.lightPink}40` }}>
-                {feature.icon}
+              className="w-12 h-12 rounded-full border-3 border-t-transparent animate-spin mx-auto mb-4"
+              style={{ borderColor: `${C.pink}33`, borderTopColor: C.pink }}
+            />
+            <p className="text-sm font-semibold" style={{ color: C.dark }}>
+              Creating {numCarousels} carousel{numCarousels > 1 ? "s" : ""} with Nano Banana 2...
+            </p>
+            <p className="text-xs mt-2" style={{ color: C.textMuted }}>
+              Each carousel: Hero → Quote → Comparison → Product (4 slides)
+              <br />
+              This may take 2-5 minutes per carousel. Text overlay will be applied after images are ready.
+            </p>
+          </div>
+        )}
+
+        {/* Example Ideas */}
+        {!generating && (
+          <>
+            <div className="mb-8">
+              <p className="text-xs font-bold uppercase tracking-wider mb-3" style={{ color: C.textMuted }}>
+                Try these ideas
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {examples.map((ex, i) => (
+                  <button
+                    key={i}
+                    onClick={() => setIdea(ex)}
+                    className="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-200 hover:scale-[1.03] hover:shadow-md"
+                    style={{
+                      backgroundColor: C.white,
+                      color: C.text,
+                      border: `1px solid #E5E7EB`,
+                    }}
+                  >
+                    {ex}
+                  </button>
+                ))}
               </div>
-              <h3 className="text-xs font-bold mb-1" style={{ color: C.dark }}>{feature.title}</h3>
-              <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>{feature.desc}</p>
             </div>
-          ))}
-        </div>
+
+            {/* Features Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {[
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
+                    </svg>
+                  ),
+                  title: "Nano Banana 2",
+                  desc: "High-quality AI images, 3:4 ratio, product reference built-in",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <polyline points="4 7 4 4 20 4 20 7" />
+                      <line x1="9.5" y1="20" x2="14.5" y2="20" />
+                      <line x1="12" y1="4" x2="12" y2="20" />
+                    </svg>
+                  ),
+                  title: "Bold Text Overlay",
+                  desc: "White rounded font + black outline, baked into each slide",
+                },
+                {
+                  icon: (
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                  ),
+                  title: "Viral Sequence",
+                  desc: "Hero → Quote → ❌/✅ → Product (proven viral format)",
+                },
+              ].map((feature, i) => (
+                <div
+                  key={i}
+                  className="rounded-2xl p-4 text-center transition-all duration-300 hover:shadow-md hover:-translate-y-0.5"
+                  style={{
+                    backgroundColor: C.white,
+                    border: "1px solid #F3F4F6",
+                  }}
+                >
+                  <div
+                    className="w-10 h-10 rounded-xl flex items-center justify-center mx-auto mb-3"
+                    style={{ backgroundColor: `${C.lightPink}40` }}
+                  >
+                    {feature.icon}
+                  </div>
+                  <h3 className="text-xs font-bold mb-1" style={{ color: C.dark }}>
+                    {feature.title}
+                  </h3>
+                  <p className="text-[11px] leading-relaxed" style={{ color: C.textMuted }}>
+                    {feature.desc}
+                  </p>
+                </div>
+              ))}
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
