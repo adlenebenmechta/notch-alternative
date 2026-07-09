@@ -83,6 +83,24 @@ function wrapText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number,
   return lines;
 }
 
+// ─── Helper: draw rounded rectangle path ──────────────────────────────
+function roundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number, y: number, w: number, h: number, r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
 // ─── Canvas: Render text overlay on image (Skill style) ────────────────────
 // Bold white rounded font with solid black outline, ~22% from top
 function renderTextOnImage(
@@ -114,8 +132,12 @@ function renderTextOnImage(
       const hasText = !!(hasHeader || hasBody);
 
       if (hasText) {
-        const maxWidth = canvas.width * 0.85;
-        const outlineWidth = Math.max(4, canvas.width * 0.008);
+        const maxWidth = canvas.width * 0.82;
+        const outlineWidth = Math.max(2, canvas.width * 0.004);
+
+        // ─── Semi-transparent dark backdrop behind text area ───
+        // This ensures text is readable regardless of image background
+        const backdropPadding = canvas.width * 0.06;
 
         // ─── Position: ~22% from top ───
         const baseY = canvas.height * 0.22;
@@ -124,17 +146,59 @@ function renderTextOnImage(
         if (hasHeader) {
           const headerLen = headerText!.length;
           let headerFontSize: number;
-          if (headerLen <= 20) headerFontSize = canvas.width * 0.09;
-          else if (headerLen <= 40) headerFontSize = canvas.width * 0.07;
-          else headerFontSize = canvas.width * 0.058;
-          headerFontSize = Math.max(headerFontSize, 32);
+          if (headerLen <= 15) headerFontSize = canvas.width * 0.065;
+          else if (headerLen <= 25) headerFontSize = canvas.width * 0.052;
+          else if (headerLen <= 40) headerFontSize = canvas.width * 0.042;
+          else headerFontSize = canvas.width * 0.035;
+          headerFontSize = Math.max(headerFontSize, 22);
 
           ctx.font = `bold ${headerFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
           ctx.textAlign = "center";
 
           // Handle multi-line headers (e.g. ❌/✅ comparison)
           const headerLines = headerText!.split("\n");
-          const lineHeight = headerFontSize * 1.45;
+          const lineHeight = headerFontSize * 1.4;
+
+          // ─── Draw backdrop for header area ───
+          // Calculate total header text height
+          let totalHeaderHeight = 0;
+          const allHeaderSubLines: string[][] = [];
+          for (let i = 0; i < headerLines.length; i++) {
+            const subLines = wrapText(ctx, headerLines[i], maxWidth);
+            allHeaderSubLines.push(subLines);
+            totalHeaderHeight += subLines.length * lineHeight;
+          }
+
+          // Draw dark rounded rect backdrop for header
+          ctx.fillStyle = "rgba(0,0,0,0.45)";
+          const backdropTop = baseY - headerFontSize * 0.8 - backdropPadding;
+          const backdropHeight = totalHeaderHeight + backdropPadding * 2;
+          const backdropWidth = canvas.width * 0.9;
+          const backdropLeft = (canvas.width - backdropWidth) / 2;
+          const backdropRadius = backdropPadding * 0.6;
+          roundRect(ctx, backdropLeft, backdropTop, backdropWidth, backdropHeight, backdropRadius);
+          ctx.fill();
+
+          // ─── Draw body backdrop too if body exists ───
+          let bodyStartY = baseY + totalHeaderHeight + 12;
+          let bodyTotalHeight = 0;
+          let bodyWrappedLines: string[] = [];
+          if (hasBody) {
+            const bodyFontSize = headerFontSize * 0.6;
+            ctx.font = `bold ${bodyFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+            bodyWrappedLines = wrapText(ctx, bodyText!, maxWidth);
+            const bodyLineHeight = bodyFontSize * 1.35;
+            bodyTotalHeight = bodyWrappedLines.length * bodyLineHeight;
+
+            // Extend backdrop to cover body too
+            const fullBackdropHeight = totalHeaderHeight + 12 + bodyTotalHeight + backdropPadding * 2;
+            ctx.fillStyle = "rgba(0,0,0,0.45)";
+            roundRect(ctx, backdropLeft, backdropTop, backdropWidth, fullBackdropHeight, backdropRadius);
+            ctx.fill();
+
+            // Restore header font for drawing
+            ctx.font = `bold ${headerFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
+          }
 
           // Draw solid black outline first (stroke)
           ctx.strokeStyle = "#000000";
@@ -142,9 +206,8 @@ function renderTextOnImage(
           ctx.lineJoin = "round";
           ctx.miterLimit = 2;
 
-          for (let i = 0; i < headerLines.length; i++) {
-            const lineText = headerLines[i];
-            const subLines = wrapText(ctx, lineText, maxWidth);
+          for (let i = 0; i < allHeaderSubLines.length; i++) {
+            const subLines = allHeaderSubLines[i];
             for (let j = 0; j < subLines.length; j++) {
               const y = baseY + (i * lineHeight) + (j * lineHeight);
               ctx.strokeText(subLines[j], canvas.width / 2, y);
@@ -153,9 +216,8 @@ function renderTextOnImage(
 
           // Then draw white fill
           ctx.fillStyle = "#FFFFFF";
-          for (let i = 0; i < headerLines.length; i++) {
-            const lineText = headerLines[i];
-            const subLines = wrapText(ctx, lineText, maxWidth);
+          for (let i = 0; i < allHeaderSubLines.length; i++) {
+            const subLines = allHeaderSubLines[i];
             for (let j = 0; j < subLines.length; j++) {
               const y = baseY + (i * lineHeight) + (j * lineHeight);
               ctx.fillText(subLines[j], canvas.width / 2, y);
@@ -164,46 +226,56 @@ function renderTextOnImage(
 
           // Draw body text below header
           if (hasBody) {
-            const bodyFontSize = headerFontSize * 0.65;
+            const bodyFontSize = headerFontSize * 0.6;
             ctx.font = `bold ${bodyFontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
-            const bodyLines = wrapText(ctx, bodyText!, maxWidth);
-            const bodyLineHeight = bodyFontSize * 1.4;
-            const bodyStartY = baseY + headerLines.length * lineHeight + 12;
+            const bodyLineHeight = bodyFontSize * 1.35;
 
             // Black outline
             ctx.strokeStyle = "#000000";
-            ctx.lineWidth = outlineWidth * 1.5;
+            ctx.lineWidth = outlineWidth * 1.2;
             ctx.lineJoin = "round";
             ctx.miterLimit = 2;
 
-            for (let i = 0; i < bodyLines.length; i++) {
-              ctx.strokeText(bodyLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
+            for (let i = 0; i < bodyWrappedLines.length; i++) {
+              ctx.strokeText(bodyWrappedLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
             }
 
             // White fill
             ctx.fillStyle = "#FFFFFF";
-            for (let i = 0; i < bodyLines.length; i++) {
-              ctx.fillText(bodyLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
+            for (let i = 0; i < bodyWrappedLines.length; i++) {
+              ctx.fillText(bodyWrappedLines[i], canvas.width / 2, bodyStartY + i * bodyLineHeight);
             }
           }
         } else if (hasBody) {
           // Only body text
           const bodyLen = bodyText!.length;
           let fontSize: number;
-          if (bodyLen <= 20) fontSize = canvas.width * 0.08;
-          else if (bodyLen <= 50) fontSize = canvas.width * 0.065;
-          else fontSize = canvas.width * 0.055;
-          fontSize = Math.max(fontSize, 28);
+          if (bodyLen <= 15) fontSize = canvas.width * 0.055;
+          else if (bodyLen <= 30) fontSize = canvas.width * 0.045;
+          else if (bodyLen <= 50) fontSize = canvas.width * 0.038;
+          else fontSize = canvas.width * 0.032;
+          fontSize = Math.max(fontSize, 20);
 
           ctx.font = `bold ${fontSize}px -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif`;
           ctx.textAlign = "center";
 
           const bodyLines = wrapText(ctx, bodyText!, maxWidth);
-          const lineHeight = fontSize * 1.4;
+          const lineHeight = fontSize * 1.35;
+
+          // ─── Draw backdrop for body-only area ───
+          const totalBodyHeight = bodyLines.length * lineHeight;
+          ctx.fillStyle = "rgba(0,0,0,0.45)";
+          const backdropTop2 = baseY - fontSize * 0.8 - backdropPadding;
+          const backdropHeight2 = totalBodyHeight + backdropPadding * 2;
+          const backdropWidth2 = canvas.width * 0.9;
+          const backdropLeft2 = (canvas.width - backdropWidth2) / 2;
+          const backdropRadius2 = backdropPadding * 0.6;
+          roundRect(ctx, backdropLeft2, backdropTop2, backdropWidth2, backdropHeight2, backdropRadius2);
+          ctx.fill();
 
           // Black outline
           ctx.strokeStyle = "#000000";
-          ctx.lineWidth = outlineWidth * 1.5;
+          ctx.lineWidth = outlineWidth * 1.2;
           ctx.lineJoin = "round";
           ctx.miterLimit = 2;
 
