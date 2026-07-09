@@ -556,12 +556,11 @@ async function generateSlideImageKie(
   referenceImageUrl?: string
 ): Promise<string> {
   // Build input object for kie.ai nano-banana-2 API
-  // ONLY include image_input when a reference image is provided (non-empty array triggers edit mode)
-  // Empty image_input array causes "File type not supported" error
+  // Use image_size (not aspect_ratio/output_format — those cause "File type not supported")
+  // ONLY include image_input when a reference image is provided
   const input: Record<string, unknown> = {
     prompt: imagePrompt,
-    aspect_ratio: "3:4",
-    output_format: "png",
+    image_size: "768x1344",
   };
   if (referenceImageUrl) {
     input.image_input = [referenceImageUrl];
