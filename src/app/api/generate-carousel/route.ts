@@ -153,10 +153,10 @@ function enforcePhotorealisticPrompt(prompt: string): string {
   return IMAGE_PROMPT_PREFIX + cleaned;
 }
 
-// ─── Carousel Skill Prompt (Locked Settings) ────────────────────────────────
+// ─── Carousel Skill Prompt (Flexible Slide Count) ────────────────────────────
 // Model: Nano Banana 2 (nano_banana_2), 3:4 aspect ratio, product as reference
 // Text style: bold white rounded font with solid black outline, ~22% from top
-// Sequence: hero shot + arrows → quote conversation → ❌/✅ comparison → product on pure white (last)
+// Slide count: 3-8 per carousel (AI decides based on topic), last slide always "product"
 
 const CAROUSEL_SKILL_PROMPT = `You are an expert at designing viral marketing carousel content for social media (Instagram, TikTok).
 
@@ -164,42 +164,74 @@ const CAROUSEL_SKILL_PROMPT = `You are an expert at designing viral marketing ca
 - Image model: Nano Banana 2 (nano_banana_2), 3:4 aspect ratio (768x1344)
 - The product is imported as reference so the tin/pack ALWAYS matches across all slides
 - Text is baked into the images (bold white rounded font with solid black outline, positioned ~22% from the top, never at the top edge)
-- Each carousel has exactly 4 slides in this fixed sequence:
 
-## FIXED SLIDE SEQUENCE (every carousel must follow this exactly)
+## FLEXIBLE SLIDE COUNT
+- Each carousel can have between 3 and 8 slides — choose the number that best fits the topic and storytelling flow
+- Some topics need only 3 slides (quick punchy hook → key point → product), others benefit from 6-8 slides (building a narrative arc)
+- Each carousel in a batch can have a DIFFERENT number of slides
+- Vary the slide count across carousels to create diversity
 
-**Slide 1 — HERO SHOT + ARROWS**
-- Image: Product hero shot on a dramatic background, with bold visual arrows or pointers drawing the eye to the product. Photorealistic, studio lighting, 3:4 ratio.
-- image_prompt MUST include: "product hero shot, dramatic lighting, visual arrows pointing at product, studio photography, 3:4 ratio, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-- header_text: A punchy hook headline (max 6 words) that grabs attention — about the DESIRE not the problem
-- body_text: null (let the visual do the talking)
+## AVAILABLE SLIDE TYPES (choose from these, in any order except the last)
+- **hero**: Product hero shot on a dramatic background, with bold visual arrows or pointers drawing the eye to the product. Photorealistic, studio lighting.
+  - image_prompt MUST include: "product hero shot, dramatic lighting, visual arrows pointing at product, studio photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A punchy hook headline (max 6 words) about the DESIRE not the problem
+  - body_text: null (let the visual do the talking)
 
-**Slide 2 — QUOTE CONVERSATION**
-- Image: A relatable scene of someone talking, whispering, or in a conversation setting. Natural candid moment. The product is subtly visible in the scene. Photorealistic, natural lighting.
-- image_prompt MUST include: "candid conversation scene, person whispering or talking naturally, product subtly visible, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-- header_text: A powerful quote or statement in quotes (like something a customer would say, max 8 words)
-- body_text: A supporting line that amplifies the quote (max 12 words)
+- **quote**: A relatable scene of someone talking, whispering, or in a conversation setting. Natural candid moment. Product subtly visible. Photorealistic, natural lighting.
+  - image_prompt MUST include: "candid conversation scene, person whispering or talking naturally, product subtly visible, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A powerful quote or statement in quotes (max 8 words)
+  - body_text: A supporting line that amplifies the quote (max 12 words)
 
-**Slide 3 — ❌/✅ COMPARISON**
-- Image: Split or side-by-side visual — the "wrong way" on one side and the "right way" (with product) on the other. Clean, minimal, photorealistic. Pure white or light background.
-- image_prompt MUST include: "split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on the correct side, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-- header_text: "❌ [the wrong way]" on first line, then "✅ [the right way with product]" on second line
-- body_text: null
+- **comparison**: Split or side-by-side visual — the "wrong way" on one side and the "right way" (with product) on the other. Clean, minimal, photorealistic.
+  - image_prompt MUST include: "split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on the correct side, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: "❌ [the wrong way]" on first line, then "✅ [the right way with product]" on second line
+  - body_text: null
 
-**Slide 4 — PRODUCT ON PURE WHITE (ALWAYS LAST)**
-- Image: The product (tin/pack) centered on a PURE WHITE background, clean, professional product photography, no shadows, no props. Like an Amazon listing photo.
-- image_prompt MUST include: "product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-- header_text: The product name or tagline (max 5 words)
-- body_text: A single clear CTA command (max 6 words), like "Order now — link in bio"
+- **tip**: A lifestyle scene showing someone benefiting from a tip or trick related to the product. Natural, relatable.
+  - image_prompt MUST include: "lifestyle scene showing tip or trick being used, person benefiting from advice, product naturally present, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A practical tip or advice headline starting with "💡" or "Pro tip:" (max 8 words)
+  - body_text: Brief explanation of the tip (max 15 words)
+
+- **stat**: A scene that visually represents data or a surprising number. The product is visible in the scene.
+  - image_prompt MUST include: "scene visually representing data or statistics, surprising number visual, product present in scene, photorealistic, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A surprising statistic with a number and "%" or "x" (max 8 words)
+  - body_text: Brief context for the stat (max 12 words)
+
+- **question**: A thought-provoking scene with someone looking curious or pondering. The product is visible.
+  - image_prompt MUST include: "person looking curious or pondering, thought-provoking scene, product visible, candid photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A provocative question that makes the viewer stop scrolling (max 8 words)
+  - body_text: null or a brief follow-up (max 10 words)
+
+- **problem**: A scene showing the pain point or frustration the product solves. Relatable, emotional.
+  - image_prompt MUST include: "person showing frustration or pain point, relatable problem scene, emotional, product not yet visible, photorealistic, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A relatable problem statement (max 8 words)
+  - body_text: null or brief amplification (max 10 words)
+
+- **benefit**: A scene showing the positive outcome or transformation after using the product. Aspirational.
+  - image_prompt MUST include: "person experiencing positive outcome or transformation, aspirational scene, product naturally present, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: A benefit statement starting with a verb like "Feel", "Get", "Enjoy" (max 8 words)
+  - body_text: Brief elaboration (max 12 words)
+
+- **feature**: A close-up or detail shot highlighting a specific product feature. Studio or lifestyle.
+  - image_prompt MUST include: "close-up detail shot of product feature, highlighting specific aspect, studio or lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: Feature name or highlight (max 6 words)
+  - body_text: Brief explanation of why it matters (max 12 words)
+
+- **product** (ALWAYS THE LAST SLIDE): The product (tin/pack) centered on a PURE WHITE background, clean, professional product photography, no shadows, no props. Like an Amazon listing photo.
+  - image_prompt MUST include: "product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, NO TEXT NO WORDS NO LETTERS IN IMAGE"
+  - header_text: The product name or tagline (max 5 words)
+  - body_text: A single clear CTA command (max 6 words), like "Order now — link in bio"
 
 ## RULES
-- Every carousel has exactly 4 slides — no more, no less
-- Each carousel idea must be UNIQUE and DIFFERENT from the others
+- The LAST slide must ALWAYS be type "product" (product on pure white background) — no exceptions
+- Each carousel must have a DIFFERENT creative angle and DIFFERENT slide structure (different types and different count)
+- Choose slide types that create the best storytelling arc for each carousel's angle
 - image_prompt is ALWAYS in English even if content is in another language
 - image_prompt must describe a photorealistic scene (NOT illustration, NOT graphic design, NOT infographic)
 - ⛔ ABSOLUTELY NO TEXT/WORDS/LETTERS in image_prompt — text goes in header_text and body_text only
-- The product tin/pack must appear consistently across all 4 slides of each carousel
+- The product tin/pack must appear consistently across all slides of each carousel
 - text_position is always "top" (text is ~22% from top, never at the edge)
+- If a product description is provided, tailor the content to that specific product — use its real features, benefits, and use cases
 
 ## LANGUAGE
 - If the user writes in Arabic → all header_text and body_text in Arabic
@@ -215,34 +247,10 @@ Return ONLY valid JSON (no markdown, no code blocks):
       "slides": [
         {
           "slide_number": 1,
-          "slide_type": "hero",
+          "slide_type": "one of: hero, quote, comparison, tip, stat, question, problem, benefit, feature, product",
           "image_prompt": "...",
           "header_text": "...",
-          "body_text": null,
-          "text_position": "top"
-        },
-        {
-          "slide_number": 2,
-          "slide_type": "quote",
-          "image_prompt": "...",
-          "header_text": "...",
-          "body_text": "...",
-          "text_position": "top"
-        },
-        {
-          "slide_number": 3,
-          "slide_type": "comparison",
-          "image_prompt": "...",
-          "header_text": "❌ ...\\n✅ ...",
-          "body_text": null,
-          "text_position": "top"
-        },
-        {
-          "slide_number": 4,
-          "slide_type": "product",
-          "image_prompt": "...",
-          "header_text": "...",
-          "body_text": "...",
+          "body_text": "... or null",
           "text_position": "top"
         }
       ]
@@ -250,9 +258,9 @@ Return ONLY valid JSON (no markdown, no code blocks):
   ]
 }
 
-Generate EXACTLY the number of carousels requested by the user. Each must have a completely different creative angle, hook, and comparison point.`;
+Generate EXACTLY the number of carousels requested by the user. Each must have a completely different creative angle, slide structure, and slide count. The last slide of EVERY carousel must be type "product".`;
 
-// ─── Template-based fallback (single carousel, 4 slides) ──────────────
+// ─── Template-based fallback (random slide count, 3-6 slides) ──────────────
 function generateTemplateCarousels(
   idea: string,
   numCarousels: number,
@@ -267,61 +275,129 @@ function generateTemplateCarousels(
     ? ["Le secret caché", "La solution que vous cherchez", "La bonne méthode", "Le résultat garanti", "Le vrai changement"]
     : ["The hidden secret", "The solution you need", "The right way", "The guaranteed result", "The real change"];
 
+  // Available slide types for the middle slides (before the product slide)
+  const middleSlideTypes: Array<"hero" | "quote" | "comparison" | "tip" | "stat" | "question" | "problem" | "benefit" | "feature"> = [
+    "hero", "quote", "comparison", "tip", "stat", "question", "problem", "benefit", "feature",
+  ];
+
+  // Template content generators per slide type
+  const slideTypeTemplates: Record<string, {
+    getTitle: (idea: string, angle: string, isAr: boolean, isFr: boolean) => string;
+    getBody: (idea: string, angle: string, isAr: boolean, isFr: boolean) => string | null;
+    getImagePrompt: (idea: string) => string;
+  }> = {
+    hero: {
+      getTitle: (_idea, angle, isAr, isFr) => isAr ? `${angle} أخيراً!` : isFr ? `${angle} enfin !` : `${angle} — finally!`,
+      getBody: () => null,
+      getImagePrompt: (idea) => `Product hero shot on dramatic background, visual arrows pointing at product, studio lighting, professional photography, 3:4 ratio, related to ${idea}`,
+    },
+    quote: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? `"لم أصدق النتيجة"` : isFr ? `"Je n'ai pas cru au résultat"` : `"I couldn't believe the results"`,
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "كل من جربها وافق" : isFr ? "Tous ceux qui ont essayé sont d'accord" : "Everyone who tried agrees",
+      getImagePrompt: (idea) => `Candid conversation scene, person whispering naturally, product subtly visible, lifestyle photography, related to ${idea}`,
+    },
+    comparison: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? `❌ الطريقة القديمة\n✅ مع منتجنا` : isFr ? `❌ L'ancienne méthode\n✅ Avec notre produit` : `❌ The old way\n✅ With our product`,
+      getBody: () => null,
+      getImagePrompt: (idea) => `Split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on correct side, related to ${idea}`,
+    },
+    tip: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "💡 نصيحة ذهبية" : isFr ? "💡 Conseil d'or" : "💡 Pro tip for best results",
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "استخدمه يومياً للنتيجة المثالية" : isFr ? "Utilisez-le quotidiennement pour des résultats optimaux" : "Use it daily for the best results",
+      getImagePrompt: (idea) => `Lifestyle scene showing tip or trick being used, person benefiting from advice, product naturally present, lifestyle photography, related to ${idea}`,
+    },
+    stat: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "97% يلاحظون الفرق" : isFr ? "97% remarquent la différence" : "97% see the difference",
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "رقم حقيقي من مستخدمين حقيقيين" : isFr ? "Un chiffre réel de vrais utilisateurs" : "Real number from real users",
+      getImagePrompt: (idea) => `Scene visually representing data or statistics, surprising number visual, product present in scene, photorealistic, related to ${idea}`,
+    },
+    question: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "هل تعاني من هذه المشكلة؟" : isFr ? "Vous souffrez de ce problème ?" : "Still struggling with this?",
+      getBody: () => null,
+      getImagePrompt: (idea) => `Person looking curious or pondering, thought-provoking scene, product visible, candid photography, related to ${idea}`,
+    },
+    problem: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "المشكلة التي تزعج الجميع" : isFr ? "Le problème qui dérange tout le monde" : "The problem everyone hates",
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "انتهى الأمر الآن" : isFr ? "C'est enfin fini" : "It ends now",
+      getImagePrompt: (idea) => `Person showing frustration or pain point, relatable problem scene, emotional, product not yet visible, photorealistic, related to ${idea}`,
+    },
+    benefit: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "شعر بالفرق من أول مرة" : isFr ? "Sentez la différence dès la première fois" : "Feel the difference instantly",
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "نتائج ملموسة وسريعة" : isFr ? "Des résultats tangibles et rapides" : "Real results you can see and feel",
+      getImagePrompt: (idea) => `Person experiencing positive outcome or transformation, aspirational scene, product naturally present, lifestyle photography, related to ${idea}`,
+    },
+    feature: {
+      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "ميزة فريدة" : isFr ? "Caractéristique unique" : "What makes it unique",
+      getBody: (_idea, _angle, isAr, isFr) => isAr ? "تصميم مبتكر يعمل بشكل أفضل" : isFr ? "Conception innovante qui fonctionne mieux" : "Innovative design that works better",
+      getImagePrompt: (idea) => `Close-up detail shot of product feature, highlighting specific aspect, studio or lifestyle photography, related to ${idea}`,
+    },
+  };
+
   const carousels: Array<{ carouselTitle: string; slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> }> = [];
+
+  // Use a seeded pseudo-random based on idea to get consistent but varied results
+  let seed = 0;
+  for (let i = 0; i < idea.length; i++) seed = ((seed << 5) - seed + idea.charCodeAt(i)) | 0;
+  const seededRandom = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
 
   for (let c = 0; c < numCarousels; c++) {
     const angle = angles[c % angles.length];
     const carouselTitle = `${angle} — ${idea.slice(0, 30)}`;
-
-    const heroHook = isAr ? `${angle} أخيراً!` : isFr ? `${angle} enfin !` : `${angle} — finally!`;
-    const quoteText = isAr ? `"لم أصدق النتيجة"` : isFr ? `"Je n'ai pas cru au résultat"` : `"I couldn't believe the results"`;
-    const quoteSub = isAr ? "كل من جربها وافق" : isFr ? "Tous ceux qui ont essayé sont d'accord" : "Everyone who tried agrees";
-    const wrongWay = isAr ? "الطريقة القديمة" : isFr ? "L'ancienne méthode" : "The old way";
-    const rightWay = isAr ? "مع منتجنا" : isFr ? "Avec notre produit" : "With our product";
     const ctaText = isAr ? "اطلب الآن!" : isFr ? "Commandez maintenant!" : "Order now!";
 
-    const slides = [
-      {
-        slideNumber: 1,
-        slideType: "hero",
-        title: heroHook,
-        body: "",
-        imagePrompt: enforcePhotorealisticPrompt(`Product hero shot on dramatic background, visual arrows pointing at product, studio lighting, professional photography, 3:4 ratio, related to ${idea}`),
-        headerText: heroHook,
-        bodyText: null,
-        textPosition: "top",
-      },
-      {
-        slideNumber: 2,
-        slideType: "quote",
-        title: quoteText,
-        body: quoteSub,
-        imagePrompt: enforcePhotorealisticPrompt(`Candid conversation scene, person whispering naturally, product subtly visible, lifestyle photography, related to ${idea}`),
-        headerText: quoteText,
-        bodyText: quoteSub,
-        textPosition: "top",
-      },
-      {
-        slideNumber: 3,
-        slideType: "comparison",
-        title: `❌ ${wrongWay} / ✅ ${rightWay}`,
-        body: "",
-        imagePrompt: enforcePhotorealisticPrompt(`Split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on correct side, related to ${idea}`),
-        headerText: `❌ ${wrongWay}\n✅ ${rightWay}`,
-        bodyText: null,
-        textPosition: "top",
-      },
-      {
-        slideNumber: 4,
-        slideType: "product",
-        title: idea.slice(0, 20),
-        body: ctaText,
-        imagePrompt: enforcePhotorealisticPrompt(`Product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, related to ${idea}`),
-        headerText: idea.slice(0, 20),
-        bodyText: ctaText,
-        textPosition: "top",
-      },
-    ];
+    // Random slide count between 3 and 6 for template fallback
+    const slideCount = 3 + Math.floor(seededRandom() * 4); // 3, 4, 5, or 6
+
+    // Pick random middle slide types (all but the last which is always "product")
+    const middleCount = slideCount - 1;
+    const usedTypes: string[] = [];
+    const availableTypes = [...middleSlideTypes];
+
+    for (let s = 0; s < middleCount; s++) {
+      // Always start with hero if it's the first slide
+      if (s === 0) {
+        usedTypes.push("hero");
+        const heroIdx = availableTypes.indexOf("hero");
+        if (heroIdx > -1) availableTypes.splice(heroIdx, 1);
+      } else {
+        // Pick a random type from remaining available
+        const typeIdx = Math.floor(seededRandom() * availableTypes.length);
+        const chosenType = availableTypes[typeIdx];
+        usedTypes.push(chosenType);
+        // Allow reuse of some types but prefer variety
+        if (availableTypes.length > 1) availableTypes.splice(typeIdx, 1);
+      }
+    }
+
+    const slides = usedTypes.map((slideType, i) => {
+      const template = slideTypeTemplates[slideType];
+      const title = template.getTitle(idea, angle, isAr, isFr);
+      const body = template.getBody(idea, angle, isAr, isFr);
+      const imagePrompt = template.getImagePrompt(idea);
+
+      return {
+        slideNumber: i + 1,
+        slideType,
+        title,
+        body: body || "",
+        imagePrompt: enforcePhotorealisticPrompt(imagePrompt),
+        headerText: title,
+        bodyText: body,
+        textPosition: "top" as const,
+      };
+    });
+
+    // Always add product slide as the last one
+    slides.push({
+      slideNumber: slideCount,
+      slideType: "product",
+      title: idea.slice(0, 20),
+      body: ctaText,
+      imagePrompt: enforcePhotorealisticPrompt(`Product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, related to ${idea}`),
+      headerText: idea.slice(0, 20),
+      bodyText: ctaText,
+      textPosition: "top" as const,
+    });
 
     carousels.push({ carouselTitle, slides });
   }
@@ -333,8 +409,15 @@ function generateTemplateCarousels(
 async function generateCarouselContent(
   idea: string,
   numCarousels: number,
-  language: string
+  language: string,
+  productDescription?: string
 ): Promise<Array<{ carouselTitle: string; slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> }>> {
+  // Build the user message, including product description if available
+  let userMessage = `Generate ${numCarousels} carousel(s) about: ${idea.trim()}. Language: ${language}. Each carousel must have a different creative angle and different slide structure. Choose between 3-8 slides per carousel based on what fits the topic best. The last slide must always be type "product".`;
+  if (productDescription) {
+    userMessage += `\n\nProduct info: ${productDescription.trim()}. Tailor the content to this specific product — use its real features, benefits, and use cases.`;
+  }
+
   const completion = await chatCompletion([
     {
       role: "system",
@@ -342,7 +425,7 @@ async function generateCarouselContent(
     },
     {
       role: "user",
-      content: `Generate ${numCarousels} carousel(s) about: ${idea.trim()}. Language: ${language}. Each carousel must have a different creative angle.`,
+      content: userMessage,
     },
   ], {
     temperature: 0.85,
@@ -379,16 +462,30 @@ async function generateCarouselContent(
               slides: generateTemplateCarousels(idea, 1, language)[0].slides,
             };
           }
-          const slides = rawSlides.map((slide: Record<string, unknown>, i: number) => ({
-            slideNumber: (slide.slide_number as number) || i + 1,
-            slideType: (slide.slide_type as string) || ["hero", "quote", "comparison", "product"][i] || "hero",
-            title: (slide.header_text as string) || (slide.title as string) || `Slide ${i + 1}`,
-            body: (slide.body_text as string) || (slide.body as string) || "",
-            imagePrompt: enforcePhotorealisticPrompt((slide.image_prompt as string) || `Professional photograph related to ${idea}, realistic, natural lighting`),
-            headerText: (slide.header_text as string | null) ?? null,
-            bodyText: (slide.body_text as string | null) ?? null,
-            textPosition: (slide.text_position as string) || "top",
-          }));
+          const validSlideTypes = ["hero", "quote", "comparison", "tip", "stat", "question", "problem", "benefit", "feature", "product"];
+          const slides = rawSlides.map((slide: Record<string, unknown>, i: number) => {
+            const rawType = (slide.slide_type as string) || "hero";
+            // Validate slide type; if invalid, pick a sensible default based on position
+            const slideType = validSlideTypes.includes(rawType) ? rawType : (i === rawSlides.length - 1 ? "product" : "hero");
+            return {
+              slideNumber: (slide.slide_number as number) || i + 1,
+              slideType,
+              title: (slide.header_text as string) || (slide.title as string) || `Slide ${i + 1}`,
+              body: (slide.body_text as string) || (slide.body as string) || "",
+              imagePrompt: enforcePhotorealisticPrompt((slide.image_prompt as string) || `Professional photograph related to ${idea}, realistic, natural lighting`),
+              headerText: (slide.header_text as string | null) ?? null,
+              bodyText: (slide.body_text as string | null) ?? null,
+              textPosition: (slide.text_position as string) || "top",
+            };
+          });
+          // Ensure the last slide is always "product"
+          if (slides.length > 0 && slides[slides.length - 1].slideType !== "product") {
+            slides[slides.length - 1] = {
+              ...slides[slides.length - 1],
+              slideType: "product",
+              imagePrompt: enforcePhotorealisticPrompt(`Product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, related to ${idea}`),
+            };
+          }
           return { carouselTitle, slides };
         });
       }
@@ -455,8 +552,19 @@ async function generateSlideImageKie(
   slideIndex: number,
   totalSlides: number,
   carouselIndex: number,
-  totalCarousels: number
+  totalCarousels: number,
+  referenceImageUrl?: string
 ): Promise<string> {
+  // Build input object — include reference image if provided (image edit mode)
+  const input: Record<string, string> = {
+    prompt: imagePrompt,
+    image_size: "768x1344",
+  };
+  if (referenceImageUrl) {
+    input.image = referenceImageUrl;
+    console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: using reference image for product consistency`);
+  }
+
   const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
     method: "POST",
     headers: {
@@ -465,10 +573,7 @@ async function generateSlideImageKie(
     },
     body: JSON.stringify({
       model: "nano-banana-2",
-      input: {
-        prompt: imagePrompt,
-        image_size: "768x1344",
-      },
+      input,
     }),
   });
 
@@ -579,7 +684,7 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { idea, kieApiKey, numCarousels = 1, language = "en" } = body;
+    const { idea, kieApiKey, numCarousels = 1, language = "en", productImageUrl, productLink } = body;
 
     if (!idea || idea.trim().length < 5) {
       return NextResponse.json(
@@ -594,13 +699,42 @@ export async function POST(req: NextRequest) {
     // Always use kie.ai for nano_banana_2
     const useKieAi = !!(finalKieApiKey && finalKieApiKey.length >= 10);
     console.log(`[Carousel] Image generation method: ${useKieAi ? 'kie.ai (nano-banana-2)' : 'built-in AI API'}`);
+    if (productImageUrl) console.log(`[Carousel] Product reference image provided: ${productImageUrl.slice(0, 80)}...`);
+    if (productLink) console.log(`[Carousel] Product link provided: ${productLink.slice(0, 80)}...`);
 
     const carouselCount = Math.max(1, Math.min(10, parseInt(numCarousels) || 1));
+
+    // Step 0: Extract product info from productLink if provided
+    let productDescription: string | undefined;
+    if (productLink && typeof productLink === "string" && productLink.trim()) {
+      console.log(`[Carousel] Extracting product info from link: ${productLink.trim().slice(0, 100)}`);
+      try {
+        const productInfoCompletion = await chatCompletion([
+          {
+            role: "user",
+            content: `Based on this URL/domain, describe the product being sold. URL: ${productLink.trim()}. What is the product name, category, key features, and target audience? Keep it concise (2-3 sentences).`,
+          },
+        ], {
+          temperature: 0.5,
+          max_tokens: 300,
+        });
+        if (productInfoCompletion) {
+          const productInfoContent = (productInfoCompletion as Record<string, unknown>)?.choices?.[0]?.message?.content;
+          if (productInfoContent && typeof productInfoContent === "string") {
+            productDescription = productInfoContent.trim();
+            console.log(`[Carousel] Extracted product info: ${productDescription.slice(0, 100)}`);
+          }
+        }
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.warn(`[Carousel] Failed to extract product info from link: ${msg}`);
+      }
+    }
 
     // Step 1: Generate carousel content with AI (multiple distinct carousels)
     console.log(`[Carousel] Generating ${carouselCount} distinct carousels for idea: "${idea.slice(0, 50)}..."`);
 
-    const carouselsContent = await generateCarouselContent(idea.trim(), carouselCount, language || "en");
+    const carouselsContent = await generateCarouselContent(idea.trim(), carouselCount, language || "en", productDescription);
 
     // Step 2: Generate images for each carousel
     const carouselsWithImages = [];
@@ -621,7 +755,8 @@ export async function POST(req: NextRequest) {
               i,
               slides.length,
               c,
-              carouselsContent.length
+              carouselsContent.length,
+              productImageUrl || undefined
             );
           } else {
             console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: generating with built-in AI API...`);

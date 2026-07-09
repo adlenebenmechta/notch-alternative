@@ -264,6 +264,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [idea, setIdea] = useState("");
   const [numCarousels, setNumCarousels] = useState(1);
   const [language, setLanguage] = useState<"en" | "ar" | "fr">("en");
+  const [productImageUrl, setProductImageUrl] = useState("");
+  const [productLink, setProductLink] = useState("");
 
   const [generating, setGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState("");
@@ -347,6 +349,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           kieApiKey: "",
           numCarousels,
           language,
+          productImageUrl: productImageUrl.trim() || undefined,
+          productLink: productLink.trim() || undefined,
         }),
       });
 
@@ -1043,7 +1047,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           </h1>
 
           <p className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style={{ color: C.textMuted }}>
-            Turn any idea into scroll-stopping carousels. Each carousel: Hero → Quote → Comparison → Product. Nano Banana 2 model, text baked in.
+            Turn any idea into scroll-stopping carousels. AI picks the best slide types &amp; count per topic. Add a product image &amp; link for perfect product matching. Nano Banana 2 model.
           </p>
         </div>
 
@@ -1090,7 +1094,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 style={{ border: `1.5px solid ${C.pink}`, color: C.pink, backgroundColor: `${C.pink}08` }}
               />
               <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
-                Each has 4 slides (Hero+Quote+Compare+Product)
+                3-8 slides per carousel (AI decides)
               </p>
             </div>
 
@@ -1157,11 +1161,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 Locked Settings
               </p>
               <p className="text-[10px] leading-relaxed mt-0.5" style={{ color: C.textMuted }}>
-                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product as reference (tin/pack always matches)
+                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product image as reference (product always matches)
                 <br />
                 Text: <b>Bold white rounded + black outline</b> • ~22% from top
                 <br />
-                Sequence: 🎯 Hero → 💬 Quote → ❌/✅ Comparison → 📦 Product (pure white)
+                Slides: 3-8 per carousel (AI picks best types) • Last slide = 📦 Product
               </p>
             </div>
           </div>
@@ -1200,6 +1204,66 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 style={{ backgroundColor: C.white, border: "1.5px solid #E5E7EB", color: C.text }} />
             </div>
           )}
+
+          {/* ─── Product Image + Link ───────────────────────────── */}
+          <div className="mb-5 rounded-2xl p-4" style={{ backgroundColor: `${C.lightPink}15`, border: `1px dashed ${C.pink}30` }}>
+            <div className="flex items-center gap-2 mb-3">
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                  <circle cx="8.5" cy="8.5" r="1.5" />
+                  <polyline points="21 15 16 10 5 21" />
+                </svg>
+              </div>
+              <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
+                Product Image &amp; Link (Optional)
+              </label>
+            </div>
+
+            {/* Product Image URL */}
+            <input
+              type="url"
+              value={productImageUrl}
+              onChange={(e) => setProductImageUrl(e.target.value)}
+              placeholder="Paste product image URL (used as reference for consistent product appearance)"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none mb-3 transition-all duration-200"
+              style={{
+                backgroundColor: C.white,
+                border: `1.5px solid ${productImageUrl ? `${C.pink}40` : "#E5E7EB"}`,
+                color: C.text,
+                boxShadow: productImageUrl ? `0 0 0 2px ${C.pink}10` : "none",
+              }}
+            />
+            {productImageUrl && (
+              <div className="mb-3 flex items-center gap-2">
+                <img src={productImageUrl} alt="Product preview" className="w-12 h-12 rounded-lg object-cover" style={{ border: `2px solid ${C.pink}30` }} />
+                <div>
+                  <p className="text-[10px] font-bold" style={{ color: C.pink }}>Product Reference</p>
+                  <p className="text-[9px]" style={{ color: C.textMuted }}>Nano Banana 2 will match this product in all slides</p>
+                </div>
+              </div>
+            )}
+
+            {/* Product Link */}
+            <input
+              type="url"
+              value={productLink}
+              onChange={(e) => setProductLink(e.target.value)}
+              placeholder="Paste product link (AI extracts name, features, benefits)"
+              className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
+              style={{
+                backgroundColor: C.white,
+                border: `1.5px solid ${productLink ? `${C.pink}40` : "#E5E7EB"}`,
+                color: C.text,
+                boxShadow: productLink ? `0 0 0 2px ${C.pink}10` : "none",
+              }}
+            />
+            {productLink && (
+              <p className="text-[9px] mt-1.5" style={{ color: C.textMuted }}>
+                AI will extract product info from this link to generate targeted content
+              </p>
+            )}
+          </div>
 
           {/* ─── Idea Input ────────────────────────────────────── */}
           <div className="flex items-center gap-2 mb-4">
@@ -1306,8 +1370,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               Creating {numCarousels} carousel{numCarousels > 1 ? "s" : ""} with Nano Banana 2...
             </p>
             <p className="text-xs mt-2" style={{ color: C.textMuted }}>
-              Each carousel: Hero → Quote → Comparison → Product (4 slides)
+              3-8 slides per carousel (AI picks the best format)
               <br />
+              {productImageUrl && "Product reference: ON — all slides will match your product"}
+              {productImageUrl && <br />}
               This may take 2-5 minutes per carousel. Text overlay will be applied after images are ready.
             </p>
           </div>
@@ -1364,13 +1430,13 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 {
                   icon: (
                     <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#22C55E" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
+                      <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                      <circle cx="8.5" cy="8.5" r="1.5" />
+                      <polyline points="21 15 16 10 5 21" />
                     </svg>
                   ),
-                  title: "Viral Sequence",
-                  desc: "Hero → Quote → ❌/✅ → Product (proven viral format)",
+                  title: "Product Reference",
+                  desc: "Add product image + link, AI matches product in every slide",
                 },
               ].map((feature, i) => (
                 <div
