@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
 import { publishPost, updatePostAnalytics } from '@/lib/autoPublish';
+import { PostPeerService } from '@/lib/postpeer';
 
 export async function GET(
   _req: NextRequest,
@@ -29,22 +30,21 @@ export async function DELETE(
 ) {
   const { id } = await params;
   try {
-    // Get the post first to check if it has a blotatoPostId
+    // Get the post first to check if it has a blotatoPostId (PostPeer submission ID)
     const post = await db.post.findUnique({ where: { id } });
     if (!post) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    // If the post has a Blotato ID and is NOT yet published, try to delete from Blotato
+    // If the post has a PostPeer ID and is NOT yet published, try to delete from PostPeer
     // (Published posts usually can't be deleted from TikTok via API)
     if (post.blotatoPostId && post.status !== 'PUBLISHED') {
       try {
-        const { BlotatoService } = await import('@/lib/blotato');
-        const blotato = new BlotatoService();
-        await blotato.deletePost(post.blotatoPostId);
-        console.log(`[DELETE] Deleted post ${id} from Blotato`);
+        const postpeer = new PostPeerService();
+        await postpeer.deletePost(post.blotatoPostId);
+        console.log(`[DELETE] Deleted post ${id} from PostPeer`);
       } catch (err: any) {
-        console.warn(`[DELETE] Failed to delete from Blotato: ${err.message}`);
+        console.warn(`[DELETE] Failed to delete from PostPeer: ${err.message}`);
         // Continue to delete from DB anyway
       }
     }

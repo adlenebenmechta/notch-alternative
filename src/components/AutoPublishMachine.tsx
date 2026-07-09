@@ -32,7 +32,7 @@ const C = {
 
 interface TikTokAccount {
   id: string;
-  blotatoId: string;
+  postpeerId: string;
   username: string | null;
   displayName: string | null;
   platform: string;
@@ -53,7 +53,7 @@ interface Post {
   publishedAt: string | null;
   tiktokUrl: string | null;
   errorMessage: string | null;
-  blotatoPostId: string | null;
+  postpeerPostId: string | null;
   views: number;
   likes: number;
   comments: number;
@@ -743,7 +743,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
       confirmMsg += "  3. Find the post → tap ⋮ → Delete\n\n";
       confirmMsg += "Continue deleting from dashboard?";
     } else {
-      confirmMsg += "This post is not yet published. It will be cancelled on Blotato and removed from your dashboard.\n\nContinue?";
+      confirmMsg += "This post is not yet published. It will be cancelled on PostPeer and removed from your dashboard.\n\nContinue?";
     }
 
     if (!confirm(confirmMsg)) return;
@@ -846,15 +846,15 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                 <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
               </svg>
               <div className="flex-1">
-                <h2 className="text-base font-bold mb-1">Setup Required - Connect Blotato</h2>
+                <h2 className="text-base font-bold mb-1">Setup Required - Connect PostPeer</h2>
                 <p className="text-sm opacity-95 mb-3">
-                  To publish videos automatically to TikTok, you need to connect Blotato API.
+                  To publish videos automatically to TikTok, you need to connect PostPeer API.
                 </p>
                 <ol className="text-xs space-y-1 opacity-95 mb-3">
-                  <li>1. Sign up at blotato.com ($29/mo, 7-day free trial)</li>
-                  <li>2. Connect your TikTok accounts in Blotato dashboard</li>
+                  <li>1. Sign up at postpeer.dev</li>
+                  <li>2. Connect your TikTok accounts in PostPeer dashboard</li>
                   <li>3. Get API Key from Settings → API</li>
-                  <li>4. Add <code className="bg-white/20 px-1 rounded">BLOTATO_API_KEY</code> to Railway env vars</li>
+                  <li>4. Add <code className="bg-white/20 px-1 rounded">POSTPEER_API_KEY</code> to Railway env vars</li>
                   <li>5. Click "Sync Accounts" below</li>
                 </ol>
                 <button
@@ -971,7 +971,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
               >
                 <option value="">Auto (first active account)</option>
                 {accounts.map((acc) => (
-                  <option key={acc.id} value={acc.blotatoId}>
+                  <option key={acc.id} value={acc.postpeerId}>
                     @{acc.username || acc.displayName || "unknown"} ({acc._count.posts} posts)
                   </option>
                 ))}
@@ -1347,7 +1347,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                 >
                   <option value="">Auto (first active account)</option>
                   {accounts.map((acc) => (
-                    <option key={acc.id} value={acc.blotatoId}>
+                    <option key={acc.id} value={acc.postpeerId}>
                       @{acc.username || acc.displayName || "unknown"} ({acc._count.posts} posts)
                     </option>
                   ))}
@@ -1495,7 +1495,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                   >
                     <option value="">Auto (first active account)</option>
                     {accounts.map((acc) => (
-                      <option key={acc.id} value={acc.blotatoId}>
+                      <option key={acc.id} value={acc.postpeerId}>
                         @{acc.username || acc.displayName || "unknown"}
                       </option>
                     ))}
@@ -1943,7 +1943,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                 <div className="text-4xl mb-3">🔗</div>
                 <p className="text-sm font-semibold" style={{ color: C.text }}>No accounts connected</p>
                 <p className="text-xs mt-1" style={{ color: C.textMuted }}>
-                  Click "Sync" to fetch your Blotato accounts
+                  Click "Sync" to fetch your PostPeer accounts
                 </p>
               </div>
             ) : (
@@ -1995,10 +1995,10 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
             <h2 className="text-base font-bold" style={{ color: C.text }}>⚙️ Setup Guide</h2>
 
             <div>
-              <h3 className="text-sm font-bold mb-2" style={{ color: C.text }}>Step 1: Get Blotato API Key</h3>
+              <h3 className="text-sm font-bold mb-2" style={{ color: C.text }}>Step 1: Get PostPeer API Key</h3>
               <ol className="text-xs space-y-1 ml-4 list-decimal" style={{ color: C.textMuted }}>
-                <li>Sign up at <a href="https://www.blotato.com" target="_blank" rel="noopener" className="underline" style={{ color: C.pink }}>blotato.com</a> ($29/mo, 7-day free trial)</li>
-                <li>Connect your TikTok accounts in Blotato dashboard</li>
+                <li>Sign up at <a href="https://postpeer.dev" target="blank" rel="noopener" className="underline" style={{ color: C.pink }}>postpeer.dev</a></li>
+                <li>Connect your TikTok accounts in PostPeer dashboard</li>
                 <li>Go to Settings → API → Generate API Key</li>
                 <li>Copy the API key</li>
               </ol>
@@ -2013,7 +2013,7 @@ export default function AutoPublishMachine({ onBack, isAdmin }: AutoPublishMachi
                 className="text-[10px] p-3 rounded-lg overflow-x-auto font-mono"
                 style={{ backgroundColor: C.dark, color: C.lime }}
               >
-{`BLOTATO_API_KEY=your_api_key_here
+{`POSTPEER_API_KEY=your_api_key_here
 WEBHOOK_SECRET=random_secret_string`}
               </pre>
             </div>
@@ -2021,7 +2021,7 @@ WEBHOOK_SECRET=random_secret_string`}
             <div>
               <h3 className="text-sm font-bold mb-2" style={{ color: C.text }}>Step 3: Sync Accounts</h3>
               <p className="text-xs" style={{ color: C.textMuted }}>
-                After adding the API key, go to "Accounts" tab and click "Sync" to fetch your TikTok accounts from Blotato.
+                After adding the API key, go to "Accounts" tab and click "Sync" to fetch your TikTok accounts from PostPeer.
               </p>
             </div>
 

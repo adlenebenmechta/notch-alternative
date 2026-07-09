@@ -18,7 +18,7 @@ export async function GET() {
 }
 
 /**
- * POST /api/autopublish/accounts - Sync accounts from Blotato
+ * POST /api/autopublish/accounts - Sync accounts from PostPeer
  */
 export async function POST() {
   try {

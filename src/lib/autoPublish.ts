@@ -1,17 +1,17 @@
 // Post Processor - manages post lifecycle (create, publish, sync analytics)
 
 import { db } from '@/lib/db';
-import { BlotatoService } from '@/lib/blotato';
+import { PostPeerService } from '@/lib/postpeer';
 
-const blotato = new BlotatoService();
+const postpeer = new PostPeerService();
 
 /**
- * Synchronize TikTok accounts from Blotato
+ * Synchronize TikTok accounts from PostPeer
  */
 export async function syncAccounts(): Promise<number> {
   try {
-    console.log('[AutoPublish] Syncing accounts from Blotato...');
-    const accounts = await blotato.getTikTokAccounts();
+    console.log('[AutoPublish] Syncing accounts from PostPeer...');
+    const accounts = await postpeer.getTikTokAccounts();
     console.log(`[AutoPublish] Found ${accounts.length} TikTok account(s)`);
 
     let count = 0;
@@ -58,7 +58,7 @@ export async function createCarouselPost(data: {
   externalId?: string; // slide number, etc.
   scheduledAt?: string;
   autoCaption?: boolean;
-}): Promise<{ post: any; needsAccount: boolean; blotatoError?: string }> {
+}): Promise<{ post: any; needsAccount: boolean; postpeerError?: string }> {
   let account;
   if (data.accountId) {
     account = await db.tikTokAccount.findFirst({
@@ -113,7 +113,7 @@ export async function createCarouselPost(data: {
 }
 
 /**
- * Publish an image carousel post to TikTok via Blotato
+ * Publish an image carousel post to TikTok via PostPeer
  */
 export async function publishImageCarousel(postId: string, imageUrls?: string[]): Promise<boolean> {
   const post = await db.post.findUnique({
@@ -140,12 +140,12 @@ export async function publishImageCarousel(postId: string, imageUrls?: string[])
     where: { id: postId },
     data: { status: 'PUBLISHING' },
   });
-  await logPost(postId, 'INFO', `Starting Blotato carousel publish (${finalImageUrls.length} images)`);
+  await logPost(postId, 'INFO', `Starting PostPeer carousel publish (${finalImageUrls.length} images)`);
 
   try {
     const hashtags = post.hashtags ? JSON.parse(post.hashtags) : [];
 
-    const result = await blotato.publishImagePost({
+    const result = await postpeer.publishImagePost({
       accountId: post.account.blotatoId,
       imageUrls: finalImageUrls,
       caption: post.caption || '',
@@ -164,7 +164,7 @@ export async function publishImageCarousel(postId: string, imageUrls?: string[])
       },
     });
 
-    await logPost(postId, 'INFO', `Blotato carousel post created: ${result.id} (status: ${result.status})`);
+    await logPost(postId, 'INFO', `PostPeer carousel post created: ${result.id} (status: ${result.status})`);
 
     if (result.status !== 'published' && result.status !== 'success') {
       pollPostStatus(postId, result.id).catch(() => {});
@@ -252,7 +252,7 @@ export async function createPost(data: {
 }
 
 /**
- * Publish a post to TikTok via Blotato
+ * Publish a post to TikTok via PostPeer
  */
 export async function publishPost(postId: string): Promise<boolean> {
   const post = await db.post.findUnique({
@@ -274,12 +274,12 @@ export async function publishPost(postId: string): Promise<boolean> {
     where: { id: postId },
     data: { status: 'PUBLISHING' },
   });
-  await logPost(postId, 'INFO', 'Starting Blotato publish');
+  await logPost(postId, 'INFO', 'Starting PostPeer publish');
 
   try {
     const hashtags = post.hashtags ? JSON.parse(post.hashtags) : [];
 
-    const result = await blotato.publishPost({
+    const result = await postpeer.publishPost({
       accountId: post.account.blotatoId,
       videoUrl: post.videoUrl,
       caption: post.caption || '',
@@ -299,7 +299,7 @@ export async function publishPost(postId: string): Promise<boolean> {
       },
     });
 
-    await logPost(postId, 'INFO', `Blotato post created: ${result.id} (status: ${result.status})`);
+    await logPost(postId, 'INFO', `PostPeer post created: ${result.id} (status: ${result.status})`);
 
     if (result.status !== 'published' && result.status !== 'success') {
       pollPostStatus(postId, result.id).catch(() => {});
@@ -322,15 +322,15 @@ export async function publishPost(postId: string): Promise<boolean> {
 }
 
 /**
- * Poll post status until published or failed (max 5 min)
+ * Poll post status until published or failed (max 10 min)
  */
-async function pollPostStatus(postId: string, blotatoPostId: string): Promise<void> {
-  const maxAttempts = 60; // 10 minutes for carousels (was 5 min)
+async function pollPostStatus(postId: string, postpeerPostId: string): Promise<void> {
+  const maxAttempts = 60; // 10 minutes for carousels
   for (let i = 0; i < maxAttempts; i++) {
     await new Promise((r) => setTimeout(r, 10000));
 
     try {
-      const status = await blotato.getPostStatus(blotatoPostId);
+      const status = await postpeer.getPostStatus(postpeerPostId);
       console.log(`[AutoPublish] Poll ${i + 1}: post ${postId} status: ${status.status}`);
 
       if (status.status === 'published' || status.status === 'success') {
@@ -351,10 +351,10 @@ async function pollPostStatus(postId: string, blotatoPostId: string): Promise<vo
           where: { id: postId },
           data: {
             status: 'FAILED',
-            errorMessage: status.error || 'Blotato reported failure',
+            errorMessage: status.error || 'PostPeer reported failure',
           },
         });
-        await logPost(postId, 'ERROR', `Blotato failed: ${status.error}`);
+        await logPost(postId, 'ERROR', `PostPeer failed: ${status.error}`);
         return;
       }
     } catch (err: any) {
@@ -362,7 +362,7 @@ async function pollPostStatus(postId: string, blotatoPostId: string): Promise<vo
     }
   }
 
-  await logPost(postId, 'WARN', 'Polling timeout - check Blotato dashboard');
+  await logPost(postId, 'WARN', 'Polling timeout - check PostPeer dashboard');
 }
 
 /**
@@ -414,7 +414,7 @@ export async function updatePostAnalytics(postId: string): Promise<void> {
   const post = await db.post.findUnique({ where: { id: postId } });
   if (!post || !post.blotatoPostId) return;
 
-  const analytics = await blotato.getPostAnalytics(post.blotatoPostId);
+  const analytics = await postpeer.getPostAnalytics(post.blotatoPostId);
 
   await db.post.update({
     where: { id: postId },

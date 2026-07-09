@@ -227,7 +227,7 @@ export async function importFromGoogleDrive(
     // Add each file to the library
     for (const file of files) {
       try {
-        // The download URL is what we store - Blotato will fetch it
+        // The download URL is what we store - PostPeer will fetch it
         const video = await db.generatedVideo.create({
           data: {
             userId,

@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { BlotatoService } from '@/lib/blotato';
+import { PostPeerService } from '@/lib/postpeer';
 
 /**
  * GET /api/autopublish/status?postId=xxx
  * 
- * Returns real-time publish status from Blotato:
- * - "in-progress": Blotato is publishing to TikTok
+ * Returns real-time publish status from PostPeer:
+ * - "in-progress": PostPeer is publishing to TikTok
  * - "published": Successfully published, includes publicUrl
  * - "failed": Publishing failed
  * 
@@ -34,48 +34,48 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Post not found' }, { status: 404 });
     }
 
-    // If we have a blotatoPostId, fetch real-time status from Blotato
-    let blotatoStatus = null;
+    // If we have a blotatoPostId (legacy field), fetch real-time status from PostPeer
+    let postpeerStatus = null;
     if (post.blotatoPostId) {
       try {
-        const blotato = new BlotatoService();
-        blotatoStatus = await blotato.getPostStatus(post.blotatoPostId);
+        const postpeer = new PostPeerService();
+        postpeerStatus = await postpeer.getPostStatus(post.blotatoPostId);
 
         // Update DB if status changed
-        if (blotatoStatus.status === 'published' && post.status !== 'PUBLISHED') {
+        if (postpeerStatus.status === 'published' && post.status !== 'PUBLISHED') {
           await db.post.update({
             where: { id: postId },
             data: {
               status: 'PUBLISHED',
               publishedAt: new Date(),
-              tiktokUrl: blotatoStatus.url || null,
+              tiktokUrl: postpeerStatus.url || null,
             },
           });
           await db.postLog.create({
             data: {
               postId,
               level: 'INFO',
-              message: `Published successfully: ${blotatoStatus.url}`,
+              message: `Published successfully: ${postpeerStatus.url}`,
             },
           });
-        } else if (blotatoStatus.status === 'failed' && post.status !== 'FAILED') {
+        } else if (postpeerStatus.status === 'failed' && post.status !== 'FAILED') {
           await db.post.update({
             where: { id: postId },
             data: {
               status: 'FAILED',
-              errorMessage: blotatoStatus.error || 'Blotato reported failure',
+              errorMessage: postpeerStatus.error || 'PostPeer reported failure',
             },
           });
           await db.postLog.create({
             data: {
               postId,
               level: 'ERROR',
-              message: `Blotato failed: ${blotatoStatus.error}`,
+              message: `PostPeer failed: ${postpeerStatus.error}`,
             },
           });
         }
       } catch (err: any) {
-        console.warn(`[Status] Failed to fetch Blotato status:`, err.message);
+        console.warn(`[Status] Failed to fetch PostPeer status:`, err.message);
       }
     }
 
@@ -91,16 +91,16 @@ export async function GET(req: NextRequest) {
         createdAt: post.createdAt,
         publishedAt: post.publishedAt,
         scheduledAt: post.scheduledAt,
-        blotatoPostId: post.blotatoPostId,
+        postpeerPostId: post.blotatoPostId, // Map legacy DB field to new name for frontend
         account: {
           username: post.account.username,
           displayName: post.account.displayName,
         },
       },
-      blotatoStatus: blotatoStatus ? {
-        status: blotatoStatus.status,
-        url: blotatoStatus.url,
-        error: blotatoStatus.error,
+      postpeerStatus: postpeerStatus ? {
+        status: postpeerStatus.status,
+        url: postpeerStatus.url,
+        error: postpeerStatus.error,
       } : null,
       logs: post.logs.map((log) => ({
         level: log.level,

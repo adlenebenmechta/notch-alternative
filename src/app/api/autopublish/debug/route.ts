@@ -2,16 +2,16 @@ import { NextResponse } from 'next/server';
 
 export async function GET() {
   try {
-    if (!process.env.BLOTATO_API_KEY) {
-      return NextResponse.json({ error: 'BLOTATO_API_KEY not set' });
+    if (!process.env.POSTPEER_API_KEY) {
+      return NextResponse.json({ error: 'POSTPEER_API_KEY not set' });
     }
 
     // Make raw request to see actual response
-    const url = 'https://backend.blotato.com/v2/users/me/accounts';
+    const url = 'https://api.postpeer.dev/v1/accounts';
     const response = await fetch(url, {
       method: 'GET',
       headers: {
-        'blotato-api-key': process.env.BLOTATO_API_KEY,
+        'Authorization': `Bearer ${process.env.POSTPEER_API_KEY}`,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },

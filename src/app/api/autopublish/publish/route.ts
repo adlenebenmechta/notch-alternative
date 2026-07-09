@@ -13,7 +13,7 @@ import { createPost } from '@/lib/autoPublish';
  *   "musicTitle": "Trending Song",          // optional
  *   "aiDescription": "Description for AI",  // optional
  *   "externalId": "your-id",                // optional
- *   "accountId": "blotato-id",              // optional
+ *   "accountId": "postpeer-id",              // optional
  *   "scheduledAt": "2026-07-01T20:00:00Z",  // optional
  *   "autoCaption": false                    // optional
  * }

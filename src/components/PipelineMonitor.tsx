@@ -32,7 +32,7 @@ interface PipelineMonitorProps {
 
 export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProps) {
   const [post, setPost] = useState<any>(null);
-  const [blotatoStatus, setBlotatoStatus] = useState<any>(null);
+  const [postpeerStatus, setPostpeerStatus] = useState<any>(null);
   const [logs, setLogs] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -45,7 +45,7 @@ export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProp
         const data = await res.json();
         if (data.post) {
           setPost(data.post);
-          setBlotatoStatus(data.blotatoStatus);
+          setPostpeerStatus(data.postpeerStatus);
           setLogs(data.logs || []);
         }
       } catch (err) {
@@ -81,49 +81,49 @@ export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProp
       },
     ];
 
-    // Step 2: Sent to Blotato
-    if (post?.blotatoPostId) {
+    // Step 2: Sent to PostPeer
+    if (post?.postpeerPostId) {
       steps.push({
-        id: "blotato",
-        label: "Sent to Blotato",
+        id: "postpeer",
+        label: "Sent to PostPeer",
         icon: "📤",
         status: "done",
-        message: `Submission ID: ${post.blotatoPostId.substring(0, 8)}...`,
+        message: `Submission ID: ${post.postpeerPostId.substring(0, 8)}...`,
       });
     } else if (post?.status === "PUBLISHING") {
       steps.push({
-        id: "blotato",
-        label: "Sending to Blotato...",
+        id: "postpeer",
+        label: "Sending to PostPeer...",
         icon: "📤",
         status: "active",
       });
-    } else if (post?.status === "FAILED" && !post?.blotatoPostId) {
+    } else if (post?.status === "FAILED" && !post?.postpeerPostId) {
       steps.push({
-        id: "blotato",
-        label: "Failed to send to Blotato",
+        id: "postpeer",
+        label: "Failed to send to PostPeer",
         icon: "❌",
         status: "failed",
         message: post?.errorMessage,
       });
     } else {
       steps.push({
-        id: "blotato",
-        label: "Send to Blotato",
+        id: "postpeer",
+        label: "Send to PostPeer",
         icon: "📤",
         status: "pending",
       });
     }
 
-    // Step 3: Blotato processing
-    if (blotatoStatus?.status === "in-progress") {
+    // Step 3: PostPeer processing
+    if (postpeerStatus?.status === "in-progress") {
       steps.push({
         id: "processing",
-        label: "Blotato Publishing to TikTok...",
+        label: "PostPeer Publishing to TikTok...",
         icon: "⏳",
         status: "active",
-        message: "Blotato is uploading your post to TikTok (takes 1-5 minutes)",
+        message: "PostPeer is uploading your post to TikTok (takes 1-5 minutes)",
       });
-    } else if (blotatoStatus?.status === "published" || post?.status === "PUBLISHED") {
+    } else if (postpeerStatus?.status === "published" || post?.status === "PUBLISHED") {
       steps.push({
         id: "processing",
         label: "Published on TikTok",
@@ -131,18 +131,18 @@ export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProp
         status: "done",
         message: "Your post is live!",
       });
-    } else if (blotatoStatus?.status === "failed" || post?.status === "FAILED") {
+    } else if (postpeerStatus?.status === "failed" || post?.status === "FAILED") {
       steps.push({
         id: "processing",
         label: "Publishing Failed",
         icon: "❌",
         status: "failed",
-        message: blotatoStatus?.error || post?.errorMessage,
+        message: postpeerStatus?.error || post?.errorMessage,
       });
-    } else if (post?.blotatoPostId) {
+    } else if (post?.postpeerPostId) {
       steps.push({
         id: "processing",
-        label: "Waiting for Blotato",
+        label: "Waiting for PostPeer",
         icon: "⏳",
         status: "pending",
       });
@@ -156,13 +156,13 @@ export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProp
     }
 
     // Step 4: Live on TikTok
-    if (post?.status === "PUBLISHED" || blotatoStatus?.status === "published") {
+    if (post?.status === "PUBLISHED" || postpeerStatus?.status === "published") {
       steps.push({
         id: "live",
         label: "Live on TikTok",
         icon: "🎉",
         status: "done",
-        message: post?.tiktokUrl || blotatoStatus?.url,
+        message: post?.tiktokUrl || postpeerStatus?.url,
       });
     } else {
       steps.push({
@@ -177,7 +177,7 @@ export default function PipelineMonitor({ postId, onClose }: PipelineMonitorProp
   };
 
   const steps = getSteps();
-  const isActive = post?.status === "PENDING" || post?.status === "PUBLISHING" || blotatoStatus?.status === "in-progress";
+  const isActive = post?.status === "PENDING" || post?.status === "PUBLISHING" || postpeerStatus?.status === "in-progress";
 
   return (
     <div

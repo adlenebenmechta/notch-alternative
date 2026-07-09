@@ -13,7 +13,7 @@ import { importFromGoogleDrive } from '@/lib/googleDriveService';
  *   folderUrl: "https://drive.google.com/drive/folders/...",
  *   autoPublish: true/false,
  *   publishMode: "now" | "schedule" | "bulk",
- *   accountId: "blotato_account_id" (optional)
+ *   accountId: "postpeer_account_id" (optional)
  * }
  */
 export async function POST(req: NextRequest) {

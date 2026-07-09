@@ -200,7 +200,7 @@ export default function SlidePublisher({
       }
 
       setPostId(data.postId);
-      // Don't immediately set to "published" - Blotato processes async
+      // Don't immediately set to "published" - PostPeer processes async
       // We'll consider it published once we get a successful response
       // The actual TikTok URL comes later via polling
       setState("published");
