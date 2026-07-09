@@ -2,6 +2,7 @@
 
 import React, { useState, useRef, useCallback, useEffect } from "react";
 import { useAuth } from "@/providers/auth-provider";
+import JSZip from "jszip";
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
@@ -447,6 +448,60 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         await downloadSlide(carousel.slides[i], carouselIdx, i);
         await new Promise((r) => setTimeout(r, 500));
       }
+    }
+  };
+
+  // ─── Download carousel as ZIP file ──────────────────────────────────
+  const [downloadingZip, setDownloadingZip] = useState<number | null>(null);
+
+  const downloadCarouselAsZip = async (carouselIdx: number) => {
+    const carousel = carousels[carouselIdx];
+    if (!carousel) return;
+
+    setDownloadingZip(carouselIdx);
+    try {
+      const zip = new JSZip();
+      const folderName = carousel.carouselTitle
+        .replace(/[^a-zA-Z0-9\u0600-\u06FF\s\-_]/g, "") // keep alphanumeric + Arabic + spaces/dashes
+        .trim()
+        .slice(0, 40) || `carousel-${carouselIdx + 1}`;
+      const folder = zip.folder(folderName);
+
+      for (let i = 0; i < carousel.slides.length; i++) {
+        const slide = carousel.slides[i];
+        const downloadUrl = slide.textOverlayUrl || slide.imageUrl;
+        if (!downloadUrl) continue;
+
+        try {
+          let blob: Blob;
+          if (downloadUrl.startsWith("data:")) {
+            const res = await fetch(downloadUrl);
+            blob = await res.blob();
+          } else {
+            const res = await fetch(downloadUrl);
+            blob = await res.blob();
+          }
+          const slideType = slide.slideType || "slide";
+          const fileName = `${String(i + 1).padStart(2, "0")}-${slideType}.png`;
+          folder!.file(fileName, blob);
+        } catch (err) {
+          console.error(`[Carousel] Failed to add slide ${i + 1} to ZIP:`, err);
+        }
+      }
+
+      const zipBlob = await zip.generateAsync({ type: "blob" });
+      const url = URL.createObjectURL(zipBlob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `${folderName}.zip`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      console.error("[Carousel] ZIP download failed:", err);
+    } finally {
+      setDownloadingZip(null);
     }
   };
 
@@ -952,24 +1007,32 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 </span>
               </button>
 
-              {/* Download All */}
+              {/* Download as ZIP (one file per carousel) */}
               <button
-                onClick={() => downloadAllSlides(currentCarousel)}
-                className="w-full py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300"
+                onClick={() => downloadCarouselAsZip(currentCarousel)}
+                disabled={downloadingZip === currentCarousel}
+                className="w-full py-3.5 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-300 disabled:opacity-50"
                 style={{
                   background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
                   color: C.white,
                   boxShadow: `0 4px 20px ${C.pink}30`,
                 }}
               >
-                <span className="inline-flex items-center gap-2">
-                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                    <polyline points="7 10 12 15 17 10" />
-                    <line x1="12" y1="15" x2="12" y2="3" />
-                  </svg>
-                  Download All Slides
-                </span>
+                {downloadingZip === currentCarousel ? (
+                  <span className="inline-flex items-center gap-2">
+                    <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                    Zipping slides...
+                  </span>
+                ) : (
+                  <span className="inline-flex items-center gap-2">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                      <polyline points="7 10 12 15 17 10" />
+                      <line x1="12" y1="15" x2="12" y2="3" />
+                    </svg>
+                    Download as ZIP ({activeCarousel!.slides.length} slides)
+                  </span>
+                )}
               </button>
             </div>
           </div>
