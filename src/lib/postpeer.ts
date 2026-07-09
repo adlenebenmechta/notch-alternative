@@ -1,17 +1,40 @@
 // PostPeer API Service - Social media auto-publishing
-// Docs: https://api.postpeer.dev/v1
-// REST API: Base URL: https://api.postpeer.dev/v1
-// Auth Header: Authorization: Bearer YOUR_API_KEY
+// Docs: https://www.postpeer.dev/docs
+// REST API Base URL: https://api.postpeer.dev/v1
+// Auth Header: x-access-key: YOUR_API_KEY
 //
-// IMPORTANT: POST /posts body structure:
+// Key Endpoints:
+//   GET  /v1/health/auth              - Verify API key
+//   GET  /v1/connect/integrations      - List connected social accounts
+//   GET  /v1/connect/{platform}        - Get OAuth connect URL for a platform
+//   POST /v1/posts                     - Create/publish a post
+//   GET  /v1/posts/{id}                - Get post status
+//   GET  /v1/posts/{id}/analytics      - Get post analytics
+//   DELETE /v1/posts/{id}              - Delete a scheduled post
+//
+// POST /v1/posts body:
 // {
-//   "platforms": [{ "platform": "tiktok", "accountId": "..." (optional) }],
-//   "content": "Caption text with #hashtags",
-//   "mediaUrls": ["https://...", ...],
-//   "scheduleDate": "..." (optional, ISO 8601)
+//   "content": "Caption with #hashtags",
+//   "platforms": [{ "platform": "tiktok", "accountId": "..." }],
+//   "mediaItems": [{ "type": "video", "url": "https://..." }],
+//   "publishNow": true,
+//   "scheduledFor": "2026-01-01T09:00:00",  // optional
+//   "timezone": "America/New_York"           // optional
 // }
 
 const POSTPEER_BASE_URL = 'https://api.postpeer.dev/v1';
+
+export interface PostPeerIntegration {
+  id: string;
+  platform: string;
+  platformUserId: string;
+  username: string;
+  displayName: string;
+  profileUrl: string;
+  imageUrl: string;
+  profileId: string;
+  createdAt: string;
+}
 
 export interface PostPeerAccount {
   id: string;
@@ -38,6 +61,8 @@ export interface PublishOptions {
   scheduledAt?: Date;
   thumbnailUrl?: string;
   platforms?: string[]; // e.g. ["tiktok", "instagram"]
+  draft?: boolean;
+  privacyLevel?: string;
 }
 
 export interface PublishImagePostOptions {
@@ -48,10 +73,17 @@ export interface PublishImagePostOptions {
   musicTitle?: string;
   scheduledAt?: Date;
   platforms?: string[];
+  draft?: boolean;
+  privacyLevel?: string;
+  autoAddMusic?: boolean;
 }
 
 /**
  * PostPeer API client for publishing to TikTok, Instagram, and other social platforms
+ *
+ * Uses x-access-key header for authentication (not Bearer token).
+ * Accounts are fetched via /v1/connect/integrations (not /v1/accounts).
+ * Posts use mediaItems array with type field (not mediaUrls).
  */
 export class PostPeerService {
   private apiKey: string;
@@ -74,7 +106,7 @@ export class PostPeerService {
     const response = await fetch(url, {
       method,
       headers: {
-        'Authorization': `Bearer ${this.apiKey}`,
+        'x-access-key': this.apiKey,
         'Content-Type': 'application/json',
         'Accept': 'application/json',
       },
@@ -100,18 +132,28 @@ export class PostPeerService {
   }
 
   /**
-   * Get all connected social media accounts
+   * Get all connected social media integrations
+   * Uses /v1/connect/integrations endpoint
+   */
+  async getIntegrations(profileId?: string): Promise<PostPeerIntegration[]> {
+    const query = profileId ? `?profileId=${profileId}` : '';
+    const data = await this.request('GET', `/connect/integrations${query}`);
+    return data.integrations || [];
+  }
+
+  /**
+   * Get all connected social media accounts (mapped from integrations)
+   * Backwards-compatible: returns PostPeerAccount[] format
    */
   async getAccounts(): Promise<PostPeerAccount[]> {
-    const data = await this.request('GET', '/accounts');
-    const accounts = data.items || data.accounts || data.data || (Array.isArray(data) ? data : []);
+    const integrations = await this.getIntegrations();
 
-    return accounts.map((a: any) => ({
-      id: a.id,
-      username: a.username || a.handle || '',
-      displayName: a.displayName || a.name || '',
-      platform: a.platform || 'tiktok',
-      avatarUrl: a.avatarUrl || a.avatar || '',
+    return integrations.map((int: PostPeerIntegration) => ({
+      id: int.id,
+      username: int.username || '',
+      displayName: int.displayName || '',
+      platform: int.platform || 'tiktok',
+      avatarUrl: int.imageUrl || '',
     }));
   }
 
@@ -142,43 +184,65 @@ export class PostPeerService {
 
   /**
    * Publish a video post to social media via PostPeer
+   * Uses mediaItems format: [{ type: "video", url: "..." }]
    */
   async publishPost(options: PublishOptions): Promise<PostPeerPostResponse> {
-    const { accountId, videoUrl, caption, hashtags, musicTitle, scheduledAt, platforms } = options;
+    const { accountId, videoUrl, caption, hashtags, musicTitle, scheduledAt, platforms, draft, privacyLevel } = options;
 
     const fullText = this.buildCaption(caption, hashtags, musicTitle);
     const targetPlatforms = platforms || ['tiktok'];
 
     const postpeerBody: Record<string, unknown> = {
+      content: fullText,
       platforms: targetPlatforms.map((p: string) => {
-        const entry: Record<string, string> = { platform: p };
+        const entry: Record<string, unknown> = { platform: p };
         if (accountId) entry.accountId = accountId;
+
+        // Add platform-specific data for TikTok
+        if (p === 'tiktok') {
+          entry.platformSpecificData = {
+            privacyLevel: privacyLevel || 'PUBLIC_TO_EVERYONE',
+            draft: draft !== undefined ? draft : false,
+            disableComment: false,
+            disableDuet: false,
+            disableStitch: false,
+          };
+        }
+
         return entry;
       }),
-      content: fullText,
-      mediaUrls: [videoUrl],
+      mediaItems: [
+        { type: 'video', url: videoUrl },
+      ],
     };
 
     if (scheduledAt) {
-      postpeerBody.scheduleDate = scheduledAt.toISOString();
+      postpeerBody.scheduledFor = scheduledAt.toISOString();
+      postpeerBody.timezone = 'UTC';
+    } else {
+      postpeerBody.publishNow = true;
     }
 
     const data = await this.request('POST', '/posts', postpeerBody);
 
+    // PostPeer returns { success, status, postId, platforms: [...] }
+    const platformResult = data.platforms?.[0] || {};
+
     return {
-      id: data.id || data.postId || (data.post && data.post.id) || '',
-      status: data.status || (data.post && data.post.status) || 'pending',
-      platformPostId: data.platformPostId,
-      url: data.url || (data.post && data.post.url),
-      error: data.error,
+      id: data.postId || data.id || '',
+      status: data.status || platformResult.status || 'pending',
+      platformPostId: platformResult.platformPostId,
+      url: platformResult.platformPostUrl || data.url || '',
+      error: data.error || platformResult.error,
     };
   }
 
   /**
    * Publish an image carousel post to social media via PostPeer
+   * Uses mediaItems format: [{ type: "image", url: "..." }, ...]
    */
   async publishImagePost(options: PublishImagePostOptions): Promise<PostPeerPostResponse> {
-    const { accountId, imageUrls, caption, hashtags, musicTitle, scheduledAt, platforms } = options;
+    const { accountId, imageUrls, caption, hashtags, musicTitle, scheduledAt, platforms, draft, privacyLevel, autoAddMusic } = options;
 
     if (!imageUrls || imageUrls.length === 0) {
       throw new Error('At least one image URL is required');
@@ -188,45 +252,75 @@ export class PostPeerService {
     const targetPlatforms = platforms || ['tiktok'];
 
     const postpeerBody: Record<string, unknown> = {
+      content: fullText,
       platforms: targetPlatforms.map((p: string) => {
-        const entry: Record<string, string> = { platform: p };
+        const entry: Record<string, unknown> = { platform: p };
         if (accountId) entry.accountId = accountId;
+
+        // Add platform-specific data for TikTok photo carousel
+        if (p === 'tiktok') {
+          entry.platformSpecificData = {
+            privacyLevel: privacyLevel || 'PUBLIC_TO_EVERYONE',
+            draft: draft !== undefined ? draft : false,
+            autoAddMusic: autoAddMusic !== undefined ? autoAddMusic : true,
+            photoCoverIndex: 0,
+            disableComment: false,
+            disableDuet: false,
+            disableStitch: false,
+          };
+        }
+
         return entry;
       }),
-      content: fullText,
-      mediaUrls: imageUrls.filter((url: string) => url && url.trim()),
+      mediaItems: imageUrls
+        .filter((url: string) => url && url.trim())
+        .map((url: string) => ({ type: 'image', url })),
     };
 
     if (scheduledAt) {
-      postpeerBody.scheduleDate = scheduledAt.toISOString();
+      postpeerBody.scheduledFor = scheduledAt.toISOString();
+      postpeerBody.timezone = 'UTC';
+    } else {
+      postpeerBody.publishNow = true;
     }
 
     const data = await this.request('POST', '/posts', postpeerBody);
 
+    // PostPeer returns { success, status, postId, platforms: [...] }
+    const platformResult = data.platforms?.[0] || {};
+
     return {
-      id: data.id || data.postId || (data.post && data.post.id) || '',
-      status: data.status || (data.post && data.post.status) || 'pending',
-      platformPostId: data.platformPostId,
-      url: data.url || (data.post && data.post.url),
-      error: data.error,
+      id: data.postId || data.id || '',
+      status: data.status || platformResult.status || 'pending',
+      platformPostId: platformResult.platformPostId,
+      url: platformResult.platformPostUrl || data.url || '',
+      error: data.error || platformResult.error,
     };
   }
 
   /**
    * Get post status (for polling)
    * Returns status: "in-progress", "published", "failed"
-   * Returns publicUrl when published
    */
   async getPostStatus(postId: string): Promise<PostPeerPostResponse> {
     const data = await this.request('GET', `/posts/${postId}`);
-    const url = data.publicUrl || data.url || (data.post && data.post.url);
+
+    // Map PostPeer status to our expected format
+    let mappedStatus = data.status || 'unknown';
+    if (mappedStatus === 'scheduled') mappedStatus = 'pending';
+    if (mappedStatus === 'in-progress' || mappedStatus === 'processing') mappedStatus = 'in-progress';
+    if (mappedStatus === 'published' || mappedStatus === 'success') mappedStatus = 'published';
+    if (mappedStatus === 'failed' || mappedStatus === 'error') mappedStatus = 'failed';
+
+    const url = data.platformPostUrl || data.publicUrl || data.url ||
+      (data.platforms && data.platforms[0]?.platformPostUrl) || '';
 
     return {
-      id: data.id || data.postId,
-      status: data.status || 'unknown',
+      id: data.postId || data.id,
+      status: mappedStatus,
       platformPostId: data.platformPostId,
       url,
-      error: data.error || (data.status === 'failed' ? 'Publishing failed' : undefined),
+      error: data.error,
     };
   }
 
@@ -273,14 +367,27 @@ export class PostPeerService {
     }
   }
 
+  /**
+   * Verify API key by calling the health/auth endpoint
+   */
   async verifyApiKey(): Promise<boolean> {
     try {
-      const accounts = await this.getAccounts();
-      console.log(`[PostPeer] API key valid. Found ${accounts.length} account(s).`);
-      return true;
+      const data = await this.request('GET', '/health/auth');
+      console.log(`[PostPeer] API key valid: ${data.ok === true}`);
+      return data.ok === true;
     } catch (err: any) {
       console.error('[PostPeer] API key verification failed:', err.message);
       return false;
     }
+  }
+
+  /**
+   * Get OAuth connect URL for a platform
+   * Returns the URL to redirect the user to for authorization
+   */
+  async getConnectUrl(platform: string, profileId?: string): Promise<string> {
+    const query = profileId ? `?profileId=${profileId}` : '';
+    const data = await this.request('GET', `/connect/${platform}${query}`);
+    return data.url || '';
   }
 }

@@ -1,15 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-server";
+import { PostPeerService } from "@/lib/postpeer";
 
 export const maxDuration = 120;
 export const dynamic = "force-dynamic";
-
-// ─── PostPeer API Configuration ──────────────────────────────────────────
-const POSTPEER_API_URL = "https://api.postpeer.dev/v1/posts";
-
-function getPostPeerApiKey(): string | null {
-  return process.env.POSTPEER_API_KEY || null;
-}
 
 // ─── POST /api/autopublish/publish-carousel ──────────────────────────────
 // Publish carousel images to social media via PostPeer API
@@ -31,7 +25,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Caption is required" }, { status: 400 });
     }
 
-    const postpeerApiKey = getPostPeerApiKey();
+    const postpeerApiKey = process.env.POSTPEER_API_KEY;
     if (!postpeerApiKey) {
       return NextResponse.json(
         { error: "PostPeer API key not configured. Set POSTPEER_API_KEY environment variable." },
@@ -39,35 +33,51 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Default platforms: Instagram + TikTok
-    const targetPlatforms = platforms || ["instagram", "tiktok"];
+    // Default platforms: TikTok
+    const targetPlatforms = platforms || ["tiktok"];
     const accountIds = platformAccountIds || {};
 
-    // Build PostPeer API request
+    // Build PostPeer API request using correct format
     const platformEntries = targetPlatforms.map((p: string) => {
-      const entry: Record<string, string> = { platform: p };
+      const entry: Record<string, unknown> = { platform: p };
       if (accountIds[p]) entry.accountId = accountIds[p];
+
+      // Add TikTok-specific data for photo carousels
+      if (p === "tiktok") {
+        entry.platformSpecificData = {
+          privacyLevel: "PUBLIC_TO_EVERYONE",
+          draft: false,
+          autoAddMusic: true,
+          photoCoverIndex: 0,
+        };
+      }
+
       return entry;
     });
 
     const postpeerBody: Record<string, unknown> = {
       platforms: platformEntries,
       content: caption.trim(),
-      mediaUrls: imageUrls.filter((url: string) => url && url.trim()),
+      mediaItems: imageUrls
+        .filter((url: string) => url && url.trim())
+        .map((url: string) => ({ type: "image", url })),
     };
 
     if (scheduleDate) {
-      postpeerBody.scheduleDate = scheduleDate;
+      postpeerBody.scheduledFor = scheduleDate;
+      postpeerBody.timezone = "UTC";
+    } else {
+      postpeerBody.publishNow = true;
     }
 
     console.log(`[AutoPublish] Publishing carousel to ${targetPlatforms.join(", ")} via PostPeer`);
     console.log(`[AutoPublish] Images: ${imageUrls.length}, Caption: "${caption.slice(0, 50)}..."`);
 
-    const response = await fetch(POSTPEER_API_URL, {
+    const response = await fetch("https://api.postpeer.dev/v1/posts", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${postpeerApiKey}`,
+        "x-access-key": postpeerApiKey,
       },
       body: JSON.stringify(postpeerBody),
       signal: AbortSignal.timeout(60000),
