@@ -555,13 +555,16 @@ async function generateSlideImageKie(
   totalCarousels: number,
   referenceImageUrl?: string
 ): Promise<string> {
-  // Build input object — include reference image if provided (image edit mode)
-  const input: Record<string, string> = {
+  // Build input object for kie.ai nano-banana-2 API
+  // Use aspect_ratio instead of image_size, and image_input (array) for reference images
+  const input: Record<string, unknown> = {
     prompt: imagePrompt,
-    image_size: "768x1344",
+    aspect_ratio: "3:4",
+    output_format: "png",
+    image_input: [] as string[],
   };
   if (referenceImageUrl) {
-    input.image = referenceImageUrl;
+    input.image_input = [referenceImageUrl];
     console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: using reference image for product consistency`);
   }
 
