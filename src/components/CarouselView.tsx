@@ -1220,27 +1220,99 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </label>
             </div>
 
-            {/* Product Image URL */}
-            <input
-              type="url"
-              value={productImageUrl}
-              onChange={(e) => setProductImageUrl(e.target.value)}
-              placeholder="Paste product image URL (used as reference for consistent product appearance)"
-              className="w-full px-4 py-3 rounded-xl text-sm outline-none mb-3 transition-all duration-200"
-              style={{
-                backgroundColor: C.white,
-                border: `1.5px solid ${productImageUrl ? `${C.pink}40` : "#E5E7EB"}`,
-                color: C.text,
-                boxShadow: productImageUrl ? `0 0 0 2px ${C.pink}10` : "none",
-              }}
-            />
+            {/* Product Image: Upload or URL */}
+            <div className="flex items-center gap-2 mb-3">
+              {/* Upload Button */}
+              <label
+                className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 hover:shadow-md flex-shrink-0"
+                style={{
+                  backgroundColor: C.pink,
+                  color: C.white,
+                  border: `1.5px solid ${C.pink}`,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                  <polyline points="17 8 12 3 7 8" />
+                  <line x1="12" y1="3" x2="12" y2="15" />
+                </svg>
+                Upload
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    // Convert to data URL for preview + upload to server
+                    const reader = new FileReader();
+                    reader.onload = async (ev) => {
+                      const dataUrl = ev.target?.result as string;
+                      // Show preview immediately
+                      setProductImageUrl(dataUrl);
+                      // Try to upload to server for a public URL (needed for kie.ai API)
+                      try {
+                        setGenerationStep("Uploading product image...");
+                        const blob = await fetch(dataUrl).then(r => r.blob());
+                        const formData = new FormData();
+                        formData.append("file", blob, `product-${Date.now()}.png`);
+                        formData.append("title", "product-reference");
+                        const uploadRes = await authFetch("/api/videos/upload", {
+                          method: "POST",
+                          body: formData,
+                        });
+                        if (uploadRes.ok) {
+                          const uploadData = await uploadRes.json();
+                          const publicUrl = uploadData.video?.url || uploadData.url;
+                          if (publicUrl) {
+                            setProductImageUrl(publicUrl);
+                            console.log("[Carousel] Product image uploaded:", publicUrl);
+                          }
+                        }
+                      } catch (err) {
+                        console.warn("[Carousel] Product image upload failed, using data URL:", err);
+                        // data URL will still work for preview, but kie.ai needs public URL
+                      }
+                      setGenerationStep("");
+                    };
+                    reader.readAsDataURL(file);
+                  }}
+                />
+              </label>
+
+              {/* URL Input */}
+              <input
+                type="url"
+                value={productImageUrl}
+                onChange={(e) => setProductImageUrl(e.target.value)}
+                placeholder="or paste product image URL here"
+                className="flex-1 px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
+                style={{
+                  backgroundColor: C.white,
+                  border: `1.5px solid ${productImageUrl ? `${C.pink}40` : "#E5E7EB"}`,
+                  color: C.text,
+                  boxShadow: productImageUrl ? `0 0 0 2px ${C.pink}10` : "none",
+                }}
+              />
+            </div>
+
             {productImageUrl && (
-              <div className="mb-3 flex items-center gap-2">
-                <img src={productImageUrl} alt="Product preview" className="w-12 h-12 rounded-lg object-cover" style={{ border: `2px solid ${C.pink}30` }} />
+              <div className="mb-3 flex items-center gap-3">
+                <img src={productImageUrl} alt="Product preview" className="w-16 h-16 rounded-xl object-cover" style={{ border: `2px solid ${C.pink}30`, boxShadow: `0 2px 8px ${C.pink}15` }} />
                 <div>
-                  <p className="text-[10px] font-bold" style={{ color: C.pink }}>Product Reference</p>
+                  <p className="text-[10px] font-bold" style={{ color: C.pink }}>✓ Product Reference Active</p>
                   <p className="text-[9px]" style={{ color: C.textMuted }}>Nano Banana 2 will match this product in all slides</p>
                 </div>
+                <button
+                  onClick={() => setProductImageUrl("")}
+                  className="ml-auto w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
+                  style={{ backgroundColor: "#FEE2E2", border: "1px solid #FECACA" }}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
               </div>
             )}
 
