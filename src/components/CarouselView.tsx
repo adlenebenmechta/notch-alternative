@@ -37,6 +37,7 @@ interface Slide {
 interface CarouselData {
   carouselTitle: string;
   slides: Slide[];
+  publishState?: "idle" | "publishing" | "published" | "failed";
 }
 
 interface CarouselViewProps {
@@ -274,6 +275,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [currentSlide, setCurrentSlide] = useState(0);
   const [applyingOverlay, setApplyingOverlay] = useState(false);
 
+  // Auto-publish via PostPeer
+  const [autoPublishEnabled, setAutoPublishEnabled] = useState(false);
+  const [publishCaption, setPublishCaption] = useState("");
+  const [publishPlatforms, setPublishPlatforms] = useState<string[]>(["instagram", "tiktok"]);
+
   const [showResult, setShowResult] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
 
@@ -507,7 +513,63 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     alert(`Carousel "${carousel.carouselTitle}" saved to library! (${totalSlides} slides)`);
   };
 
-  // ─── Examples ────────────────────────────────────────────────────────
+  // ─── Publish to PostPeer ────────────────────────────────────────────
+  const publishCarousel = async (carouselIdx: number) => {
+    const carousel = carousels[carouselIdx];
+    if (!carousel) return;
+
+    setCarousels(prev => {
+      const updated = [...prev];
+      updated[carouselIdx] = { ...updated[carouselIdx], publishState: "publishing" };
+      return updated;
+    });
+
+    try {
+      const allImageUrls: string[] = [];
+      for (const slide of carousel.slides) {
+        const url = slide.textOverlayUrl || slide.imageUrl;
+        if (!url) continue;
+        if (url.startsWith("data:")) {
+          const res = await fetch(url);
+          const blob = await res.blob();
+          const formData = new FormData();
+          formData.append("file", blob, "slide.png");
+          formData.append("title", "temp-upload");
+          const uploadRes = await authFetch("/api/videos/upload", { method: "POST", body: formData });
+          if (uploadRes.ok) { const data = await uploadRes.json(); allImageUrls.push(data.video?.url || data.url || url); }
+          else allImageUrls.push(url);
+        } else {
+          allImageUrls.push(url);
+        }
+      }
+
+      const caption = publishCaption || `${carousel.carouselTitle} 🔥 #fyp #viral #carousel #ai`;
+
+      const res = await authFetch("/api/autopublish/publish-carousel", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ imageUrls: allImageUrls, caption, platforms: publishPlatforms }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Publish failed");
+
+      setCarousels(prev => {
+        const updated = [...prev];
+        updated[carouselIdx] = { ...updated[carouselIdx], publishState: "published" };
+        return updated;
+      });
+    } catch (err) {
+      console.error("[Carousel] Publish failed:", err);
+      setCarousels(prev => {
+        const updated = [...prev];
+        updated[carouselIdx] = { ...updated[carouselIdx], publishState: "failed" };
+        return updated;
+      });
+    }
+  };
+
+  // ─── Touch / Swipe ─────────────────────────────────────────────────
   const examples = [
     "5 tips to grow your Instagram in 2025",
     "How AI is changing digital marketing",
@@ -810,8 +872,57 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </div>
             )}
 
+            {/* ─── Auto-Publish Section (PostPeer) ──────────────────── */}
+            <div className="mt-5 rounded-2xl p-4" style={{ backgroundColor: "#1A1A1A", border: "1.5px solid #333" }}>
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.gold}20` }}>
+                    <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4z" /></svg>
+                  </div>
+                  <span className="text-xs font-bold uppercase tracking-wider" style={{ color: C.gold }}>Auto-Publish (PostPeer)</span>
+                </div>
+                <button onClick={() => setAutoPublishEnabled(!autoPublishEnabled)} className="relative w-12 h-7 rounded-full transition-all duration-300" style={{ backgroundColor: autoPublishEnabled ? C.gold : "#444", boxShadow: autoPublishEnabled ? `0 0 0 3px ${C.gold}20` : "none" }}>
+                  <div className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300" style={{ left: autoPublishEnabled ? "calc(100% - 26px)" : "2px" }} />
+                </button>
+              </div>
+
+              {autoPublishEnabled && (
+                <>
+                  <div className="flex items-center gap-2 mb-3">
+                    {[{ id: "instagram", label: "IG", color: "#E1306C" }, { id: "tiktok", label: "TT", color: "#000000" }, { id: "twitter", label: "X", color: "#1DA1F2" }, { id: "linkedin", label: "LI", color: "#0A66C2" }, { id: "facebook", label: "FB", color: "#1877F2" }].map(p => (
+                      <button key={p.id} onClick={() => setPublishPlatforms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])}
+                        className="flex-1 py-2 rounded-xl text-[10px] font-bold transition-all duration-200"
+                        style={{ backgroundColor: publishPlatforms.includes(p.id) ? p.color : "#2A2A2A", color: publishPlatforms.includes(p.id) ? "#fff" : "#888", border: `1.5px solid ${publishPlatforms.includes(p.id) ? p.color : "#444"}` }}>
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                  <input type="text" value={publishCaption} onChange={e => setPublishCaption(e.target.value)}
+                    placeholder={activeCarousel ? `${activeCarousel!.carouselTitle} 🔥 #fyp #viral` : "Caption for the post..."}
+                    className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mb-3"
+                    style={{ backgroundColor: "#2A2A2A", border: "1.5px solid #444", color: "#eee" }} />
+                  <button onClick={() => publishCarousel(currentCarousel)} disabled={activeCarousel!.publishState === "publishing" || publishPlatforms.length === 0}
+                    className="w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300 disabled:opacity-40"
+                    style={{ backgroundColor: activeCarousel!.publishState === "published" ? "#22C55E" : activeCarousel!.publishState === "failed" ? "#EF4444" : C.gold, color: "#000" }}>
+                    {activeCarousel!.publishState === "publishing" ? (
+                      <span className="inline-flex items-center gap-2"><span className="w-3 h-3 rounded-full border-2 border-black border-t-transparent animate-spin" /> Publishing...</span>
+                    ) : activeCarousel!.publishState === "published" ? (
+                      <span className="inline-flex items-center gap-2">✅ Published!</span>
+                    ) : activeCarousel!.publishState === "failed" ? (
+                      <span className="inline-flex items-center gap-2">❌ Failed — Retry</span>
+                    ) : (
+                      <span className="inline-flex items-center gap-2">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4z" /></svg>
+                        Publish to {publishPlatforms.map(p => p.toUpperCase()).join(" + ")}
+                      </span>
+                    )}
+                  </button>
+                </>
+              )}
+            </div>
+
             {/* Action Buttons */}
-            <div className="space-y-2.5 mt-5">
+            <div className="space-y-2.5 mt-3">
               {/* Save to Library */}
               <button
                 onClick={() => saveCarouselToLibrary(currentCarousel)}
@@ -1054,6 +1165,41 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               </p>
             </div>
           </div>
+
+          {/* ─── Auto-Publish toggle (PostPeer) ────────────────────── */}
+          <div className="mb-5 rounded-2xl p-3 flex items-center justify-between" style={{ backgroundColor: autoPublishEnabled ? `${C.gold}10` : "#F9FAFB", border: `1px dashed ${autoPublishEnabled ? C.gold : "#E5E7EB"}` }}>
+            <div className="flex items-center gap-2">
+              <div className="w-6 h-6 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.gold}15` }}>
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 2L11 13" /><path d="M22 2L15 22l-4-9-9-4z" /></svg>
+              </div>
+              <div>
+                <p className="text-xs font-bold" style={{ color: autoPublishEnabled ? C.gold : C.textMuted }}>Auto-Publish via PostPeer</p>
+                <p className="text-[10px]" style={{ color: C.textMuted }}>Publish to Instagram, TikTok, X, LinkedIn...</p>
+              </div>
+            </div>
+            <button onClick={() => setAutoPublishEnabled(!autoPublishEnabled)} className="relative w-12 h-7 rounded-full transition-all duration-300"
+              style={{ backgroundColor: autoPublishEnabled ? C.gold : "#E5E7EB", boxShadow: autoPublishEnabled ? `0 0 0 3px ${C.gold}20` : "none" }}>
+              <div className="absolute top-0.5 w-6 h-6 rounded-full bg-white shadow-md transition-all duration-300" style={{ left: autoPublishEnabled ? "calc(100% - 26px)" : "2px" }} />
+            </button>
+          </div>
+
+          {autoPublishEnabled && (
+            <div className="mb-5 rounded-2xl p-4" style={{ backgroundColor: `${C.gold}08`, border: `1px dashed ${C.gold}25` }}>
+              <p className="text-[10px] font-bold uppercase tracking-wider mb-2" style={{ color: C.gold }}>Publish Platforms</p>
+              <div className="flex items-center gap-2">
+                {[{ id: "instagram", label: "Instagram", color: "#E1306C" }, { id: "tiktok", label: "TikTok", color: "#000" }, { id: "twitter", label: "X/Twitter", color: "#1DA1F2" }, { id: "linkedin", label: "LinkedIn", color: "#0A66C2" }].map(p => (
+                  <button key={p.id} onClick={() => setPublishPlatforms(prev => prev.includes(p.id) ? prev.filter(x => x !== p.id) : [...prev, p.id])}
+                    className="flex-1 py-2 rounded-xl text-[10px] font-bold transition-all duration-200"
+                    style={{ backgroundColor: publishPlatforms.includes(p.id) ? p.color : "#F3F4F6", color: publishPlatforms.includes(p.id) ? "#fff" : C.textMuted, border: `1.5px solid ${publishPlatforms.includes(p.id) ? p.color : "#E5E7EB"}` }}>
+                    {p.label}
+                  </button>
+                ))}
+              </div>
+              <input type="text" value={publishCaption} onChange={e => setPublishCaption(e.target.value)} placeholder="Custom caption (leave empty for auto)"
+                className="w-full px-3 py-2.5 rounded-xl text-sm outline-none mt-3"
+                style={{ backgroundColor: C.white, border: "1.5px solid #E5E7EB", color: C.text }} />
+            </div>
+          )}
 
           {/* ─── Idea Input ────────────────────────────────────── */}
           <div className="flex items-center gap-2 mb-4">

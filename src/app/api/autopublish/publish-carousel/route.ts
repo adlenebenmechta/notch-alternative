@@ -1,80 +1,104 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { createCarouselPost } from '@/lib/autoPublish';
+import { NextRequest, NextResponse } from "next/server";
+import { getAuthUser } from "@/lib/auth-server";
 
-/**
- * POST /api/autopublish/publish-carousel
- *
- * Publish a TikTok photo carousel post (multiple images = swipeable carousel)
- * Used by the AI Viral Carousel Machine to publish each slide (2 images: problem + solution)
- *
- * Body:
- * {
- *   "imageUrls": ["https://.../problem.jpg", "https://.../solution.jpg"],
- *   "caption": "Check this out! 🔥",         // optional
- *   "hashtags": ["fyp", "viral", "carousel"], // optional
- *   "musicTitle": "Trending Song",            // optional
- *   "aiDescription": "Description for AI",    // optional (used if autoCaption=true)
- *   "externalId": "carousel_123_slide_1",     // optional (for tracking)
- *   "accountId": "blotato_account_id",        // optional
- *   "scheduledAt": "2026-07-01T20:00:00Z",    // optional
- *   "autoCaption": false                       // optional (generate caption with AI)
- * }
- */
+export const maxDuration = 120;
+export const dynamic = "force-dynamic";
+
+// ─── PostPeer API Configuration ──────────────────────────────────────────
+const POSTPEER_API_URL = "https://api.postpeer.dev/v1/posts";
+
+function getPostPeerApiKey(): string | null {
+  return process.env.POSTPEER_API_KEY || null;
+}
+
+// ─── POST /api/autopublish/publish-carousel ──────────────────────────────
+// Publish carousel images to social media via PostPeer API
 export async function POST(req: NextRequest) {
   try {
-    const body = await req.json();
+    const user = await getAuthUser(req);
+    if (!user) {
+      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+    }
 
-    // Validate required fields
-    if (!body.imageUrls || !Array.isArray(body.imageUrls) || body.imageUrls.length === 0) {
+    const body = await req.json();
+    const { imageUrls, caption, platforms, platformAccountIds, scheduleDate } = body;
+
+    if (!imageUrls || !Array.isArray(imageUrls) || imageUrls.length === 0) {
+      return NextResponse.json({ error: "At least one image URL is required" }, { status: 400 });
+    }
+
+    if (!caption || caption.trim().length === 0) {
+      return NextResponse.json({ error: "Caption is required" }, { status: 400 });
+    }
+
+    const postpeerApiKey = getPostPeerApiKey();
+    if (!postpeerApiKey) {
       return NextResponse.json(
-        { error: 'imageUrls is required and must be a non-empty array' },
-        { status: 400 }
+        { error: "PostPeer API key not configured. Set POSTPEER_API_KEY environment variable." },
+        { status: 500 }
       );
     }
 
-    // Validate URLs
-    for (const url of body.imageUrls) {
-      if (typeof url !== 'string' || !url.startsWith('http')) {
-        return NextResponse.json(
-          { error: `Invalid image URL: ${url}` },
-          { status: 400 }
-        );
-      }
-    }
+    // Default platforms: Instagram + TikTok
+    const targetPlatforms = platforms || ["instagram", "tiktok"];
+    const accountIds = platformAccountIds || {};
 
-    const { post, needsAccount } = await createCarouselPost({
-      accountId: body.accountId,
-      imageUrls: body.imageUrls,
-      caption: body.caption,
-      hashtags: body.hashtags,
-      musicTitle: body.musicTitle,
-      aiDescription: body.aiDescription,
-      externalId: body.externalId,
-      scheduledAt: body.scheduledAt,
-      autoCaption: body.autoCaption,
+    // Build PostPeer API request
+    const platformEntries = targetPlatforms.map((p: string) => {
+      const entry: Record<string, string> = { platform: p };
+      if (accountIds[p]) entry.accountId = accountIds[p];
+      return entry;
     });
 
-    if (needsAccount) {
-      return NextResponse.json(
-        {
-          error: 'No TikTok account connected. Go to Auto-Publish → Accounts → Sync.',
-          code: 'NO_ACCOUNT',
-        },
-        { status: 400 }
-      );
+    const postpeerBody: Record<string, unknown> = {
+      platforms: platformEntries,
+      content: caption.trim(),
+      mediaUrls: imageUrls.filter((url: string) => url && url.trim()),
+    };
+
+    if (scheduleDate) {
+      postpeerBody.scheduleDate = scheduleDate;
     }
+
+    console.log(`[AutoPublish] Publishing carousel to ${targetPlatforms.join(", ")} via PostPeer`);
+    console.log(`[AutoPublish] Images: ${imageUrls.length}, Caption: "${caption.slice(0, 50)}..."`);
+
+    const response = await fetch(POSTPEER_API_URL, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${postpeerApiKey}`,
+      },
+      body: JSON.stringify(postpeerBody),
+      signal: AbortSignal.timeout(60000),
+    });
+
+    const responseText = await response.text();
+    let responseData: Record<string, unknown>;
+    try {
+      responseData = JSON.parse(responseText);
+    } catch {
+      responseData = { raw: responseText };
+    }
+
+    if (!response.ok) {
+      console.error("[AutoPublish] PostPeer API error:", response.status, responseText.slice(0, 500));
+      return NextResponse.json({
+        error: `PostPeer API failed (${response.status}): ${(responseData as Record<string, unknown>).error || responseData.message || responseText.slice(0, 200)}`,
+        details: responseData,
+      }, { status: response.status });
+    }
+
+    console.log("[AutoPublish] Successfully published via PostPeer!");
 
     return NextResponse.json({
-      ok: true,
-      postId: post.id,
-      status: post.status,
-      imageCount: body.imageUrls.length,
-      message: post.status === 'SCHEDULED'
-        ? `Carousel post scheduled for ${post.scheduledAt}`
-        : `Carousel post with ${body.imageUrls.length} image(s) is being published...`,
+      success: true,
+      publishedPlatforms: targetPlatforms,
+      postpeerResponse: responseData,
     });
-  } catch (err: any) {
-    console.error('[AutoPublish Carousel] Error:', err);
-    return NextResponse.json({ error: err.message }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : String(error);
+    console.error("POST /api/autopublish/publish-carousel error:", msg);
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
