@@ -580,6 +580,9 @@ async function generateSlideImageKie(
   });
 
   const submitText = await submitRes.text();
+  console.log(`[Carousel] kie.ai createTask response for carousel ${carouselIndex + 1} slide ${slideIndex + 1}: ${submitText.slice(0, 300)}`);
+  console.log(`[Carousel] kie.ai createTask input: prompt=${imagePrompt.slice(0, 100)}, image_size=${input.image_size}, has_image_input=${!!input.image_input}`);
+
   let submitJson: Record<string, unknown>;
   try {
     submitJson = JSON.parse(submitText);
@@ -701,7 +704,17 @@ export async function POST(req: NextRequest) {
     // Always use kie.ai for nano_banana_2
     const useKieAi = !!(finalKieApiKey && finalKieApiKey.length >= 10);
     console.log(`[Carousel] Image generation method: ${useKieAi ? 'kie.ai (nano-banana-2)' : 'built-in AI API'}`);
-    if (productImageUrl) console.log(`[Carousel] Product reference image provided: ${productImageUrl.slice(0, 80)}...`);
+    // Validate productImageUrl — kie.ai only accepts public https:// URLs (NOT data: URLs, NOT internal URLs)
+    let validProductImageUrl: string | undefined;
+    if (productImageUrl && typeof productImageUrl === "string" && productImageUrl.trim()) {
+      const url = productImageUrl.trim();
+      if (url.startsWith("https://") && !url.includes("kobisto.com") && !url.includes("railway.app") && !url.includes("localhost")) {
+        validProductImageUrl = url;
+        console.log(`[Carousel] Valid product reference image URL: ${url.slice(0, 80)}...`);
+      } else {
+        console.warn(`[Carousel] Product image URL is not a valid public https URL — cannot use as kie.ai reference. URL type: ${url.startsWith("data:") ? "data URL" : url.startsWith("http://") ? "http (not https)" : "internal/self-referencing URL"}`);
+      }
+    }
     if (productLink) console.log(`[Carousel] Product link provided: ${productLink.slice(0, 80)}...`);
 
     const carouselCount = Math.max(1, Math.min(10, parseInt(numCarousels) || 1));
@@ -758,7 +771,7 @@ export async function POST(req: NextRequest) {
               slides.length,
               c,
               carouselsContent.length,
-              productImageUrl || undefined
+              validProductImageUrl || undefined
             );
           } else {
             console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: generating with built-in AI API...`);

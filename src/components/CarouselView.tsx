@@ -356,7 +356,9 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           kieApiKey: "",
           numCarousels,
           language,
-          productImageUrl: productImageUrl.trim() || undefined,
+          // Only send productImageUrl if it's a valid public https URL (not a data: URL)
+          // kie.ai API rejects data: URLs and internal URLs with "File type not supported"
+          productImageUrl: (productImageUrl.trim() && productImageUrl.trim().startsWith("https://") && !productImageUrl.trim().includes("kobisto.com")) ? productImageUrl.trim() : undefined,
           productLink: productLink.trim() || undefined,
         }),
       });
