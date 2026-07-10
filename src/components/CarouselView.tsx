@@ -48,16 +48,21 @@ interface CarouselViewProps {
 
 // ─── Slide type colors/icons ───────────────────────────────────────────────
 const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
+  // UGC methodology slide types (primary)
+  hook: { color: "#E461AD", bg: "#E461AD25", label: "Hook", emoji: "🎯" },
+  person_using: { color: "#22C55E", bg: "#22C55E25", label: "Person Using", emoji: "📱" },
+  candid: { color: "#3B82F6", bg: "#3B82F625", label: "Candid", emoji: "💬" },
+  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
+  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
+  // Legacy slide types (kept for backward compatibility)
   hero: { color: "#E461AD", bg: "#E461AD25", label: "Hero Shot", emoji: "🎯" },
   quote: { color: "#3B82F6", bg: "#3B82F625", label: "Quote", emoji: "💬" },
-  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
   tip: { color: "#8B5CF6", bg: "#8B5CF625", label: "Tip", emoji: "💡" },
   stat: { color: "#06B6D4", bg: "#06B6D425", label: "Stat", emoji: "📊" },
   question: { color: "#EC4899", bg: "#EC489925", label: "Question", emoji: "🤔" },
   problem: { color: "#EF4444", bg: "#EF444425", label: "Problem", emoji: "😤" },
   benefit: { color: "#22C55E", bg: "#22C55E25", label: "Benefit", emoji: "✨" },
   feature: { color: "#6366F1", bg: "#6366F125", label: "Feature", emoji: "🔬" },
-  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
 };
 
 // ─── Word wrap helper ────────────────────────────────────────────────────────
@@ -528,15 +533,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       setShowResult(true);
       setGenerationStep("");
 
-      // Auto-apply text overlay from AI response
-      const hasAnyText = rawCarousels.some(c =>
-        c.slides.some(s =>
-          (s.headerText && s.headerText.trim()) || (s.bodyText && s.bodyText.trim())
-        )
-      );
-      if (hasAnyText) {
-        await applyTextOverlay(rawCarousels);
-      }
+      // NOTE: UGC methodology — text is BAKED INTO the image by the AI model.
+      // No canvas overlay is applied anymore. The image_prompt already includes
+      // the caption text description, so the generated imageUrl has text baked in.
+      // We skip the applyTextOverlay() call entirely.
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
@@ -958,23 +958,21 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 </div>
               )}
 
-              {/* Text overlay badge */}
-              {activeSlide.textOverlayUrl && (
-                <div
-                  className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
-                  style={{ backgroundColor: `${C.pink}cc`, color: C.white }}
-                >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                    <polyline points="4 7 4 4 20 4 20 7" />
-                    <line x1="9.5" y1="20" x2="14.5" y2="20" />
-                    <line x1="12" y1="4" x2="12" y2="20" />
-                  </svg>
-                  Text
-                </div>
-              )}
+              {/* UGC badge — text is always baked in */}
+              <div
+                className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                style={{ backgroundColor: `${C.pink}cc`, color: C.white }}
+              >
+                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                  <polyline points="4 7 4 4 20 4 20 7" />
+                  <line x1="9.5" y1="20" x2="14.5" y2="20" />
+                  <line x1="12" y1="4" x2="12" y2="20" />
+                </svg>
+                UGC
+              </div>
             </div>
 
-            {/* Slide Text Content */}
+            {/* Slide Text Content (reference — text is already baked into the image above) */}
             <div className="mt-5 px-2">
               {activeSlide.headerText && (
                 <h2 className="text-lg font-black mb-2" style={{ color: C.white }}>
@@ -993,7 +991,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               )}
               {!activeSlide.headerText && !activeSlide.bodyText && (
                 <p className="text-xs italic" style={{ color: "#666666" }}>
-                  Clean image — no text overlay
+                  Clean image — no caption text
                 </p>
               )}
             </div>
@@ -1239,7 +1237,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           >
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.gold }} />
             <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: C.gold }}>
-              Nano Banana 2
+              Nano Banana Pro · UGC
             </span>
           </div>
 
@@ -1253,7 +1251,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           </h1>
 
           <p className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style={{ color: C.textMuted }}>
-            Turn any idea into scroll-stopping carousels. AI picks the best slide types &amp; count per topic. Add a product image &amp; link for perfect product matching. Nano Banana 2 model.
+            Create viral-style UGC product carousels. Hyperrealistic "shot on iPhone" photos with TikTok-style captions baked in. Add a product image &amp; link — AI matches your product perfectly across every slide.
           </p>
         </div>
 
@@ -1364,14 +1362,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             </div>
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.gold }}>
-                Locked Settings
+                UGC Methodology
               </p>
               <p className="text-[10px] leading-relaxed mt-0.5" style={{ color: C.textMuted }}>
-                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product image as reference (product always matches)
+                Model: <b>Nano Banana Pro</b> (edit mode) • 3:4 ratio • iPhone 15 Pro Max style
                 <br />
-                Text: <b>Bold white rounded + black outline</b> • ~22% from top
+                Text: <b>Baked into image</b> (white rounded + black outline, TikTok caption style) • ~22% from top
                 <br />
-                Slides: 3-8 per carousel (AI picks best types) • Last slide = 📦 Product
+                Slides: Hook + middle + 📦 Product (last) • Each carousel: different person, scene & angle
               </p>
             </div>
           </div>
@@ -1651,14 +1649,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               style={{ borderColor: `${C.pink}33`, borderTopColor: C.pink }}
             />
             <p className="text-sm font-semibold" style={{ color: C.dark }}>
-              Creating {numCarousels} carousel{numCarousels > 1 ? "s" : ""} with Nano Banana 2...
+              Creating {numCarousels} UGC carousel{numCarousels > 1 ? "s" : ""} with Nano Banana Pro...
             </p>
             <p className="text-xs mt-2" style={{ color: C.textMuted }}>
-              3-8 slides per carousel (AI picks the best format)
+              Hook + middle + product slides (text baked into images)
               <br />
-              {productImageUrl && "Product reference: ON — all slides will match your product"}
+              {productImageUrl && "Product reference: ON — logo & colors will match your product"}
               {productImageUrl && <br />}
-              This may take 2-5 minutes per carousel. Text overlay will be applied after images are ready.
+              This may take 2-5 minutes per carousel. Captions are rendered inside each image by AI.
             </p>
           </div>
         )}
@@ -1697,8 +1695,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                     </svg>
                   ),
-                  title: "Nano Banana 2",
-                  desc: "High-quality AI images, 3:4 ratio, product reference built-in",
+                  title: "UGC iPhone Style",
+                  desc: "Hyperrealistic phone photos, Nano Banana Pro, 3:4 ratio",
                 },
                 {
                   icon: (
@@ -1708,8 +1706,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <line x1="12" y1="4" x2="12" y2="20" />
                     </svg>
                   ),
-                  title: "Bold Text Overlay",
-                  desc: "White rounded font + black outline, baked into each slide",
+                  title: "Text Baked In",
+                  desc: "TikTok captions rendered inside the image by AI (no overlay)",
                 },
                 {
                   icon: (
@@ -1719,8 +1717,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                   ),
-                  title: "Product Reference",
-                  desc: "Add product image + link, AI matches product in every slide",
+                  title: "Product Matching",
+                  desc: "Logo, colors & label stay accurate across all slides",
                 },
               ].map((feature, i) => (
                 <div

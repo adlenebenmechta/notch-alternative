@@ -136,121 +136,139 @@ async function chatCompletion(
   return null;
 }
 
-// ─── Image prompt enforcement: photorealistic with NO TEXT ───────────────
-const IMAGE_PROMPT_PREFIX = "Photorealistic professional photograph, DSLR camera, natural lighting, realistic candid shot, absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE: ";
+// ─── UGC Image prompt enforcement: iPhone-style photo WITH baked-in text ──
+// UGC methodology: hyperrealistic phone photo, text baked into the image
+const UGC_PROMPT_PREFIX = "Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: ";
+const UGC_PROMPT_SUFFIX = " Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.";
 
-function enforcePhotorealisticPrompt(prompt: string): string {
-  const cleaned = prompt
-    .replace(/\b(text|typography|lettering|words|font|headline|title|caption|quote)\b/gi, "")
-    .replace(/\b(infographic|illustration|graphic design|cartoon|vector|clip.?art)\b/gi, "")
+function enforceUGCPrompt(prompt: string): string {
+  // Don't strip text-related words — text is BAKED INTO the image in UGC mode
+  // Just ensure the UGC prefix and suffix are present
+  const lower = prompt.toLowerCase();
+  const hasPrefix = lower.startsWith("hyper realistic photorealistic photo shot on an iphone 15 pro max");
+  const hasSuffix = lower.includes("authentic unfiltered phone snapshot");
+
+  let result = prompt.trim();
+
+  // Remove any old "NO TEXT" restrictions if they slipped in
+  result = result
+    .replace(/absolutely NO TEXT NO WORDS NO LETTERS NO TYPOGRAPHY IN IMAGE\.?\s*/gi, "")
+    .replace(/\bNO TEXT NO WORDS NO LETTERS IN IMAGE\b,?\s*/gi, "")
     .replace(/\s{2,}/g, " ")
     .trim();
 
-  if (cleaned.toLowerCase().includes("no text") && cleaned.toLowerCase().includes("photorealistic")) {
-    return cleaned;
+  if (!hasPrefix) {
+    result = UGC_PROMPT_PREFIX + result;
+  }
+  if (!hasSuffix) {
+    result = result + UGC_PROMPT_SUFFIX;
   }
 
-  return IMAGE_PROMPT_PREFIX + cleaned;
+  return result;
 }
 
-// ─── Carousel Skill Prompt (Flexible Slide Count) ────────────────────────────
-// Model: Nano Banana 2 (nano_banana_2), 3:4 aspect ratio, product as reference
-// Text style: bold white rounded font with solid black outline, ~22% from top
-// Slide count: 3-8 per carousel (AI decides based on topic), last slide always "product"
+// ─── Carousel Skill Prompt (UGC Methodology) ───────────────────────────────
+// Model: Nano Banana Pro (edit mode), 3:4 aspect ratio (768x1344)
+// Text is BAKED INTO the image (bold white rounded sans-serif + solid black outline)
+// Text position: ~22% down from the top, never touching the top edge
+// Slide count: 3-6 per carousel (hook + 1-3 middle + product), last slide always "product"
 
-const CAROUSEL_SKILL_PROMPT = `You are an expert at designing viral marketing carousel content for social media (Instagram, TikTok).
+const CAROUSEL_SKILL_PROMPT = `You are an expert at creating viral-style UGC (User-Generated Content) product carousels for TikTok and Instagram.
 
-## LOCKED SETTINGS (never change these)
-- Image model: Nano Banana 2 (nano_banana_2), 3:4 aspect ratio (768x1344)
-- The product is imported as reference so the tin/pack ALWAYS matches across all slides
-- Text is baked into the images (bold white rounded font with solid black outline, positioned ~22% from the top, never at the top edge)
+## YOUR TASK
+Given a product idea/description (and optionally real product info from a product link), generate carousel plans. Each carousel is a set of hyperrealistic "shot on iPhone" images with caption text BAKED INTO each image, ending on a clean product-on-white slide.
 
-## FLEXIBLE SLIDE COUNT
-- Each carousel can have between 3 and 8 slides — choose the number that best fits the topic and storytelling flow
-- Some topics need only 3 slides (quick punchy hook → key point → product), others benefit from 6-8 slides (building a narrative arc)
-- Each carousel in a batch can have a DIFFERENT number of slides
-- Vary the slide count across carousels to create diversity
+## CORE RULES (NEVER BREAK THESE)
 
-## AVAILABLE SLIDE TYPES (choose from these, in any order except the last)
-- **hero**: Product hero shot on a dramatic background, with bold visual arrows or pointers drawing the eye to the product. Photorealistic, studio lighting.
-  - image_prompt MUST include: "product hero shot, dramatic lighting, visual arrows pointing at product, studio photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A punchy hook headline (max 6 words) about the DESIRE not the problem
-  - body_text: null (let the visual do the talking)
+1. EVERY slide is a hyperrealistic phone photo, not a polished ad.
+   - Every image_prompt MUST start with: "Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max"
+   - Every image_prompt MUST end with: "Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic"
 
-- **quote**: A relatable scene of someone talking, whispering, or in a conversation setting. Natural candid moment. Product subtly visible. Photorealistic, natural lighting.
-  - image_prompt MUST include: "candid conversation scene, person whispering or talking naturally, product subtly visible, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A powerful quote or statement in quotes (max 8 words)
-  - body_text: A supporting line that amplifies the quote (max 12 words)
+2. TEXT IS BAKED INTO THE IMAGE — you never add it afterward.
+   - The image_prompt must DESCRIBE the caption text inside it, using this exact phrasing:
+     "Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: \\"[CAPTION]\\"", positioned about 22% down from the top of the frame (not at the very top edge)"
+   - Caption style: bold white rounded sans-serif font with solid black outline (TikTok caption look)
+   - Caption position: about 22% down from the top — never touching the top edge
 
-- **comparison**: Split or side-by-side visual — the "wrong way" on one side and the "right way" (with product) on the other. Clean, minimal, photorealistic.
-  - image_prompt MUST include: "split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on the correct side, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: "❌ [the wrong way]" on first line, then "✅ [the right way with product]" on second line
-  - body_text: null
+3. PRODUCT REFERENCE: On every slide that shows the product, the image_prompt MUST include:
+   "exactly matching the reference product's design, logo, colors and typography"
+   (The product image is passed as a reference input to the image model separately — you just need to mention it in the prompt.)
 
-- **tip**: A lifestyle scene showing someone benefiting from a tip or trick related to the product. Natural, relatable.
-  - image_prompt MUST include: "lifestyle scene showing tip or trick being used, person benefiting from advice, product naturally present, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A practical tip or advice headline starting with "💡" or "Pro tip:" (max 8 words)
-  - body_text: Brief explanation of the tip (max 15 words)
+4. LAST SLIDE: Always the product on a PURE WHITE seamless background with a soft realistic shadow, plus a short caption + a smaller line under it.
 
-- **stat**: A scene that visually represents data or a surprising number. The product is visible in the scene.
-  - image_prompt MUST include: "scene visually representing data or statistics, surprising number visual, product present in scene, photorealistic, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A surprising statistic with a number and "%" or "x" (max 8 words)
-  - body_text: Brief context for the stat (max 12 words)
+## PLANNING EACH CAROUSEL
 
-- **question**: A thought-provoking scene with someone looking curious or pondering. The product is visible.
-  - image_prompt MUST include: "person looking curious or pondering, thought-provoking scene, product visible, candid photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A provocative question that makes the viewer stop scrolling (max 8 words)
-  - body_text: null or a brief follow-up (max 10 words)
+- Give each carousel ONE marketing angle tied to a REAL product benefit.
+- If product info is provided, use its ACTUAL claims (e.g., "UPF 50+", "blocks 98% UV", "24-hour hydration") — NEVER invent claims.
+- If making multiple carousels: each gets a DIFFERENT angle AND different scenes.
+- Rotate the person across carousels: different gender, age (20s-30s), location, lighting, camera feel.
+- Do NOT reuse the same setup twice across carousels.
+- Mirror selfies: max once per batch.
 
-- **problem**: A scene showing the pain point or frustration the product solves. Relatable, emotional.
-  - image_prompt MUST include: "person showing frustration or pain point, relatable problem scene, emotional, product not yet visible, photorealistic, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A relatable problem statement (max 8 words)
-  - body_text: null or brief amplification (max 10 words)
+## SLIDE STRUCTURE (mini story)
 
-- **benefit**: A scene showing the positive outcome or transformation after using the product. Aspirational.
-  - image_prompt MUST include: "person experiencing positive outcome or transformation, aspirational scene, product naturally present, lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: A benefit statement starting with a verb like "Feel", "Get", "Enjoy" (max 8 words)
-  - body_text: Brief elaboration (max 12 words)
+Each carousel has 3-6 slides:
+- Slide 1 (HOOK): product in a real-world scene + big benefit caption + one white hand-drawn arrow pointing at the product.
+- Middle slide(s): a person actually using it (person_using), a candid moment (candid), or a X-vs-check comparison flat-lay (comparison) — reinforcing the benefit.
+- Last slide: product on pure white background (product).
 
-- **feature**: A close-up or detail shot highlighting a specific product feature. Studio or lifestyle.
-  - image_prompt MUST include: "close-up detail shot of product feature, highlighting specific aspect, studio or lifestyle photography, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: Feature name or highlight (max 6 words)
-  - body_text: Brief explanation of why it matters (max 12 words)
+## PROMPT TEMPLATES (use these exactly, filling in the brackets)
 
-- **product** (ALWAYS THE LAST SLIDE): The product (tin/pack) centered on a PURE WHITE background, clean, professional product photography, no shadows, no props. Like an Amazon listing photo.
-  - image_prompt MUST include: "product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, NO TEXT NO WORDS NO LETTERS IN IMAGE"
-  - header_text: The product name or tagline (max 5 words)
-  - body_text: A single clear CTA command (max 6 words), like "Order now — link in bio"
+### Hook slide (ALWAYS slide 1):
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person + action + the exact PRODUCT, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+
+### Person-using slide (middle):
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person of specified gender/age actually using the PRODUCT in a real setting, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+
+### Candid slide (middle):
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [candid unposed moment related to the product benefit, the PRODUCT visible in the scene exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+
+### Comparison slide (optional middle):
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: top-down flat-lay [surface + setting]. Left side: [old/inferior solution] with a bold red X over it. Right side: the PRODUCT (exactly matching the reference product's design, logo, colors and typography) with a bold green check over it. Baked-in TikTok-style captions in bold white rounded sans-serif with solid black outline in the upper third (below the top edge): left "[Name + emoji]" with line "[drawback]"; right "[Name + emoji]" with line "[benefit]". No other text or graphics. Authentic unfiltered phone snapshot, not polished, not cinematic.
+
+### Final product slide (ALWAYS last):
+Clean studio product photo: the PRODUCT (exactly matching the reference product's design, logo, colors, typography) centered on a pure white seamless background with a soft realistic shadow beneath, logo facing camera perfectly legible, true to life texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "[ACTION LINE]" and directly under it slightly smaller "([supporting detail})". No other text or graphics outside the product and caption. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ## RULES
-- The LAST slide must ALWAYS be type "product" (product on pure white background) — no exceptions
-- Each carousel must have a DIFFERENT creative angle and DIFFERENT slide structure (different types and different count)
-- Choose slide types that create the best storytelling arc for each carousel's angle
-- image_prompt is ALWAYS in English even if content is in another language
-- image_prompt must describe a photorealistic scene (NOT illustration, NOT graphic design, NOT infographic)
-- ⛔ ABSOLUTELY NO TEXT/WORDS/LETTERS in image_prompt — text goes in header_text and body_text only
-- The product tin/pack must appear consistently across all slides of each carousel
-- text_position is always "top" (text is ~22% from top, never at the edge)
-- If a product description is provided, tailor the content to that specific product — use its real features, benefits, and use cases
+- Each carousel: 3-6 slides (1 hook + 1-3 middle + 1 product)
+- Each carousel in a batch: DIFFERENT angle, DIFFERENT scene, DIFFERENT person (gender/age 20s-30s)
+- image_prompt: ALWAYS in English (except the [CAPTION] text which follows the user's language)
+- header_text and body_text: in the user's language (for display + PostPeer caption)
+- The caption text [CAPTION] inside image_prompt MUST MATCH header_text (and body_text if present)
+- Last slide: ALWAYS type "product"
+- Keep captions SHORT and SIMPLE (2-8 words) — AI image models misspell long text often
+- The hook slide MUST include the white hand-drawn arrow pointing at the product
+- The product slide MUST have pure white seamless background + soft realistic shadow
 
 ## LANGUAGE
-- If the user writes in Arabic → all header_text and body_text in Arabic
-- If the user writes in English → all header_text and body_text in English
-- If the user writes in French → all header_text and body_text in French
+- If the user writes in Arabic -> header_text/body_text in Arabic, and the [CAPTION] inside image_prompt in Arabic too
+- If the user writes in English -> all text in English
+- If the user writes in French -> all text in French
+- The image_prompt structure (templates above) is always in English, but the [CAPTION] text inside follows the user's language
 
 ## OUTPUT FORMAT
-Return ONLY valid JSON (no markdown, no code blocks):
+Return ONLY valid JSON (no markdown, no code blocks, no extra text):
 {
   "carousels": [
     {
       "carousel_title": "Short unique title for this carousel",
+      "marketing_angle": "The single real product benefit this carousel focuses on",
       "slides": [
         {
           "slide_number": 1,
-          "slide_type": "one of: hero, quote, comparison, tip, stat, question, problem, benefit, feature, product",
-          "image_prompt": "...",
-          "header_text": "...",
-          "body_text": "... or null",
+          "slide_type": "hook",
+          "image_prompt": "Full prompt following the hook template, with brackets filled in, INCLUDING the baked-in caption and arrow",
+          "header_text": "The caption text (same as [CAPTION] in image_prompt, for display)",
+          "body_text": "null (hook slides have no body text)",
+          "text_position": "top"
+        },
+        ...1-3 middle slides (person_using, candid, or comparison)...,
+        {
+          "slide_number": N,
+          "slide_type": "product",
+          "image_prompt": "Full prompt following the final product slide template",
+          "header_text": "Action line (e.g., 'Get yours today')",
+          "body_text": "Supporting detail (e.g., 'Link in bio')",
           "text_position": "top"
         }
       ]
@@ -258,9 +276,17 @@ Return ONLY valid JSON (no markdown, no code blocks):
   ]
 }
 
-Generate EXACTLY the number of carousels requested by the user. Each must have a completely different creative angle, slide structure, and slide count. The last slide of EVERY carousel must be type "product".`;
+## QUALITY CHECK (self-check before returning)
+- Product matches the reference (logo, colors, label legible) — mentioned in every image_prompt
+- Caption is white with black outline, not touching the top edge — described in every image_prompt
+- Last slide background is pure white — specified in the product slide template
+- Across carousels: different angle, different scene, different person each time
+- No typos in caption text — keep captions short and simple
+- Hook slide has the white hand-drawn arrow
 
-// ─── Template-based fallback (random slide count, 3-6 slides) ──────────────
+Generate EXACTLY the number of carousels requested. Each must have a completely different creative angle, scene, person, and slide structure. The last slide of EVERY carousel must be type "product".`;
+
+// ─── Template-based fallback (UGC style, 3-6 slides, text baked in) ────────
 function generateTemplateCarousels(
   idea: string,
   numCarousels: number,
@@ -269,133 +295,104 @@ function generateTemplateCarousels(
   const isAr = language === "ar";
   const isFr = language === "fr";
 
+  // UGC angles — each tied to a product benefit
   const angles = isAr
-    ? ["السر المخفي", "الحل الذي تبحث عنه", "الطريقة الصحيحة", "النتيجة المضمونة", "التغيير الحقيقي"]
+    ? ["النتيجة التي تنتظرها", "الحل العملي", "الفارق الحقيقي", "تجربة مختلفة", "السر وراء النجاح"]
     : isFr
-    ? ["Le secret caché", "La solution que vous cherchez", "La bonne méthode", "Le résultat garanti", "Le vrai changement"]
-    : ["The hidden secret", "The solution you need", "The right way", "The guaranteed result", "The real change"];
+    ? ["Le resultat que vous attendez", "La solution pratique", "La vraie difference", "Une experience unique", "Le secret du succes"]
+    : ["The result you want", "The practical fix", "The real difference", "A different experience", "The secret behind it"];
 
-  // Available slide types for the middle slides (before the product slide)
-  const middleSlideTypes: Array<"hero" | "quote" | "comparison" | "tip" | "stat" | "question" | "problem" | "benefit" | "feature"> = [
-    "hero", "quote", "comparison", "tip", "stat", "question", "problem", "benefit", "feature",
+  // UGC persons — rotate gender/age/setting per carousel
+  const persons = [
+    "a 25-year-old woman with curly hair, wearing casual streetwear",
+    "a 28-year-old man with short beard, wearing a plain t-shirt",
+    "a 23-year-old woman with glasses, wearing athleisure",
+    "a 30-year-old man with man-bun, wearing a hoodie",
+    "a 26-year-old woman with straight hair, wearing a denim jacket",
   ];
 
-  // Template content generators per slide type
-  const slideTypeTemplates: Record<string, {
-    getTitle: (idea: string, angle: string, isAr: boolean, isFr: boolean) => string;
-    getBody: (idea: string, angle: string, isAr: boolean, isFr: boolean) => string | null;
-    getImagePrompt: (idea: string) => string;
-  }> = {
-    hero: {
-      getTitle: (_idea, angle, isAr, isFr) => isAr ? `${angle} أخيراً!` : isFr ? `${angle} enfin !` : `${angle} — finally!`,
-      getBody: () => null,
-      getImagePrompt: (idea) => `Product hero shot on dramatic background, visual arrows pointing at product, studio lighting, professional photography, 3:4 ratio, related to ${idea}`,
-    },
-    quote: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? `"لم أصدق النتيجة"` : isFr ? `"Je n'ai pas cru au résultat"` : `"I couldn't believe the results"`,
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "كل من جربها وافق" : isFr ? "Tous ceux qui ont essayé sont d'accord" : "Everyone who tried agrees",
-      getImagePrompt: (idea) => `Candid conversation scene, person whispering naturally, product subtly visible, lifestyle photography, related to ${idea}`,
-    },
-    comparison: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? `❌ الطريقة القديمة\n✅ مع منتجنا` : isFr ? `❌ L'ancienne méthode\n✅ Avec notre produit` : `❌ The old way\n✅ With our product`,
-      getBody: () => null,
-      getImagePrompt: (idea) => `Split comparison scene, wrong way vs right way, before and after visual, clean minimal background, product on correct side, related to ${idea}`,
-    },
-    tip: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "💡 نصيحة ذهبية" : isFr ? "💡 Conseil d'or" : "💡 Pro tip for best results",
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "استخدمه يومياً للنتيجة المثالية" : isFr ? "Utilisez-le quotidiennement pour des résultats optimaux" : "Use it daily for the best results",
-      getImagePrompt: (idea) => `Lifestyle scene showing tip or trick being used, person benefiting from advice, product naturally present, lifestyle photography, related to ${idea}`,
-    },
-    stat: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "97% يلاحظون الفرق" : isFr ? "97% remarquent la différence" : "97% see the difference",
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "رقم حقيقي من مستخدمين حقيقيين" : isFr ? "Un chiffre réel de vrais utilisateurs" : "Real number from real users",
-      getImagePrompt: (idea) => `Scene visually representing data or statistics, surprising number visual, product present in scene, photorealistic, related to ${idea}`,
-    },
-    question: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "هل تعاني من هذه المشكلة؟" : isFr ? "Vous souffrez de ce problème ?" : "Still struggling with this?",
-      getBody: () => null,
-      getImagePrompt: (idea) => `Person looking curious or pondering, thought-provoking scene, product visible, candid photography, related to ${idea}`,
-    },
-    problem: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "المشكلة التي تزعج الجميع" : isFr ? "Le problème qui dérange tout le monde" : "The problem everyone hates",
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "انتهى الأمر الآن" : isFr ? "C'est enfin fini" : "It ends now",
-      getImagePrompt: (idea) => `Person showing frustration or pain point, relatable problem scene, emotional, product not yet visible, photorealistic, related to ${idea}`,
-    },
-    benefit: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "شعر بالفرق من أول مرة" : isFr ? "Sentez la différence dès la première fois" : "Feel the difference instantly",
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "نتائج ملموسة وسريعة" : isFr ? "Des résultats tangibles et rapides" : "Real results you can see and feel",
-      getImagePrompt: (idea) => `Person experiencing positive outcome or transformation, aspirational scene, product naturally present, lifestyle photography, related to ${idea}`,
-    },
-    feature: {
-      getTitle: (_idea, _angle, isAr, isFr) => isAr ? "ميزة فريدة" : isFr ? "Caractéristique unique" : "What makes it unique",
-      getBody: (_idea, _angle, isAr, isFr) => isAr ? "تصميم مبتكر يعمل بشكل أفضل" : isFr ? "Conception innovante qui fonctionne mieux" : "Innovative design that works better",
-      getImagePrompt: (idea) => `Close-up detail shot of product feature, highlighting specific aspect, studio or lifestyle photography, related to ${idea}`,
-    },
-  };
+  // UGC locations — rotate per carousel
+  const locations = [
+    "sunny kitchen counter, morning light streaming through window, coffee mug nearby, marble countertop",
+    "modern bathroom shelf, soft fluorescent lighting, toiletries in background, white tiles",
+    "cozy bedroom nightstand, warm lamp light, books and phone nearby, wooden surface",
+    "office desk, natural daylight from window, laptop and notebook in background, clean white surface",
+    "outdoor patio table, golden hour lighting, plants in background, rustic wood surface",
+  ];
 
   const carousels: Array<{ carouselTitle: string; slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> }> = [];
 
-  // Use a seeded pseudo-random based on idea to get consistent but varied results
+  // Seeded pseudo-random for consistent but varied results
   let seed = 0;
   for (let i = 0; i < idea.length; i++) seed = ((seed << 5) - seed + idea.charCodeAt(i)) | 0;
   const seededRandom = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
 
   for (let c = 0; c < numCarousels; c++) {
     const angle = angles[c % angles.length];
+    const person = persons[c % persons.length];
+    const location = locations[c % locations.length];
     const carouselTitle = `${angle} — ${idea.slice(0, 30)}`;
-    const ctaText = isAr ? "اطلب الآن!" : isFr ? "Commandez maintenant!" : "Order now!";
+    const ctaText = isAr ? "اطلب الآن" : isFr ? "Commandez maintenant" : "Order now";
+    const ctaSub = isAr ? "الرابط في البايو" : isFr ? "Lien dans la bio" : "Link in bio";
 
-    // Random slide count between 3 and 6 for template fallback
-    const slideCount = 3 + Math.floor(seededRandom() * 4); // 3, 4, 5, or 6
+    // Random slide count: 3-5 (hook + 1-2 middle + product)
+    const slideCount = 3 + Math.floor(seededRandom() * 3); // 3, 4, or 5
 
-    // Pick random middle slide types (all but the last which is always "product")
-    const middleCount = slideCount - 1;
-    const usedTypes: string[] = [];
-    const availableTypes = [...middleSlideTypes];
+    const slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> = [];
 
-    for (let s = 0; s < middleCount; s++) {
-      // Always start with hero if it's the first slide
-      if (s === 0) {
-        usedTypes.push("hero");
-        const heroIdx = availableTypes.indexOf("hero");
-        if (heroIdx > -1) availableTypes.splice(heroIdx, 1);
-      } else {
-        // Pick a random type from remaining available
-        const typeIdx = Math.floor(seededRandom() * availableTypes.length);
-        const chosenType = availableTypes[typeIdx];
-        usedTypes.push(chosenType);
-        // Allow reuse of some types but prefer variety
-        if (availableTypes.length > 1) availableTypes.splice(typeIdx, 1);
-      }
-    }
-
-    const slides = usedTypes.map((slideType, i) => {
-      const template = slideTypeTemplates[slideType];
-      const title = template.getTitle(idea, angle, isAr, isFr);
-      const body = template.getBody(idea, angle, isAr, isFr);
-      const imagePrompt = template.getImagePrompt(idea);
-
-      return {
-        slideNumber: i + 1,
-        slideType,
-        title,
-        body: body || "",
-        imagePrompt: enforcePhotorealisticPrompt(imagePrompt),
-        headerText: title,
-        bodyText: body,
-        textPosition: "top" as const,
-      };
+    // ─── Slide 1: HOOK ───
+    const hookCaption = isAr ? `${angle}!` : isFr ? `${angle} !` : `${angle}!`;
+    slides.push({
+      slideNumber: 1,
+      slideType: "hook",
+      title: hookCaption,
+      body: "",
+      imagePrompt: enforceUGCPrompt(
+        `${person} holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${hookCaption}", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
+      ),
+      headerText: hookCaption,
+      bodyText: null,
+      textPosition: "top" as const,
     });
 
-    // Always add product slide as the last one
+    // ─── Middle slides: person_using or candid ───
+    const middleCount = slideCount - 2; // minus hook and product
+    for (let s = 0; s < middleCount; s++) {
+      const midCaption = isAr
+        ? s === 0 ? "استخدمتها هكذا" : "النتيجة واضحة"
+        : isFr
+        ? s === 0 ? "Je l'utilise comme ca" : "Le resultat parle"
+        : s === 0 ? "This is how I use it" : "The result speaks";
+      const midType = s === 0 ? "person_using" : "candid";
+      const midAction = s === 0
+        ? `${person} actually using the ${idea} product in real-time, exactly matching the reference product's design, logo, colors and typography`
+        : `candid unposed moment with the ${idea} product naturally visible in the scene, exactly matching the reference product's design, logo, colors and typography`;
+
+      slides.push({
+        slideNumber: s + 2,
+        slideType: midType,
+        title: midCaption,
+        body: "",
+        imagePrompt: enforceUGCPrompt(
+          `${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${midCaption}", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics.`
+        ),
+        headerText: midCaption,
+        bodyText: null,
+        textPosition: "top" as const,
+      });
+    }
+
+    // ─── Last slide: PRODUCT on pure white ───
     slides.push({
       slideNumber: slideCount,
       slideType: "product",
-      title: idea.slice(0, 20),
-      body: ctaText,
-      imagePrompt: enforcePhotorealisticPrompt(`Product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, related to ${idea}`),
-      headerText: idea.slice(0, 20),
-      bodyText: ctaText,
+      title: ctaText,
+      body: ctaSub,
+      imagePrompt: enforceUGCPrompt(
+        `Clean studio product photo: the ${idea} product (exactly matching the reference product's design, logo, colors, typography) centered on a pure white seamless background with a soft realistic shadow beneath, logo facing camera perfectly legible, true to life texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "${ctaText}" and directly under it slightly smaller "(${ctaSub})". No other text or graphics outside the product and caption.`
+      ),
+      headerText: ctaText,
+      bodyText: ctaSub,
       textPosition: "top" as const,
     });
 
@@ -462,17 +459,17 @@ async function generateCarouselContent(
               slides: generateTemplateCarousels(idea, 1, language)[0].slides,
             };
           }
-          const validSlideTypes = ["hero", "quote", "comparison", "tip", "stat", "question", "problem", "benefit", "feature", "product"];
+          const validSlideTypes = ["hook", "person_using", "candid", "comparison", "hero", "quote", "tip", "stat", "question", "problem", "benefit", "feature", "product"];
           const slides = rawSlides.map((slide: Record<string, unknown>, i: number) => {
-            const rawType = (slide.slide_type as string) || "hero";
+            const rawType = (slide.slide_type as string) || "hook";
             // Validate slide type; if invalid, pick a sensible default based on position
-            const slideType = validSlideTypes.includes(rawType) ? rawType : (i === rawSlides.length - 1 ? "product" : "hero");
+            const slideType = validSlideTypes.includes(rawType) ? rawType : (i === rawSlides.length - 1 ? "product" : "hook");
             return {
               slideNumber: (slide.slide_number as number) || i + 1,
               slideType,
               title: (slide.header_text as string) || (slide.title as string) || `Slide ${i + 1}`,
               body: (slide.body_text as string) || (slide.body as string) || "",
-              imagePrompt: enforcePhotorealisticPrompt((slide.image_prompt as string) || `Professional photograph related to ${idea}, realistic, natural lighting`),
+              imagePrompt: enforceUGCPrompt((slide.image_prompt as string) || `Person holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. Real-world scene, candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "Check this out", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics.`),
               headerText: (slide.header_text as string | null) ?? null,
               bodyText: (slide.body_text as string | null) ?? null,
               textPosition: (slide.text_position as string) || "top",
@@ -483,7 +480,7 @@ async function generateCarouselContent(
             slides[slides.length - 1] = {
               ...slides[slides.length - 1],
               slideType: "product",
-              imagePrompt: enforcePhotorealisticPrompt(`Product tin pack centered on pure white background, professional product photography, clean, no shadows, no props, Amazon listing style, related to ${idea}`),
+              imagePrompt: enforceUGCPrompt(`Clean studio product photo: the ${idea} product (exactly matching the reference product's design, logo, colors, typography) centered on a pure white seamless background with a soft realistic shadow beneath, logo facing camera perfectly legible, true to life texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "Order now" and directly under it slightly smaller "(Link in bio)". No other text or graphics outside the product and caption.`),
             };
           }
           return { carouselTitle, slides };
@@ -545,7 +542,10 @@ async function pollKieImage(taskId: string, apiKey: string): Promise<string> {
   throw new Error("Image generation timed out after 6 minutes");
 }
 
-// ─── Generate a single slide image via kie.ai (nano_banana_2) ──────────
+// ─── Generate a single slide image via kie.ai (nano-banana-pro with fallback) ──
+// UGC methodology: uses Nano Banana Pro (edit mode) as primary model.
+// Falls back to nano-banana-2 if Pro is unavailable.
+// Always passes product image as reference (image_input) for logo/color consistency.
 async function generateSlideImageKie(
   imagePrompt: string,
   apiKey: string,
@@ -555,56 +555,82 @@ async function generateSlideImageKie(
   totalCarousels: number,
   referenceImageUrl?: string
 ): Promise<string> {
-  // Build input object for kie.ai nano-banana-2 API
+  // Build input object for kie.ai API
   // Use image_size (not aspect_ratio/output_format — those cause "File type not supported")
-  // ONLY include image_input when a reference image is provided
+  // Include image_input (product reference) whenever available — UGC methodology requires it
   const input: Record<string, unknown> = {
     prompt: imagePrompt,
     image_size: "768x1344",
   };
   if (referenceImageUrl) {
     input.image_input = [referenceImageUrl];
-    console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: using reference image for product consistency`);
+    console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: using product reference image for UGC consistency`);
   }
 
-  const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
-    method: "POST",
-    headers: {
-      Authorization: `Bearer ${apiKey}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify({
-      model: "nano-banana-2",
-      input,
-    }),
-  });
+  // Try Nano Banana Pro first (user's preferred model for UGC), fall back to nano-banana-2
+  const models = ["nano-banana-pro", "nano-banana-2"];
+  let lastError: Error | null = null;
 
-  const submitText = await submitRes.text();
-  console.log(`[Carousel] kie.ai createTask response for carousel ${carouselIndex + 1} slide ${slideIndex + 1}: ${submitText.slice(0, 300)}`);
-  console.log(`[Carousel] kie.ai createTask input: prompt=${imagePrompt.slice(0, 100)}, image_size=${input.image_size}, has_image_input=${!!input.image_input}`);
+  for (const model of models) {
+    try {
+      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: trying model ${model}...`);
 
-  let submitJson: Record<string, unknown>;
-  try {
-    submitJson = JSON.parse(submitText);
-  } catch {
-    throw new Error("kie.ai API returned non-JSON: " + submitText.slice(0, 200));
+      const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ model, input }),
+      });
+
+      const submitText = await submitRes.text();
+      console.log(`[Carousel] kie.ai (${model}) createTask response for carousel ${carouselIndex + 1} slide ${slideIndex + 1}: ${submitText.slice(0, 300)}`);
+
+      let submitJson: Record<string, unknown>;
+      try {
+        submitJson = JSON.parse(submitText);
+      } catch {
+        throw new Error(`kie.ai (${model}) returned non-JSON: ` + submitText.slice(0, 200));
+      }
+
+      if (submitJson.code !== 200) {
+        const errMsg = (submitJson.msg as string) || submitText.slice(0, 200);
+        // If model not found/supported, try next model
+        if (errMsg.toLowerCase().includes("model") || errMsg.toLowerCase().includes("not found") || errMsg.toLowerCase().includes("not support")) {
+          console.warn(`[Carousel] Model ${model} not available (${errMsg}), trying next...`);
+          lastError = new Error(`Model ${model}: ${errMsg}`);
+          continue;
+        }
+        // For other errors, throw immediately
+        throw new Error(
+          "Failed to submit image for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1) + " (" + model + "): " + errMsg
+        );
+      }
+
+      const taskId = submitJson.data?.taskId;
+      if (!taskId) {
+        throw new Error("No taskId returned for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1) + " (" + model + ")");
+      }
+
+      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: ${model} task ${taskId} submitted, polling...`);
+      const imageUrl = await pollKieImage(taskId, apiKey);
+      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: image ready (model: ${model})!`);
+      return imageUrl;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // If this is a "model not available" error, continue to next model
+      if (msg.includes("not available") || msg.toLowerCase().includes("not support") || msg.toLowerCase().includes("not found")) {
+        console.warn(`[Carousel] Model ${model} failed (${msg}), trying next...`);
+        lastError = err instanceof Error ? err : new Error(msg);
+        continue;
+      }
+      // For other errors (timeout, generation failure), throw immediately
+      throw err;
+    }
   }
 
-  if (submitJson.code !== 200) {
-    throw new Error(
-      "Failed to submit image for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1) + ": " + (submitJson.msg || submitText.slice(0, 200))
-    );
-  }
-
-  const taskId = submitJson.data?.taskId;
-  if (!taskId) {
-    throw new Error("No taskId returned for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1));
-  }
-
-  console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: kie.ai task ${taskId} submitted, polling...`);
-  const imageUrl = await pollKieImage(taskId, apiKey);
-  console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: image ready!`);
-  return imageUrl;
+  throw lastError || new Error("All kie.ai models failed for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1));
 }
 
 // ─── Generate slide image using built-in AI API ──────────────────────
