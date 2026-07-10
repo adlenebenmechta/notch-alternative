@@ -400,23 +400,39 @@ The image_prompt scene MUST visually match what the caption says. If the caption
 
 ## PROMPT TEMPLATES (use these exactly, filling in the brackets)
 
-### IMPORTANT — TEXT SIZE IN IMAGES
-The baked-in caption text MUST be SMALL and DISCREET — like a real TikTok caption, NOT a giant billboard. Aim for text that takes up only ~15-20% of the image width, positioned neatly at 22% from top. Do NOT make the text huge or oversized. Think "small subtitle at the top" not "big poster headline". The product and scene should dominate the image, with the caption as a small overlay.
+### ⚠️ CRITICAL — TEXT SIZE IN IMAGES (READ THIS CAREFULLY)
+The baked-in caption text MUST be TINY — like a small TikTok subtitle, NOT a giant billboard headline. The text is a MINOR element of the image, not the main focus.
+
+**Text size rules (NON-NEGOTIABLE):**
+- The caption text MUST be VERY SMALL — take up only ~10-15% of the image width
+- The text MUST fit in a small subtitle bar/text strip at 22% from top
+- The text MUST NOT be large, huge, oversized, or fill the frame
+- The text MUST NOT be a big poster headline
+- The text MUST NOT dominate the image
+- The product and scene MUST be the main focus, text is just a small overlay
+- Think "tiny subtitle at the top of a TikTok video" NOT "big advertising headline"
+
+**If the text comes out large, the image is WRONG. Regenerate with smaller text.**
+
+**To keep text small:**
+1. Keep captions VERY SHORT (2-4 words max for hooks, 3-5 words max for middle slides)
+2. Use the phrase "tiny text" and "very small font" in every image_prompt
+3. Describe it as "small subtitle text bar" to constrain it visually
 
 ### Hook slide (ALWAYS slide 1):
-Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person + action + the exact PRODUCT, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard, plus one small white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person + action + the exact PRODUCT, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized, plus one small white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ### Person-using slide (middle):
-Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person of specified gender/age actually using the PRODUCT in a real setting, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [person of specified gender/age actually using the PRODUCT in a real setting, exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ### Candid slide (middle):
-Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [candid unposed moment related to the product benefit, the PRODUCT visible in the scene exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: [candid unposed moment related to the product benefit, the PRODUCT visible in the scene exactly matching the reference product's design, logo, colors and typography]. [Location + 3-4 realism details + lighting]. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "[CAPTION]", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ### Comparison slide (optional middle):
-Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: top-down flat-lay [surface + setting]. Left side: [old/inferior solution] with a bold red X over it. Right side: the PRODUCT (exactly matching the reference product's design, logo, colors and typography) with a bold green check over it. Baked-in TikTok-style captions in SMALL bold white rounded sans-serif with solid black outline in the upper third (below the top edge): left "[Name + emoji]" with line "[drawback]"; right "[Name + emoji]" with line "[benefit]", text size small and discreet. No other text or graphics. Authentic unfiltered phone snapshot, not polished, not cinematic.
+Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: top-down flat-lay [surface + setting]. Left side: [old/inferior solution] with a bold red X over it. Right side: the PRODUCT (exactly matching the reference product's design, logo, colors and typography) with a bold green check over it. Tiny TikTok-style captions in very small bold white rounded sans-serif with solid black outline, fitted inside small subtitle text bars in the upper third (below the top edge): left "[Name + emoji]" with line "[drawback]"; right "[Name + emoji]" with line "[benefit]", text is TINY and discreet, NOT large. No other text or graphics. Authentic unfiltered phone snapshot, not polished, not cinematic.
 
 ### Final product slide (ALWAYS last) — LOGO ACCURACY IS CRITICAL:
-Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text). The product centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "[ACTION LINE]" and directly under it slightly smaller "([supporting detail])", text size small and discreet. No other text or graphics outside the product and caption. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
+Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text). The product centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar, placed in the upper-middle area above the product (not at the very top edge): "[ACTION LINE]" and directly under it slightly smaller "([supporting detail])", text is TINY and discreet, NOT large. No other text or graphics outside the product and caption. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ## RULES
 - **Analyze the product first** (Step 1), then pick a structure (Step 2), then write slides.
@@ -427,8 +443,8 @@ Clean studio product photo: the EXACT product from the reference image (MUST mat
 - The caption text [CAPTION] inside image_prompt MUST MATCH header_text (and body_text if present)
 - First slide: ALWAYS type "hook" (includes the white hand-drawn arrow pointing at the product)
 - Last slide: ALWAYS type "product" (pure white seamless background + soft realistic shadow)
-- **Hook captions: 3-6 words, ALL CAPS if blunt claim, lowercase if POV/convo.** AI image models misspell long text — keep it short.
-- **Middle captions: lowercase, texting-style, one idea, max 8 words.**
+- **Hook captions: 2-4 words MAX, ALL CAPS if blunt claim, lowercase if POV/convo.** Shorter text = smaller visual footprint in the image. AI image models render short text better and smaller.
+- **Middle captions: lowercase, texting-style, one idea, 3-5 words MAX.**
 - **Product slide caption: plain "do this" nudge (e.g., "1 a day" + check emoji, "get yours", "link in bio").**
 - The product slide MUST have pure white seamless background + soft realistic shadow
 - **One real number or claim per carousel** — pull from product info, never invent
@@ -863,7 +879,7 @@ function generateTemplateCarousels(
       title: hookCaptionWithEmoji,
       body: "",
       imagePrompt: enforceUGCPrompt(
-        `${person} with the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "${hookCaptionWithEmoji}", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard, plus one small white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
+        `${person} with the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "${hookCaptionWithEmoji}", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized, plus one small white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
       ),
       headerText: hookCaptionWithEmoji,
       bodyText: null,
@@ -895,11 +911,11 @@ function generateTemplateCarousels(
       let imagePromptStr: string;
       if (midType === "comparison") {
         imagePromptStr = enforceUGCPrompt(
-          `Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: ${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style captions in SMALL bold white rounded sans-serif with solid black outline in the upper third (below the top edge): left "old way" with line "drawback"; right "new way" with line "${midCaption}", text size small and discreet. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.`
+          `Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: ${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style captions in very small bold white rounded sans-serif with solid black outline, fitted inside small subtitle text bars in the upper third (below the top edge): left "old way" with line "drawback"; right "new way" with line "${midCaption}", text is TINY and discreet, NOT large. No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.`
         );
       } else {
         imagePromptStr = enforceUGCPrompt(
-          `${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "${midCaption}", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard. No other text or graphics.`
+          `${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "${midCaption}", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized. No other text or graphics.`
         );
       }
 
@@ -923,7 +939,7 @@ function generateTemplateCarousels(
       title: ctaText,
       body: ctaSub,
       imagePrompt: enforceUGCPrompt(
-        `Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text) centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "${ctaText}" and directly under it slightly smaller "(${ctaSub})", text size small and discreet. No other text or graphics outside the product and caption.`
+        `Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text) centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar, placed in the upper-middle area above the product (not at the very top edge): "${ctaText}" and directly under it slightly smaller "(${ctaSub})", text is TINY and discreet, NOT large. No other text or graphics outside the product and caption.`
       ),
       headerText: ctaText,
       bodyText: ctaSub,
@@ -1003,7 +1019,7 @@ async function generateCarouselContent(
               slideType,
               title: (slide.header_text as string) || (slide.title as string) || `Slide ${i + 1}`,
               body: (slide.body_text as string) || (slide.body as string) || "",
-              imagePrompt: enforceUGCPrompt((slide.image_prompt as string) || `Person holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. Real-world scene, candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline reading: "Check this out", positioned about 22% down from the top of the frame (not at the very top edge), text size small and discreet like a subtitle not a billboard. No other text or graphics.`),
+              imagePrompt: enforceUGCPrompt((slide.image_prompt as string) || `Person holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. Real-world scene, candid handheld composition, realistic skin and material texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar reading: "Check this out", positioned about 22% down from the top of the frame (not at the very top edge), text is TINY and discreet taking up only 10-15% of image width, NOT large NOT huge NOT oversized. No other text or graphics.`),
               headerText: (slide.header_text as string | null) ?? null,
               bodyText: (slide.body_text as string | null) ?? null,
               textPosition: (slide.text_position as string) || "top",
@@ -1014,7 +1030,7 @@ async function generateCarouselContent(
             slides[slides.length - 1] = {
               ...slides[slides.length - 1],
               slideType: "product",
-              imagePrompt: enforceUGCPrompt(`Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text) centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Baked-in TikTok-style caption in SMALL bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "Order now" and directly under it slightly smaller "(Link in bio)", text size small and discreet. No other text or graphics outside the product and caption.`),
+              imagePrompt: enforceUGCPrompt(`Clean studio product photo: the EXACT product from the reference image (MUST match the reference product's design, logo, colors, typography, packaging, and label 100% — do NOT invent or alter the logo, do NOT change the brand name, do NOT modify the label text) centered on a pure white seamless background with a soft realistic shadow beneath, logo and label facing camera perfectly legible and accurate, true to life texture. Tiny TikTok-style caption in very small bold white rounded sans-serif with solid black outline, fitted inside a small subtitle text bar, placed in the upper-middle area above the product (not at the very top edge): "Order now" and directly under it slightly smaller "(Link in bio)", text is TINY and discreet, NOT large. No other text or graphics outside the product and caption.`),
             };
           }
           return { carouselTitle, slides };
