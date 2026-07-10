@@ -905,8 +905,9 @@ export async function POST(req: NextRequest) {
 
     return new Response(stream, {
       headers: {
-        "Content-Type": "application/x-ndstream",
+        "Content-Type": "text/plain; charset=utf-8",
         "Cache-Control": "no-cache, no-transform",
+        "X-Content-Type-Options": "nosniff",
         Connection: "keep-alive",
       },
     });

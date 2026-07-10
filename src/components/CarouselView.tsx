@@ -498,8 +498,12 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         }),
       });
 
-      if (!res.ok) {
-        // Try to parse error as JSON
+      // Check Content-Type to determine if this is a streaming or regular JSON response
+      const contentType = res.headers.get("content-type") || "";
+      const isStreaming = contentType.includes("x-ndstream") || contentType.includes("ndjson") || contentType.includes("text/plain");
+
+      // If response is not OK and it's not a streaming response, parse as JSON error
+      if (!res.ok && !isStreaming) {
         let errMsg = "Generation failed";
         try {
           const errData = await res.json();
@@ -508,6 +512,35 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           errMsg = `Generation failed (${res.status})`;
         }
         throw new Error(errMsg);
+      }
+
+      // If it's not a streaming response (old server or error), fall back to JSON parsing
+      if (!isStreaming || !res.body) {
+        const data = await res.json();
+        if (!res.ok) {
+          throw new Error(data.error || "Generation failed");
+        }
+        // Parse carousels from old format
+        const rawCarousels: CarouselData[] = (data.carousels || []).map((c: Record<string, unknown>) => ({
+          carouselTitle: (c.carouselTitle as string) || idea.slice(0, 30),
+          slides: ((c.slides || []) as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
+            ...s,
+            textOverlayUrl: null,
+          })) as Slide[],
+        }));
+        if (rawCarousels.length === 0 && data.slides && Array.isArray(data.slides)) {
+          rawCarousels.push({
+            carouselTitle: data.carouselTitle || idea.slice(0, 30),
+            slides: (data.slides as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
+              ...s,
+              textOverlayUrl: null,
+            })) as Slide[],
+          });
+        }
+        setCarousels(rawCarousels);
+        setShowResult(true);
+        setGenerationStep("");
+        return;
       }
 
       // ─── Read streaming response (NDJSON: newline-delimited JSON) ───
