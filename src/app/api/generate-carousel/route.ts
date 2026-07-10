@@ -173,7 +173,7 @@ function enforceUGCPrompt(prompt: string): string {
 // Text position: ~22% down from the top, never touching the top edge
 // Slide count: 3-6 per carousel (hook + 1-3 middle + product), last slide always "product"
 
-const CAROUSEL_SKILL_PROMPT = `You are an expert at creating viral-style UGC (User-Generated Content) product carousels for TikTok and Instagram.
+const CAROUSEL_SKILL_PROMPT = `You are an expert at creating viral-style UGC (User-Generated Content) product carousels for TikTok and Instagram. You write like a real person sharing a tip, not like a brand.
 
 ## YOUR TASK
 Given a product idea/description (and optionally real product info from a product link), generate carousel plans. Each carousel is a set of hyperrealistic "shot on iPhone" images with caption text BAKED INTO each image, ending on a clean product-on-white slide.
@@ -196,6 +196,56 @@ Given a product idea/description (and optionally real product info from a produc
 
 4. LAST SLIDE: Always the product on a PURE WHITE seamless background with a soft realistic shadow, plus a short caption + a smaller line under it.
 
+## THE ONE JOB OF EACH SLIDE
+
+- **Slide 1 (HOOK) = the scroll-stopper.** It must promise a benefit or spark curiosity in under 6 words. This is the only text most people read. If it's boring, nothing else matters.
+- **Middle slides = proof or relatability.** Show the benefit being true, or name the pain the viewer already feels.
+- **Last slide = the nudge.** Tell them what to do / what they get, plainly.
+
+## RULES FOR WRITING THE CAPTIONS
+
+1. **Short beats clever.** "BLOCKS 98% OF UV RAYS" beats "The ultimate sun-defense technology." Aim for 3–6 words on hooks. If you can cut a word, cut it.
+2. **Talk like a person texting, not a brand.** Lowercase middle captions ("melts on your tongue, no pills") feel native to TikTok. ALL CAPS only for the big hook line.
+3. **Use one real number or claim.** Numbers feel true: "98%", "UPF 50+", "30 strips", "1 a day". Pull them from the actual product page — never invent them. A single concrete fact outperforms three vague adjectives.
+4. **Lead with the benefit, not the feature.** Feature = "compression fabric." Benefit = "less fatigue, less soreness." The viewer cares what it does for them.
+5. **One idea per slide.** Don't cram two benefits into one caption. Split them across slides.
+6. **Emojis as punctuation, not decoration.** One emoji that matches the message (sun for sun, basketball for sport, check for the payoff). Never a string of them.
+
+## HOOK FORMULAS (use one of these — they reliably work)
+
+1. **POV:** "POV: it's week 6 of no sun and your energy is at 2%"
+2. **The blunt claim:** "BLOCKS 98% OF UV RAYS" (with a sun emoji)
+3. **The objection/answer:** "can't swallow big pills?" then next slide "just use strips"
+4. **The overheard convo:** "bro why am I always tired lately?" / "vitamin D3" / "but I hate pills"
+5. **Old way vs new way:** "pills (nausea emoji) vs strips (relieved emoji)" — the X/check slide
+6. **The relatable fail:** "I buy vitamins and forget them in a drawer"
+
+The convo and POV formats work because they feel like a real moment you're eavesdropping on, not an ad.
+
+## STRUCTURING THE CONTENT ACROSS THE CAROUSEL
+
+Think **problem → shift → proof → product**:
+
+1. **Hook** — grab attention with the benefit or a relatable pain.
+2. **Agitate/relate** — "you've felt this" (the tired-on-couch, the drawer full of pills).
+3. **Show the fix** — comparison or the product in action.
+4. **Close** — product on white + what to do ("1 a day" with a check emoji).
+
+Each slide should make the viewer want to swipe to the next. End slide 1 on curiosity, not a full answer.
+
+## MAKING THE SEQUENCE FEEL HUMAN (NOT AI)
+
+- **Vary the scenes and people across carousels** — different person, place, and moment each time. Repetition is the biggest tell of AI content.
+- **Show someone doing something** — handing a coffee, racking a weight, pulling a sleeve on before work — not just posing. Action reads as real.
+- **Keep it slightly imperfect.** A candid, mid-motion, arm's-length feel beats a centered studio look for slides 1–3. Save the clean look for the final product slide.
+- **Match the caption to the scene.** If they're at the gym, the copy talks performance. If on a sunny course, it talks sun. Mismatched text feels stock.
+
+## TONE BY PRODUCT CATEGORY (adapt to the product)
+
+- **Supplements/health:** reassuring + effortless. "never miss a day", "no pills, no water."
+- **Sports/performance:** punchy, confident. "keeps you going", "built for game day."
+- **Everyday/utility:** practical, relatable. "work-ready in seconds", "fits in your pocket."
+
 ## PLANNING EACH CAROUSEL
 
 - Give each carousel ONE marketing angle tied to a REAL product benefit.
@@ -208,9 +258,9 @@ Given a product idea/description (and optionally real product info from a produc
 ## SLIDE STRUCTURE (mini story)
 
 Each carousel has 3-6 slides:
-- Slide 1 (HOOK): product in a real-world scene + big benefit caption + one white hand-drawn arrow pointing at the product.
-- Middle slide(s): a person actually using it (person_using), a candid moment (candid), or a X-vs-check comparison flat-lay (comparison) — reinforcing the benefit.
-- Last slide: product on pure white background (product).
+- Slide 1 (HOOK): product in a real-world scene + big benefit caption (3-6 words, ALL CAPS if it's a blunt claim) + one white hand-drawn arrow pointing at the product.
+- Middle slide(s): a person actually using it (person_using), a candid moment (candid), or a X-vs-check comparison flat-lay (comparison) — reinforcing the benefit with proof or relatability. Captions here are lowercase, casual, texting-style.
+- Last slide: product on pure white background (product) + a plain "do this" nudge.
 
 ## PROMPT TEMPLATES (use these exactly, filling in the brackets)
 
@@ -236,15 +286,20 @@ Clean studio product photo: the PRODUCT (exactly matching the reference product'
 - header_text and body_text: in the user's language (for display + PostPeer caption)
 - The caption text [CAPTION] inside image_prompt MUST MATCH header_text (and body_text if present)
 - Last slide: ALWAYS type "product"
-- Keep captions SHORT and SIMPLE (2-8 words) — AI image models misspell long text often
+- **Hook captions: 3-6 words, ALL CAPS if blunt claim, lowercase if POV/convo.** AI image models misspell long text — keep it short.
+- **Middle captions: lowercase, texting-style, one idea, max 8 words.**
+- **Product slide caption: plain "do this" nudge (e.g., "1 a day" + check emoji, "get yours", "link in bio").**
 - The hook slide MUST include the white hand-drawn arrow pointing at the product
 - The product slide MUST have pure white seamless background + soft realistic shadow
+- **One real number or claim per carousel** — pull from product info, never invent
+- **One emoji max per slide** — matching the message, never a string
 
 ## LANGUAGE
 - If the user writes in Arabic -> header_text/body_text in Arabic, and the [CAPTION] inside image_prompt in Arabic too
 - If the user writes in English -> all text in English
 - If the user writes in French -> all text in French
 - The image_prompt structure (templates above) is always in English, but the [CAPTION] text inside follows the user's language
+- Arabic captions: keep them short (2-5 words) since Arabic text in AI images can be harder to render correctly
 
 ## OUTPUT FORMAT
 Return ONLY valid JSON (no markdown, no code blocks, no extra text):
@@ -267,8 +322,8 @@ Return ONLY valid JSON (no markdown, no code blocks, no extra text):
           "slide_number": N,
           "slide_type": "product",
           "image_prompt": "Full prompt following the final product slide template",
-          "header_text": "Action line (e.g., 'Get yours today')",
-          "body_text": "Supporting detail (e.g., 'Link in bio')",
+          "header_text": "Action line (e.g., '1 a day')",
+          "body_text": "Supporting detail (e.g., 'link in bio')",
           "text_position": "top"
         }
       ]
@@ -276,17 +331,28 @@ Return ONLY valid JSON (no markdown, no code blocks, no extra text):
   ]
 }
 
-## QUALITY CHECK (self-check before returning)
+## BEFORE YOU SHIP THE COPY — QUICK TEST (self-check before returning)
+- Does slide 1 make sense in half a second with sound off?
+- Is there one real number or claim somewhere in the carousel?
+- Could a friend have texted this caption? (If it sounds like a brochure, rewrite.)
+- Does each slide push toward the next, ending on a clear "do this"?
+- No typos in the baked text? (AI misspells — always read it back. If a caption is long enough to risk a typo, shorten it.)
 - Product matches the reference (logo, colors, label legible) — mentioned in every image_prompt
 - Caption is white with black outline, not touching the top edge — described in every image_prompt
 - Last slide background is pure white — specified in the product slide template
 - Across carousels: different angle, different scene, different person each time
-- No typos in caption text — keep captions short and simple
 - Hook slide has the white hand-drawn arrow
+
+## THE SHORT VERSION
+Write like a real person sharing a tip, lead every hook with one concrete benefit, keep one idea per slide, and vary the scenes so it never smells like a template.
 
 Generate EXACTLY the number of carousels requested. Each must have a completely different creative angle, scene, person, and slide structure. The last slide of EVERY carousel must be type "product".`;
 
-// ─── Template-based fallback (UGC style, 3-6 slides, text baked in) ────────
+// ─── Template-based fallback (UGC style, 3-5 slides, text baked in) ────────
+// Follows the same caption principles as the AI prompt:
+// - Hook: 3-6 words, ALL CAPS blunt claim OR lowercase POV/objection
+// - Middle: lowercase, texting-style, one idea, max 8 words
+// - Product: plain "do this" nudge + supporting line
 function generateTemplateCarousels(
   idea: string,
   numCarousels: number,
@@ -295,23 +361,44 @@ function generateTemplateCarousels(
   const isAr = language === "ar";
   const isFr = language === "fr";
 
-  // UGC angles — each tied to a product benefit
-  const angles = isAr
-    ? ["النتيجة التي تنتظرها", "الحل العملي", "الفارق الحقيقي", "تجربة مختلفة", "السر وراء النجاح"]
-    : isFr
-    ? ["Le resultat que vous attendez", "La solution pratique", "La vraie difference", "Une experience unique", "Le secret du succes"]
-    : ["The result you want", "The practical fix", "The real difference", "A different experience", "The secret behind it"];
+  // UGC hook formulas — each carousel uses a different formula
+  // Format: { caption, angle, emoji }
+  type HookFormula = { caption: string; angle: string; emoji: string; midCaption: string };
 
-  // UGC persons — rotate gender/age/setting per carousel
+  const hookFormulas: HookFormula[] = isAr
+    ? [
+        { caption: `يعمل بفعالية`, angle: "الفائدة الحقيقية", emoji: "✅", midCaption: "هكذا أستعمله" },
+        { caption: `النتيجة تتكلم`, angle: "الدليل", emoji: "💯", midCaption: "لا أصدق الفرق" },
+        { caption: `جربتها بنفسي`, angle: "تجربة حقيقية", emoji: "🔥", midCaption: "أصبح روتيني" },
+        { caption: `الحل بين يديك`, angle: "الحل", emoji: "💪", midCaption: "بسيط وسريع" },
+        { caption: `تعرف هذا الشعور؟`, angle: "نقطة الألم", emoji: "🤔", midCaption: "انتهى الأمر" },
+      ]
+    : isFr
+    ? [
+        { caption: "VRAIMENT EFFICACE", angle: "Le vrai benefice", emoji: "✅", midCaption: "je l'utilise tous les jours" },
+        { caption: "LE RESULTAT PARLE", angle: "La preuve", emoji: "💯", midCaption: "je n'y croyais pas" },
+        { caption: "ESSAYE PAR MOI", angle: "Experience reelle", emoji: "🔥", midCaption: "fait partie de ma routine" },
+        { caption: "LA SOLUTION ICI", angle: "La solution", emoji: "💪", midCaption: "simple et rapide" },
+        { caption: "TU CONNAIS CA ?", angle: "Le probleme", emoji: "🤔", midCaption: "c'est fini" },
+      ]
+    : [
+        { caption: "ACTUALLY WORKS", angle: "The real benefit", emoji: "✅", midCaption: "this is how i use it" },
+        { caption: "THE PROOF IS REAL", angle: "The proof", emoji: "💯", midCaption: "couldn't believe the difference" },
+        { caption: "I TRIED IT", angle: "Real experience", emoji: "🔥", midCaption: "now it's my routine" },
+        { caption: "THE FIX IS HERE", angle: "The solution", emoji: "💪", midCaption: "simple and fast" },
+        { caption: "KNOW THIS FEELING?", angle: "The pain point", emoji: "🤔", midCaption: "not anymore" },
+      ];
+
+  // UGC persons — rotate gender/age/setting per carousel (vary scenes so it never smells like a template)
   const persons = [
-    "a 25-year-old woman with curly hair, wearing casual streetwear",
-    "a 28-year-old man with short beard, wearing a plain t-shirt",
-    "a 23-year-old woman with glasses, wearing athleisure",
-    "a 30-year-old man with man-bun, wearing a hoodie",
-    "a 26-year-old woman with straight hair, wearing a denim jacket",
+    "a 25-year-old woman with curly hair, wearing casual streetwear, mid-motion reaching for the product",
+    "a 28-year-old man with short beard, wearing a plain t-shirt, pulling the product on before heading out",
+    "a 23-year-old woman with glasses, wearing athleisure, holding the product at arm's length",
+    "a 30-year-old man with man-bun, wearing a hoodie, using the product mid-task",
+    "a 26-year-old woman with straight hair, wearing a denim jacket, candidly using the product",
   ];
 
-  // UGC locations — rotate per carousel
+  // UGC locations — rotate per carousel, match caption to scene
   const locations = [
     "sunny kitchen counter, morning light streaming through window, coffee mug nearby, marble countertop",
     "modern bathroom shelf, soft fluorescent lighting, toiletries in background, white tiles",
@@ -328,41 +415,44 @@ function generateTemplateCarousels(
   const seededRandom = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
 
   for (let c = 0; c < numCarousels; c++) {
-    const angle = angles[c % angles.length];
+    const formula = hookFormulas[c % hookFormulas.length];
     const person = persons[c % persons.length];
     const location = locations[c % locations.length];
-    const carouselTitle = `${angle} — ${idea.slice(0, 30)}`;
-    const ctaText = isAr ? "اطلب الآن" : isFr ? "Commandez maintenant" : "Order now";
-    const ctaSub = isAr ? "الرابط في البايو" : isFr ? "Lien dans la bio" : "Link in bio";
+    const carouselTitle = `${formula.angle} — ${idea.slice(0, 30)}`;
+    // Product slide nudge — plain "do this" + supporting line (lowercase, texting-style)
+    const ctaText = isAr ? "اطلب الآن" : isFr ? "commandez maintenant" : "1 a day";
+    const ctaSub = isAr ? "الرابط في البايو" : isFr ? "lien dans la bio" : "link in bio";
 
     // Random slide count: 3-5 (hook + 1-2 middle + product)
     const slideCount = 3 + Math.floor(seededRandom() * 3); // 3, 4, or 5
 
     const slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> = [];
 
-    // ─── Slide 1: HOOK ───
-    const hookCaption = isAr ? `${angle}!` : isFr ? `${angle} !` : `${angle}!`;
+    // ─── Slide 1: HOOK (3-6 words, ALL CAPS, scroll-stopper) ───
+    // Hook caption includes emoji as punctuation (one emoji, matching the message)
+    const hookCaptionWithEmoji = `${formula.caption} ${formula.emoji}`;
     slides.push({
       slideNumber: 1,
       slideType: "hook",
-      title: hookCaption,
+      title: hookCaptionWithEmoji,
       body: "",
       imagePrompt: enforceUGCPrompt(
-        `${person} holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${hookCaption}", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
+        `${person} holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${hookCaptionWithEmoji}", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
       ),
-      headerText: hookCaption,
+      headerText: hookCaptionWithEmoji,
       bodyText: null,
       textPosition: "top" as const,
     });
 
-    // ─── Middle slides: person_using or candid ───
+    // ─── Middle slides: proof or relatability (lowercase, texting-style, one idea) ───
     const middleCount = slideCount - 2; // minus hook and product
+    const middleCaptions = isAr
+      ? [formula.midCaption, "النتيجة واضحة", "أنصح به بشدة"]
+      : isFr
+      ? [formula.midCaption, "le resultat est clair", "je recommande"]
+      : [formula.midCaption, "the difference is real", "would buy again"];
     for (let s = 0; s < middleCount; s++) {
-      const midCaption = isAr
-        ? s === 0 ? "استخدمتها هكذا" : "النتيجة واضحة"
-        : isFr
-        ? s === 0 ? "Je l'utilise comme ca" : "Le resultat parle"
-        : s === 0 ? "This is how I use it" : "The result speaks";
+      const midCaption = middleCaptions[s % middleCaptions.length];
       const midType = s === 0 ? "person_using" : "candid";
       const midAction = s === 0
         ? `${person} actually using the ${idea} product in real-time, exactly matching the reference product's design, logo, colors and typography`
@@ -382,7 +472,7 @@ function generateTemplateCarousels(
       });
     }
 
-    // ─── Last slide: PRODUCT on pure white ───
+    // ─── Last slide: PRODUCT on pure white + plain "do this" nudge ───
     slides.push({
       slideNumber: slideCount,
       slideType: "product",
