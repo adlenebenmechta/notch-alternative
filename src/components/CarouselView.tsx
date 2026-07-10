@@ -345,6 +345,10 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   const [language, setLanguage] = useState<"en" | "ar" | "fr">("en");
   const [productImageUrl, setProductImageUrl] = useState("");
   const [productLink, setProductLink] = useState("");
+  const [productImageFile, setProductImageFile] = useState<File | null>(null);
+  const [productImagePreview, setProductImagePreview] = useState<string | null>(null);
+  const [uploadingProduct, setUploadingProduct] = useState(false);
+  const productImageInputRef = useRef<HTMLInputElement>(null);
 
   const [generating, setGenerating] = useState(false);
   const [generationStep, setGenerationStep] = useState("");
@@ -363,6 +367,51 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
   const [showResult, setShowResult] = useState(false);
   const carouselRef = useRef<HTMLDivElement>(null);
+
+  // ─── Handle product image file selection ────────────────────────────
+  const handleProductImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 10 * 1024 * 1024) {
+      setError("Product image must be under 10MB");
+      return;
+    }
+    setProductImageFile(file);
+    setProductImageUrl(""); // Reset — will be uploaded on generate
+    // Create preview
+    const reader = new FileReader();
+    reader.onload = () => setProductImagePreview(reader.result as string);
+    reader.readAsDataURL(file);
+  };
+
+  // ─── Upload product image to kie.ai hosting ───────────────────────────
+  const uploadProductImage = async (): Promise<string | null> => {
+    if (!productImageFile) return null;
+    setUploadingProduct(true);
+    try {
+      const formData = new FormData();
+      formData.append("productImage", productImageFile);
+      const res = await authFetch("/api/upload-product-image", {
+        method: "POST",
+        body: formData,
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Product image upload failed");
+      }
+      const url = data.productImageUrl as string;
+      setProductImageUrl(url);
+      console.log("[Carousel] Product image uploaded:", url.slice(0, 80));
+      return url;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[Carousel] Product image upload failed:", msg);
+      setError("Product image upload failed: " + msg);
+      return null;
+    } finally {
+      setUploadingProduct(false);
+    }
+  };
 
   // ─── Apply text overlay to all slides in all carousels ──────────────
   const applyTextOverlay = useCallback(async (rawCarousels: CarouselData[]) => {
@@ -420,6 +469,20 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     setGenerationStep("Generating carousel content with AI...");
 
     try {
+      // Step 1: Upload product image if a file was selected (to get public URL for kie.ai)
+      let refImageUrl = productImageUrl; // Use cached URL if already uploaded
+      if (productImageFile && !refImageUrl) {
+        setGenerationStep("Uploading product image...");
+        refImageUrl = (await uploadProductImage()) || "";
+        if (!refImageUrl && productImageFile) {
+          // Upload failed but user wanted a reference image — warn but continue
+          console.warn("[Carousel] Product image upload failed, generating without reference");
+        }
+      }
+
+      // Step 2: Generate carousel content and images
+      setGenerationStep("Generating carousel content with AI...");
+
       const res = await authFetch("/api/generate-carousel", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -430,7 +493,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           language,
           // Only send productImageUrl if it's a valid public https URL (not a data: URL)
           // kie.ai API rejects data: URLs and internal URLs with "File type not supported"
-          productImageUrl: (productImageUrl.trim() && productImageUrl.trim().startsWith("https://") && !productImageUrl.trim().includes("kobisto.com")) ? productImageUrl.trim() : undefined,
+          productImageUrl: (refImageUrl.trim() && refImageUrl.trim().startsWith("https://") && !refImageUrl.trim().includes("kobisto.com")) ? refImageUrl.trim() : undefined,
           productLink: productLink.trim() || undefined,
         }),
       });
@@ -1349,87 +1412,105 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           )}
 
           {/* ─── Product Image + Link ───────────────────────────── */}
-          <div className="mb-5 rounded-2xl p-4" style={{ backgroundColor: `${C.lightPink}15`, border: `1px dashed ${C.pink}30` }}>
-            <div className="flex items-center gap-2 mb-3">
-              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.pink}12` }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-                  <circle cx="8.5" cy="8.5" r="1.5" />
-                  <polyline points="21 15 16 10 5 21" />
-                </svg>
+          <div className="mb-5 rounded-2xl p-4" style={{ backgroundColor: productImagePreview ? `${C.lightGold}30` : `${C.lightPink}15`, border: `1.5px dashed ${productImagePreview ? C.gold : `${C.pink}30`}` }}>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ backgroundColor: `${C.gold}15` }}>
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.gold} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
+                    <circle cx="8.5" cy="8.5" r="1.5" />
+                    <polyline points="21 15 16 10 5 21" />
+                  </svg>
+                </div>
+                <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
+                  Product Image (Optional)
+                </label>
               </div>
-              <label className="text-xs font-bold uppercase tracking-wider" style={{ color: C.text }}>
-                Product Image &amp; Link (Optional)
-              </label>
-            </div>
-
-            {/* Product Image: Upload or URL */}
-            <div className="flex items-center gap-2 mb-3">
-              {/* Upload Button */}
-              <label
-                className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold cursor-pointer transition-all duration-200 hover:shadow-md flex-shrink-0"
-                style={{
-                  backgroundColor: C.pink,
-                  color: C.white,
-                  border: `1.5px solid ${C.pink}`,
-                }}
-              >
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                  <polyline points="17 8 12 3 7 8" />
-                  <line x1="12" y1="3" x2="12" y2="15" />
-                </svg>
-                Upload
-                <input
-                  type="file"
-                  accept="image/*"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0];
-                    if (!file) return;
-                    // Convert to data URL for preview + upload to server
-                    const reader = new FileReader();
-                    reader.onload = async (ev) => {
-                      const dataUrl = ev.target?.result as string;
-                      // Show preview immediately
-                      setProductImageUrl(dataUrl);
-                      // Try to upload to server for a public URL (needed for kie.ai API)
-                      try {
-                        setGenerationStep("Uploading product image...");
-                        const blob = await fetch(dataUrl).then(r => r.blob());
-                        const formData = new FormData();
-                        formData.append("file", blob, `product-${Date.now()}.png`);
-                        formData.append("title", "product-reference");
-                        const uploadRes = await authFetch("/api/videos/upload", {
-                          method: "POST",
-                          body: formData,
-                        });
-                        if (uploadRes.ok) {
-                          const uploadData = await uploadRes.json();
-                          const publicUrl = uploadData.video?.url || uploadData.url;
-                          if (publicUrl) {
-                            setProductImageUrl(publicUrl);
-                            console.log("[Carousel] Product image uploaded:", publicUrl);
-                          }
-                        }
-                      } catch (err) {
-                        console.warn("[Carousel] Product image upload failed, using data URL:", err);
-                        // data URL will still work for preview, but kie.ai needs public URL
-                      }
-                      setGenerationStep("");
-                    };
-                    reader.readAsDataURL(file);
+              {(productImagePreview || productImageUrl) && (
+                <button
+                  onClick={() => {
+                    setProductImageFile(null);
+                    setProductImagePreview(null);
+                    setProductImageUrl("");
                   }}
-                />
-              </label>
+                  className="text-[10px] font-bold uppercase tracking-wider px-2 py-1 rounded-lg"
+                  style={{ color: "#DC2626", backgroundColor: "#FEE2E2" }}
+                >
+                  Remove
+                </button>
+              )}
+            </div>
+            <p className="text-[11px] mb-3" style={{ color: C.textMuted }}>
+              Upload your product image so AI keeps the exact same product (logo, shape, colors) in every slide
+            </p>
 
-              {/* URL Input */}
+            {/* Upload from file */}
+            {!productImagePreview && !productImageUrl && (
+              <div className="flex items-center gap-2 mb-3">
+                <button
+                  onClick={() => productImageInputRef.current?.click()}
+                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-xs font-bold transition-all duration-200 hover:shadow-md flex-shrink-0"
+                  style={{
+                    backgroundColor: C.gold,
+                    color: C.white,
+                    border: `1.5px solid ${C.gold}`,
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                    <polyline points="17 8 12 3 7 8" />
+                    <line x1="12" y1="3" x2="12" y2="15" />
+                  </svg>
+                  Upload
+                </button>
+                <span className="text-[10px]" style={{ color: C.textMuted }}>or paste URL below</span>
+              </div>
+            )}
+
+            {/* Preview of uploaded file */}
+            {productImagePreview && (
+              <div className="flex items-center gap-3 mb-3">
+                <div className="w-16 h-16 rounded-xl overflow-hidden flex-shrink-0" style={{ border: `2px solid ${C.gold}` }}>
+                  <img src={productImagePreview} alt="Product" className="w-full h-full object-cover" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-bold truncate" style={{ color: C.text }}>
+                    {productImageFile?.name || "Product image"}
+                  </p>
+                  <p className="text-[10px]" style={{ color: C.textMuted }}>
+                    {productImageFile ? `${(productImageFile.size / 1024).toFixed(0)}KB` : ""}
+                    {uploadingProduct ? " • Uploading..." : productImageUrl ? " ✓ Uploaded" : " • Will upload on generate"}
+                  </p>
+                </div>
+                <button
+                  onClick={() => productImageInputRef.current?.click()}
+                  className="text-[10px] font-bold px-2 py-1 rounded-lg"
+                  style={{ color: C.gold, backgroundColor: `${C.gold}15` }}
+                >
+                  Change
+                </button>
+              </div>
+            )}
+
+            {/* Preview of pasted URL */}
+            {productImageUrl && !productImagePreview && (
+              <div className="mb-3 flex items-center gap-3">
+                <img src={productImageUrl} alt="Product preview" className="w-16 h-16 rounded-xl object-cover" style={{ border: `2px solid ${C.pink}30`, boxShadow: `0 2px 8px ${C.pink}15` }} />
+                <div>
+                  <p className="text-[10px] font-bold" style={{ color: C.pink }}>✓ Product Reference Active</p>
+                  <p className="text-[9px]" style={{ color: C.textMuted }}>Nano Banana 2 will match this product in all slides</p>
+                </div>
+              </div>
+            )}
+
+            {/* URL Input (for pasting URLs directly) */}
+            {!productImagePreview && (
               <input
                 type="url"
                 value={productImageUrl}
                 onChange={(e) => setProductImageUrl(e.target.value)}
-                placeholder="or paste product image URL here"
-                className="flex-1 px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200"
+                placeholder="Paste product image URL here"
+                className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all duration-200 mb-3"
                 style={{
                   backgroundColor: C.white,
                   border: `1.5px solid ${productImageUrl ? `${C.pink}40` : "#E5E7EB"}`,
@@ -1437,27 +1518,15 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                   boxShadow: productImageUrl ? `0 0 0 2px ${C.pink}10` : "none",
                 }}
               />
-            </div>
-
-            {productImageUrl && (
-              <div className="mb-3 flex items-center gap-3">
-                <img src={productImageUrl} alt="Product preview" className="w-16 h-16 rounded-xl object-cover" style={{ border: `2px solid ${C.pink}30`, boxShadow: `0 2px 8px ${C.pink}15` }} />
-                <div>
-                  <p className="text-[10px] font-bold" style={{ color: C.pink }}>✓ Product Reference Active</p>
-                  <p className="text-[9px]" style={{ color: C.textMuted }}>Nano Banana 2 will match this product in all slides</p>
-                </div>
-                <button
-                  onClick={() => setProductImageUrl("")}
-                  className="ml-auto w-7 h-7 rounded-lg flex items-center justify-center transition-all duration-200 hover:scale-110"
-                  style={{ backgroundColor: "#FEE2E2", border: "1px solid #FECACA" }}
-                >
-                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="#EF4444" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <line x1="18" y1="6" x2="6" y2="18" />
-                    <line x1="6" y1="6" x2="18" y2="18" />
-                  </svg>
-                </button>
-              </div>
             )}
+
+            <input
+              ref={productImageInputRef}
+              type="file"
+              accept="image/jpeg,image/png,image/webp"
+              onChange={handleProductImageSelect}
+              className="hidden"
+            />
 
             {/* Product Link */}
             <input
