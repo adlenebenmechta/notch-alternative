@@ -102,11 +102,45 @@ async function chatCompletionDirect(
   return await response.json();
 }
 
+// ─── DeepSeek fallback (used when ZAI and OpenAI are unavailable) ─────────
+const DEEPSEEK_API_URL = "https://api.deepseek.com/v1/chat/completions";
+const DEEPSEEK_API_KEY = process.env.DEEPSEEK_KEY || "sk-b1cf6ffa8ebd457abc96da5904912931";
+const DEEPSEEK_MODEL = "deepseek-chat";
+
+async function chatCompletionDeepSeek(
+  messages: Array<{ role: string; content: string }>,
+  options?: { temperature?: number; max_tokens?: number }
+): Promise<Record<string, unknown>> {
+  console.log("[Carousel] Trying DeepSeek API as fallback...");
+  const response = await fetch(DEEPSEEK_API_URL, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${DEEPSEEK_API_KEY}`,
+    },
+    body: JSON.stringify({
+      model: DEEPSEEK_MODEL,
+      messages,
+      temperature: options?.temperature ?? 0.7,
+      max_tokens: options?.max_tokens ?? 4000,
+    }),
+    signal: AbortSignal.timeout(90000),
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`DeepSeek API error (${response.status}): ${err.slice(0, 300)}`);
+  }
+
+  return await response.json();
+}
+
 // ─── Chat completion with fallback chain ───────────────────────────────
 async function chatCompletion(
   messages: Array<{ role: string; content: string }>,
   options?: { temperature?: number; max_tokens?: number }
 ): Promise<Record<string, unknown> | null> {
+  // Strategy 1: Env var API (ZAI or OpenAI)
   const config = getAIConfig();
   if (config) {
     try {
@@ -117,6 +151,7 @@ async function chatCompletion(
     }
   }
 
+  // Strategy 2: ZAI SDK from config file
   const zai = await createZAIFromConfig();
   if (zai) {
     try {
@@ -130,6 +165,14 @@ async function chatCompletion(
       const msg = err instanceof Error ? err.message : String(err);
       console.warn("[Carousel] ZAI SDK failed:", msg);
     }
+  }
+
+  // Strategy 3: DeepSeek API (reliable fallback — always works)
+  try {
+    return await chatCompletionDeepSeek(messages, options);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.warn("[Carousel] DeepSeek API failed:", msg);
   }
 
   console.log("[Carousel] All AI APIs failed, will use template-based content generation");
@@ -294,6 +337,35 @@ Best for: products with multiple benefits worth showing separately.
 - **Keep it slightly imperfect.** A candid, mid-motion, arm's-length feel beats a centered studio look for slides 1–3. Save the clean look for the final product slide.
 - **Match the caption to the scene.** If they're at the gym, the copy talks performance. If on a sunny course, it talks sun. Mismatched text feels stock.
 
+## ⚠️ CRITICAL: SCENE MUST MATCH CAPTION (read this twice)
+
+The image_prompt scene MUST visually match what the caption says. If the caption talks about sun, the scene is outdoors in sun. If the caption talks about pills, pills are in the scene. A mismatch is the #1 tell of AI content.
+
+### Scene-caption matching rules:
+- **Caption mentions sun / UV / outdoor** → scene is OUTDOORS in bright sunlight (sunny golf course, beach, park, sunny sidewalk). The product is shown being used in the sun.
+- **Caption mentions pills / swallowing / nausea** → scene shows PILLS or the alternative (strips) on a table/counter. Person looking at pills with discomfort.
+- **Caption mentions tired / fatigue / energy** → scene is a couch, bed, or low-energy moment. Person looks drained, dim lighting, blanket, phone nearby.
+- **Caption mentions gym / sport / performance / workout** → scene is a GYM or sports setting. Weights, treadmill, basketball court, locker room. Person mid-workout.
+- **Caption mentions skin / glow / beauty** → scene is a bathroom or vanity mirror. Skincare products nearby, good lighting, close-up on skin.
+- **Caption mentions drawer / forgetting / routine** → scene shows an open drawer with forgotten items, or a bedside table. Person opening drawer.
+- **Caption mentions travel / pocket / on-the-go** → scene is a car, airport, train, or bag. Product fits in a pocket or bag.
+- **Caption mentions comparison (old vs new)** → scene is a TOP-DOWN FLAT-LAY on a clean surface. Old solution on left, product on right.
+
+### How to write the image_prompt:
+1. First, decide the caption (what the text says).
+2. Then, IMMEDIATELY decide the scene based on what the caption talks about (use the rules above).
+3. Write the image_prompt so the scene description MATCHES the caption topic. The person in the image should be doing something RELATED to the caption.
+
+### Example (GOOD — scene matches caption):
+- Caption: "BLOCKS 98% OF UV RAYS ☀️"
+- image_prompt: "Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: a 28-year-old man wearing the ARMORAY arm sleeve product on a sunny golf course, exactly matching the reference product's design, logo, colors and typography. Bright midday sun, green golf course background, golf club in hand, visible tan line where sleeve starts. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption... reading: 'BLOCKS 98% OF UV RAYS ☀️'..."
+
+### Example (BAD — scene does NOT match caption):
+- Caption: "BLOCKS 98% OF UV RAYS ☀️"
+- image_prompt: "person holding the product in a kitchen counter, morning light..." ← WRONG! Kitchen has nothing to do with UV rays.
+
+**If the caption and scene don't match, the viewer feels the disconnect immediately. Always pair them.**
+
 ## TONE BY PRODUCT CATEGORY (adapt to the product)
 
 - **Supplements/health:** reassuring + effortless. "never miss a day", "no pills, no water."
@@ -429,12 +501,15 @@ function generateTemplateCarousels(
 
   // ─── 8 carousel structures, each with its own slide pattern ───
   // Each structure defines: hookCaption, hookEmoji, middleSlides (type + caption + scene),
-  // and the product slide caption. Each carousel in the batch uses a different structure.
+  // sceneLocation (the location that MATCHES the structure's theme), and the product slide caption.
+  // Each carousel in the batch uses a different structure.
   type StructureDef = {
     name: string;
     hookCaption: string;
     hookEmoji: string;
     angle: string;
+    sceneLocation: string;  // Location that MATCHES the caption theme
+    scenePerson: string;    // Person description that matches the scene
     middleSlides: Array<{ type: string; caption: string; scene: string }>;
   };
 
@@ -446,8 +521,10 @@ function generateTemplateCarousels(
           hookCaption: "تعرف هذا الشعور؟",
           hookEmoji: "🤔",
           angle: "المشكلة والحل",
+          sceneLocation: "cozy living room couch, dim evening lighting, blanket and phone nearby, person looking frustrated",
+          scenePerson: "a 27-year-old woman with messy bun hair, wearing oversized sweater, looking frustrated on couch",
           middleSlides: [
-            { type: "solution", caption: "الحل هنا", scene: "person using the product as the fix" },
+            { type: "solution", caption: "الحل هنا", scene: "person using the product as the fix, relieved expression" },
           ],
         },
         // Structure B: POV
@@ -456,6 +533,8 @@ function generateTemplateCarousels(
           hookCaption: "من وجهة نظري",
           hookEmoji: "👀",
           angle: "تجربة شخصية",
+          sceneLocation: "sunny kitchen counter, morning light streaming through window, coffee mug nearby, marble countertop",
+          scenePerson: "a 25-year-old woman with curly hair, wearing casual streetwear, mid-motion reaching for the product",
           middleSlides: [
             { type: "proof", caption: "الفرق حقيقي", scene: "candid moment showing the benefit in real life" },
             { type: "candid", caption: "أصبح روتيني", scene: "candid daily routine moment with the product" },
@@ -467,8 +546,10 @@ function generateTemplateCarousels(
           hookCaption: "يعمل بفعالية",
           hookEmoji: "✅",
           angle: "النتيجة المضمونة",
+          sceneLocation: "outdoor sunny setting, bright midday sun, green background, visible sunlight on skin",
+          scenePerson: "a 28-year-old man with short beard, wearing athletic gear, outdoors in bright sun",
           middleSlides: [
-            { type: "proof", caption: "النتيجة تتكلم", scene: "person experiencing the claimed benefit" },
+            { type: "proof", caption: "النتيجة تتكلم", scene: "person experiencing the claimed benefit outdoors" },
           ],
         },
         // Structure D: Comparison
@@ -477,6 +558,8 @@ function generateTemplateCarousels(
           hookCaption: "القديم مقابل الجديد",
           hookEmoji: "⚖️",
           angle: "المقارنة",
+          sceneLocation: "clean wooden table top, top-down flat-lay view, neutral background, good lighting",
+          scenePerson: "hands placing items on table for comparison",
           middleSlides: [
             { type: "comparison", caption: "الفرق واضح", scene: "top-down flat-lay comparing old way vs the product" },
             { type: "person_using", caption: "هكذا أستعمله", scene: "person using the new way" },
@@ -488,8 +571,10 @@ function generateTemplateCarousels(
           hookCaption: "تعاني من هذا؟",
           hookEmoji: "😤",
           angle: "الاعتراض والجواب",
+          sceneLocation: "bathroom counter or bedside table, person looking at old solution with discomfort",
+          scenePerson: "a 26-year-old woman with glasses, looking at old solution with frustrated expression",
           middleSlides: [
-            { type: "solution", caption: "الحل بسيط", scene: "product as the easy answer" },
+            { type: "solution", caption: "الحل بسيط", scene: "product as the easy answer, person relieved" },
             { type: "proof", caption: "سهل وسريع", scene: "showing how easy it is to use" },
           ],
         },
@@ -499,6 +584,8 @@ function generateTemplateCarousels(
           hookCaption: "سمعت هذا؟",
           hookEmoji: "💬",
           angle: "محادثة",
+          sceneLocation: "coffee shop table or office break room, two friends talking, coffee cups nearby",
+          scenePerson: "a 24-year-old woman with pixie cut, holding coffee, mid-conversation with friend",
           middleSlides: [
             { type: "solution", caption: "هذا الحل", scene: "product as the answer to the convo" },
           ],
@@ -509,8 +596,10 @@ function generateTemplateCarousels(
           hookCaption: "فعلت هذا؟",
           hookEmoji: "😅",
           angle: "خطأ شائع",
+          sceneLocation: "bedroom drawer or bedside table, open drawer with forgotten items, person looking guilty",
+          scenePerson: "a 30-year-old man with man-bun, opening a drawer full of forgotten products, sheepish expression",
           middleSlides: [
-            { type: "solution", caption: "انتهى الأمر", scene: "product making it effortless" },
+            { type: "solution", caption: "انتهى الأمر", scene: "product making it effortless, person using it daily" },
           ],
         },
         // Structure H: Benefit Cascade
@@ -519,8 +608,10 @@ function generateTemplateCarousels(
           hookCaption: "فوائد حقيقية",
           hookEmoji: "🔥",
           angle: "فوائد متعددة",
+          sceneLocation: "gym or outdoor active setting, person mid-activity, energetic lighting",
+          scenePerson: "a 23-year-old woman with ponytail, wearing gym gear, mid-workout with product visible",
           middleSlides: [
-            { type: "benefit", caption: "فائدة 1", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "فائدة 1", scene: "showing first benefit in action during workout" },
             { type: "benefit", caption: "فائدة 2", scene: "showing second benefit in action" },
             { type: "benefit", caption: "فائدة 3", scene: "showing third benefit in action" },
           ],
@@ -533,8 +624,10 @@ function generateTemplateCarousels(
           hookCaption: "TU CONNAIS CA ?",
           hookEmoji: "🤔",
           angle: "Le probleme et la solution",
+          sceneLocation: "cozy living room couch, dim evening lighting, blanket and phone nearby, person looking frustrated",
+          scenePerson: "a 27-year-old woman with messy bun hair, wearing oversized sweater, looking frustrated on couch",
           middleSlides: [
-            { type: "solution", caption: "la solution ici", scene: "person using the product as the fix" },
+            { type: "solution", caption: "la solution ici", scene: "person using the product as the fix, relieved expression" },
           ],
         },
         {
@@ -542,6 +635,8 @@ function generateTemplateCarousels(
           hookCaption: "POV: tu te sens comme ca",
           hookEmoji: "👀",
           angle: "Experience personnelle",
+          sceneLocation: "sunny kitchen counter, morning light streaming through window, coffee mug nearby, marble countertop",
+          scenePerson: "a 25-year-old woman with curly hair, wearing casual streetwear, mid-motion reaching for the product",
           middleSlides: [
             { type: "proof", caption: "la difference est reelle", scene: "candid moment showing the benefit in real life" },
             { type: "candid", caption: "maintenant c'est ma routine", scene: "candid daily routine moment with the product" },
@@ -552,8 +647,10 @@ function generateTemplateCarousels(
           hookCaption: "VRAIMENT EFFICACE",
           hookEmoji: "✅",
           angle: "Le resultat garanti",
+          sceneLocation: "outdoor sunny setting, bright midday sun, green background, visible sunlight on skin",
+          scenePerson: "a 28-year-old man with short beard, wearing athletic gear, outdoors in bright sun",
           middleSlides: [
-            { type: "proof", caption: "le resultat parle", scene: "person experiencing the claimed benefit" },
+            { type: "proof", caption: "le resultat parle", scene: "person experiencing the claimed benefit outdoors" },
           ],
         },
         {
@@ -561,6 +658,8 @@ function generateTemplateCarousels(
           hookCaption: "ANCIEN VS NOUVEAU",
           hookEmoji: "⚖️",
           angle: "La comparaison",
+          sceneLocation: "clean wooden table top, top-down flat-lay view, neutral background, good lighting",
+          scenePerson: "hands placing items on table for comparison",
           middleSlides: [
             { type: "comparison", caption: "la difference saute aux yeux", scene: "top-down flat-lay comparing old way vs the product" },
             { type: "person_using", caption: "je l'utilise comme ca", scene: "person using the new way" },
@@ -571,8 +670,10 @@ function generateTemplateCarousels(
           hookCaption: "TU AS DU MAL AVEC CA ?",
           hookEmoji: "😤",
           angle: "L'objection et la reponse",
+          sceneLocation: "bathroom counter or bedside table, person looking at old solution with discomfort",
+          scenePerson: "a 26-year-old woman with glasses, looking at old solution with frustrated expression",
           middleSlides: [
-            { type: "solution", caption: "c'est simple en fait", scene: "product as the easy answer" },
+            { type: "solution", caption: "c'est simple en fait", scene: "product as the easy answer, person relieved" },
             { type: "proof", caption: "simple et rapide", scene: "showing how easy it is to use" },
           ],
         },
@@ -581,6 +682,8 @@ function generateTemplateCarousels(
           hookCaption: "T'AS ENTENDU CA ?",
           hookEmoji: "💬",
           angle: "Conversation",
+          sceneLocation: "coffee shop table or office break room, two friends talking, coffee cups nearby",
+          scenePerson: "a 24-year-old woman with pixie cut, holding coffee, mid-conversation with friend",
           middleSlides: [
             { type: "solution", caption: "c'est la reponse", scene: "product as the answer to the convo" },
           ],
@@ -590,8 +693,10 @@ function generateTemplateCarousels(
           hookCaption: "T'AS DEJA FAIT CA ?",
           hookEmoji: "😅",
           angle: "Erreur courante",
+          sceneLocation: "bedroom drawer or bedside table, open drawer with forgotten items, person looking guilty",
+          scenePerson: "a 30-year-old man with man-bun, opening a drawer full of forgotten products, sheepish expression",
           middleSlides: [
-            { type: "solution", caption: "c'est fini", scene: "product making it effortless" },
+            { type: "solution", caption: "c'est fini", scene: "product making it effortless, person using it daily" },
           ],
         },
         {
@@ -599,8 +704,10 @@ function generateTemplateCarousels(
           hookCaption: "DES VRAIS BENEFICES",
           hookEmoji: "🔥",
           angle: "Plusieurs benefices",
+          sceneLocation: "gym or outdoor active setting, person mid-activity, energetic lighting",
+          scenePerson: "a 23-year-old woman with ponytail, wearing gym gear, mid-workout with product visible",
           middleSlides: [
-            { type: "benefit", caption: "benefice 1", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "benefice 1", scene: "showing first benefit in action during workout" },
             { type: "benefit", caption: "benefice 2", scene: "showing second benefit in action" },
             { type: "benefit", caption: "benefice 3", scene: "showing third benefit in action" },
           ],
@@ -612,8 +719,10 @@ function generateTemplateCarousels(
           hookCaption: "KNOW THIS FEELING?",
           hookEmoji: "🤔",
           angle: "The problem and the fix",
+          sceneLocation: "cozy living room couch, dim evening lighting, blanket and phone nearby, person looking frustrated",
+          scenePerson: "a 27-year-old woman with messy bun hair, wearing oversized sweater, looking frustrated on couch",
           middleSlides: [
-            { type: "solution", caption: "the fix is here", scene: "person using the product as the fix" },
+            { type: "solution", caption: "the fix is here", scene: "person using the product as the fix, relieved expression" },
           ],
         },
         {
@@ -621,6 +730,8 @@ function generateTemplateCarousels(
           hookCaption: "POV: you feel like this",
           hookEmoji: "👀",
           angle: "Personal experience",
+          sceneLocation: "sunny kitchen counter, morning light streaming through window, coffee mug nearby, marble countertop",
+          scenePerson: "a 25-year-old woman with curly hair, wearing casual streetwear, mid-motion reaching for the product",
           middleSlides: [
             { type: "proof", caption: "the difference is real", scene: "candid moment showing the benefit in real life" },
             { type: "candid", caption: "now it's my routine", scene: "candid daily routine moment with the product" },
@@ -631,8 +742,10 @@ function generateTemplateCarousels(
           hookCaption: "ACTUALLY WORKS",
           hookEmoji: "✅",
           angle: "The guaranteed result",
+          sceneLocation: "outdoor sunny setting, bright midday sun, green background, visible sunlight on skin",
+          scenePerson: "a 28-year-old man with short beard, wearing athletic gear, outdoors in bright sun",
           middleSlides: [
-            { type: "proof", caption: "the proof is real", scene: "person experiencing the claimed benefit" },
+            { type: "proof", caption: "the proof is real", scene: "person experiencing the claimed benefit outdoors" },
           ],
         },
         {
@@ -640,6 +753,8 @@ function generateTemplateCarousels(
           hookCaption: "OLD VS NEW",
           hookEmoji: "⚖️",
           angle: "The comparison",
+          sceneLocation: "clean wooden table top, top-down flat-lay view, neutral background, good lighting",
+          scenePerson: "hands placing items on table for comparison",
           middleSlides: [
             { type: "comparison", caption: "the difference is obvious", scene: "top-down flat-lay comparing old way vs the product" },
             { type: "person_using", caption: "this is how i use it", scene: "person using the new way" },
@@ -650,8 +765,10 @@ function generateTemplateCarousels(
           hookCaption: "STRUGGLING WITH THIS?",
           hookEmoji: "😤",
           angle: "The objection and the answer",
+          sceneLocation: "bathroom counter or bedside table, person looking at old solution with discomfort",
+          scenePerson: "a 26-year-old woman with glasses, looking at old solution with frustrated expression",
           middleSlides: [
-            { type: "solution", caption: "it's actually simple", scene: "product as the easy answer" },
+            { type: "solution", caption: "it's actually simple", scene: "product as the easy answer, person relieved" },
             { type: "proof", caption: "simple and fast", scene: "showing how easy it is to use" },
           ],
         },
@@ -660,6 +777,8 @@ function generateTemplateCarousels(
           hookCaption: "HEARD THIS BEFORE?",
           hookEmoji: "💬",
           angle: "Conversation",
+          sceneLocation: "coffee shop table or office break room, two friends talking, coffee cups nearby",
+          scenePerson: "a 24-year-old woman with pixie cut, holding coffee, mid-conversation with friend",
           middleSlides: [
             { type: "solution", caption: "this is the answer", scene: "product as the answer to the convo" },
           ],
@@ -669,8 +788,10 @@ function generateTemplateCarousels(
           hookCaption: "DONE THIS BEFORE?",
           hookEmoji: "😅",
           angle: "Common mistake",
+          sceneLocation: "bedroom drawer or bedside table, open drawer with forgotten items, person looking guilty",
+          scenePerson: "a 30-year-old man with man-bun, opening a drawer full of forgotten products, sheepish expression",
           middleSlides: [
-            { type: "solution", caption: "not anymore", scene: "product making it effortless" },
+            { type: "solution", caption: "not anymore", scene: "product making it effortless, person using it daily" },
           ],
         },
         {
@@ -678,8 +799,10 @@ function generateTemplateCarousels(
           hookCaption: "REAL BENEFITS",
           hookEmoji: "🔥",
           angle: "Multiple benefits",
+          sceneLocation: "gym or outdoor active setting, person mid-activity, energetic lighting",
+          scenePerson: "a 23-year-old woman with ponytail, wearing gym gear, mid-workout with product visible",
           middleSlides: [
-            { type: "benefit", caption: "benefit one", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "benefit one", scene: "showing first benefit in action during workout" },
             { type: "benefit", caption: "benefit two", scene: "showing second benefit in action" },
             { type: "benefit", caption: "benefit three", scene: "showing third benefit in action" },
           ],
@@ -719,8 +842,9 @@ function generateTemplateCarousels(
 
   for (let c = 0; c < numCarousels; c++) {
     const structure = structures[c % structures.length];
-    const person = persons[c % persons.length];
-    const location = locations[c % locations.length];
+    // Use the structure's scene-specific location and person (so the scene MATCHES the caption)
+    const person = structure.scenePerson;
+    const location = structure.sceneLocation;
     const carouselTitle = `${structure.angle} — ${idea.slice(0, 30)}`;
     // Product slide nudge — plain "do this" + supporting line (lowercase, texting-style)
     const ctaText = isAr ? "اطلب الآن" : isFr ? "commandez maintenant" : "1 a day";
@@ -728,7 +852,7 @@ function generateTemplateCarousels(
 
     const slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> = [];
 
-    // ─── Slide 1: HOOK (uses the structure's hook caption) ───
+    // ─── Slide 1: HOOK (uses the structure's hook caption + MATCHING scene) ───
     const hookCaptionWithEmoji = `${structure.hookCaption} ${structure.hookEmoji}`;
     slides.push({
       slideNumber: 1,
@@ -736,20 +860,20 @@ function generateTemplateCarousels(
       title: hookCaptionWithEmoji,
       body: "",
       imagePrompt: enforceUGCPrompt(
-        `${person} holding the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${hookCaptionWithEmoji}", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
+        `${person} with the ${idea} product, exactly matching the reference product's design, logo, colors and typography. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${hookCaptionWithEmoji}", positioned about 22% down from the top of the frame (not at the very top edge), plus one white hand-drawn arrow with black outline in the lower area pointing at the product. No other text or graphics.`
       ),
       headerText: hookCaptionWithEmoji,
       bodyText: null,
       textPosition: "top" as const,
     });
 
-    // ─── Middle slides: from the structure's middleSlides definition ───
+    // ─── Middle slides: from the structure's middleSlides definition (scenes MATCH captions) ───
     for (let s = 0; s < structure.middleSlides.length; s++) {
       const mid = structure.middleSlides[s];
       const midCaption = mid.caption;
       const midType = mid.type;
 
-      // Build the scene description based on slide type
+      // Build the scene description based on slide type — scene matches the caption theme
       let midAction: string;
       if (midType === "comparison") {
         midAction = `top-down flat-lay on ${location}. Left side: an old or inferior solution with a bold red X over it. Right side: the ${idea} product (exactly matching the reference product's design, logo, colors and typography) with a bold green check over it`;
