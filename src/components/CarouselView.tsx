@@ -48,21 +48,16 @@ interface CarouselViewProps {
 
 // ─── Slide type colors/icons ───────────────────────────────────────────────
 const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
-  // UGC methodology slide types (primary)
-  hook: { color: "#E461AD", bg: "#E461AD25", label: "Hook", emoji: "🎯" },
-  person_using: { color: "#22C55E", bg: "#22C55E25", label: "Person Using", emoji: "📱" },
-  candid: { color: "#3B82F6", bg: "#3B82F625", label: "Candid", emoji: "💬" },
-  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
-  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
-  // Legacy slide types (kept for backward compatibility)
   hero: { color: "#E461AD", bg: "#E461AD25", label: "Hero Shot", emoji: "🎯" },
   quote: { color: "#3B82F6", bg: "#3B82F625", label: "Quote", emoji: "💬" },
+  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
   tip: { color: "#8B5CF6", bg: "#8B5CF625", label: "Tip", emoji: "💡" },
   stat: { color: "#06B6D4", bg: "#06B6D425", label: "Stat", emoji: "📊" },
   question: { color: "#EC4899", bg: "#EC489925", label: "Question", emoji: "🤔" },
   problem: { color: "#EF4444", bg: "#EF444425", label: "Problem", emoji: "😤" },
   benefit: { color: "#22C55E", bg: "#22C55E25", label: "Benefit", emoji: "✨" },
   feature: { color: "#6366F1", bg: "#6366F125", label: "Feature", emoji: "🔬" },
+  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
 };
 
 // ─── Word wrap helper ────────────────────────────────────────────────────────
@@ -461,7 +456,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
     setGenerationStep("");
   }, []);
 
-  // ─── Handle Generate ─────────────────────────────────────────────────
+  // ─── Handle Generate (streaming version) ──────────────────────────────
   const handleGenerate = async () => {
     if (!idea.trim()) return;
 
@@ -485,7 +480,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         }
       }
 
-      // Step 2: Generate carousel content and images
+      // Step 2: Generate carousel content and images (STREAMING)
       setGenerationStep("Generating carousel content with AI...");
 
       const res = await authFetch("/api/generate-carousel", {
@@ -503,40 +498,146 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         }),
       });
 
-      const data = await res.json();
-
       if (!res.ok) {
-        throw new Error(data.error || "Generation failed");
+        // Try to parse error as JSON
+        let errMsg = "Generation failed";
+        try {
+          const errData = await res.json();
+          errMsg = errData.error || errMsg;
+        } catch {
+          errMsg = `Generation failed (${res.status})`;
+        }
+        throw new Error(errMsg);
       }
 
-      // Parse carousels from new format
-      const rawCarousels: CarouselData[] = (data.carousels || []).map((c: Record<string, unknown>) => ({
-        carouselTitle: (c.carouselTitle as string) || idea.slice(0, 30),
-        slides: ((c.slides || []) as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
-          ...s,
-          textOverlayUrl: null,
-        })) as Slide[],
-      }));
-
-      // Fallback: if old format (single carousel with slides array at top level)
-      if (rawCarousels.length === 0 && data.slides && Array.isArray(data.slides)) {
-        rawCarousels.push({
-          carouselTitle: data.carouselTitle || idea.slice(0, 30),
-          slides: (data.slides as Record<string, unknown>[]).map((s: Record<string, unknown>) => ({
-            ...s,
-            textOverlayUrl: null,
-          })) as Slide[],
-        });
+      // ─── Read streaming response (NDJSON: newline-delimited JSON) ───
+      // The API sends progress events as JSON objects separated by newlines.
+      // This keeps the connection alive and shows slides as they're generated.
+      const reader = res.body?.getReader();
+      if (!reader) {
+        throw new Error("Streaming not supported by browser");
       }
 
-      setCarousels(rawCarousels);
-      setShowResult(true);
-      setGenerationStep("");
+      const decoder = new TextDecoder();
+      let buffer = "";
+      const carouselsAccumulator: CarouselData[] = [];
+      let totalSlidesExpected = 0;
+      let slidesReady = 0;
 
-      // NOTE: UGC methodology — text is BAKED INTO the image by the AI model.
-      // No canvas overlay is applied anymore. The image_prompt already includes
-      // the caption text description, so the generated imageUrl has text baked in.
-      // We skip the applyTextOverlay() call entirely.
+      const ensureCarouselSlot = (idx: number, title?: string) => {
+        while (carouselsAccumulator.length <= idx) {
+          carouselsAccumulator.push({
+            carouselTitle: title || idea.slice(0, 30),
+            slides: [] as Slide[],
+          });
+        }
+        if (title && carouselsAccumulator[idx].carouselTitle === idea.slice(0, 30)) {
+          carouselsAccumulator[idx].carouselTitle = title;
+        }
+      };
+
+      while (true) {
+        const { done, value } = await reader.read();
+        if (done) break;
+
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split("\n");
+        buffer = lines.pop() || ""; // Keep incomplete last line in buffer
+
+        for (const line of lines) {
+          if (!line.trim()) continue;
+          let event: Record<string, unknown>;
+          try {
+            event = JSON.parse(line);
+          } catch {
+            continue; // Skip malformed lines
+          }
+
+          const eventType = event.type as string;
+
+          if (eventType === "start") {
+            totalSlidesExpected = (event.totalSlides as number) || 0;
+            setGenerationStep(`Generating ${totalSlidesExpected} slide${totalSlidesExpected > 1 ? "s" : ""}...`);
+          } else if (eventType === "carousel_start") {
+            const cIdx = event.carouselIndex as number;
+            const cTitle = event.carouselTitle as string;
+            ensureCarouselSlot(cIdx, cTitle);
+            setGenerationStep(`Carousel ${cIdx + 1}: generating ${event.slideCount} slides...`);
+          } else if (eventType === "slide_ready") {
+            const cIdx = event.carouselIndex as number;
+            const sIdx = event.slideIndex as number;
+            const slideData = event.slide as Record<string, unknown>;
+            ensureCarouselSlot(cIdx);
+
+            // Insert/replace slide at correct index
+            const carousel = carouselsAccumulator[cIdx];
+            const newSlide = { ...slideData, textOverlayUrl: null } as Slide;
+            while (carousel.slides.length <= sIdx) {
+              carousel.slides.push({} as Slide);
+            }
+            carousel.slides[sIdx] = newSlide;
+
+            slidesReady++;
+            setGenerationStep(`Slide ${slidesReady}/${totalSlidesExpected} ready!`);
+
+            // Update UI with current progress
+            setCarousels([...carouselsAccumulator]);
+            setShowResult(true);
+          } else if (eventType === "slide_failed") {
+            const cIdx = event.carouselIndex as number;
+            const sIdx = event.slideIndex as number;
+            const errMsg = (event.error as string) || "Image failed";
+            ensureCarouselSlot(cIdx);
+
+            const carousel = carouselsAccumulator[cIdx];
+            while (carousel.slides.length <= sIdx) {
+              carousel.slides.push({} as Slide);
+            }
+            carousel.slides[sIdx] = {
+              slideNumber: sIdx + 1,
+              slideType: "hook",
+              title: "Failed",
+              body: "",
+              imagePrompt: "",
+              imageUrl: null,
+              headerText: null,
+              bodyText: null,
+              textPosition: "top",
+              status: "image_failed",
+              error: errMsg,
+              textOverlayUrl: null,
+            };
+
+            slidesReady++;
+            setCarousels([...carouselsAccumulator]);
+          } else if (eventType === "carousel_done") {
+            const cIdx = event.carouselIndex as number;
+            console.log(`[Carousel] Carousel ${cIdx + 1} complete`);
+          } else if (eventType === "complete") {
+            // Final result with all carousels
+            const finalCarousels = (event.carousels as Record<string, unknown>[]) || [];
+            if (finalCarousels.length > 0) {
+              const parsed: CarouselData[] = finalCarousels.map((c) => ({
+                carouselTitle: (c.carouselTitle as string) || idea.slice(0, 30),
+                slides: ((c.slides || []) as Record<string, unknown>[]).map((s) => ({
+                  ...s,
+                  textOverlayUrl: null,
+                })) as Slide[],
+              }));
+              setCarousels(parsed);
+            }
+            setShowResult(true);
+            setGenerationStep("");
+          } else if (eventType === "error") {
+            throw new Error((event.error as string) || "Stream error");
+          }
+        }
+      }
+
+      // Fallback: if no complete event was received but we have accumulated carousels
+      if (carouselsAccumulator.length > 0 && generationStep !== "") {
+        setGenerationStep("");
+      }
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
       setError(msg);
@@ -958,21 +1059,23 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 </div>
               )}
 
-              {/* UGC badge — text is always baked in */}
-              <div
-                className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
-                style={{ backgroundColor: `${C.pink}cc`, color: C.white }}
-              >
-                <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
-                  <polyline points="4 7 4 4 20 4 20 7" />
-                  <line x1="9.5" y1="20" x2="14.5" y2="20" />
-                  <line x1="12" y1="4" x2="12" y2="20" />
-                </svg>
-                UGC
-              </div>
+              {/* Text overlay badge */}
+              {activeSlide.textOverlayUrl && (
+                <div
+                  className="absolute top-4 right-4 px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider flex items-center gap-1"
+                  style={{ backgroundColor: `${C.pink}cc`, color: C.white }}
+                >
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round">
+                    <polyline points="4 7 4 4 20 4 20 7" />
+                    <line x1="9.5" y1="20" x2="14.5" y2="20" />
+                    <line x1="12" y1="4" x2="12" y2="20" />
+                  </svg>
+                  Text
+                </div>
+              )}
             </div>
 
-            {/* Slide Text Content (reference — text is already baked into the image above) */}
+            {/* Slide Text Content */}
             <div className="mt-5 px-2">
               {activeSlide.headerText && (
                 <h2 className="text-lg font-black mb-2" style={{ color: C.white }}>
@@ -991,7 +1094,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               )}
               {!activeSlide.headerText && !activeSlide.bodyText && (
                 <p className="text-xs italic" style={{ color: "#666666" }}>
-                  Clean image — no caption text
+                  Clean image — no text overlay
                 </p>
               )}
             </div>
@@ -1237,7 +1340,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           >
             <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.gold }} />
             <span className="text-[11px] font-bold uppercase tracking-widest" style={{ color: C.gold }}>
-              Nano Banana Pro · UGC
+              Nano Banana 2
             </span>
           </div>
 
@@ -1251,7 +1354,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
           </h1>
 
           <p className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed" style={{ color: C.textMuted }}>
-            Create viral-style UGC product carousels. Hyperrealistic "shot on iPhone" photos with TikTok-style captions baked in. Add a product image &amp; link — AI matches your product perfectly across every slide.
+            Turn any idea into scroll-stopping carousels. AI picks the best slide types &amp; count per topic. Add a product image &amp; link for perfect product matching. Nano Banana 2 model.
           </p>
         </div>
 
@@ -1362,14 +1465,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             </div>
             <div>
               <p className="text-[11px] font-bold uppercase tracking-wider" style={{ color: C.gold }}>
-                UGC Methodology
+                Locked Settings
               </p>
               <p className="text-[10px] leading-relaxed mt-0.5" style={{ color: C.textMuted }}>
-                Model: <b>Nano Banana Pro</b> (edit mode) • 3:4 ratio • iPhone 15 Pro Max style
+                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product image as reference (product always matches)
                 <br />
-                Text: <b>Baked into image</b> (white rounded + black outline, TikTok caption style) • ~22% from top
+                Text: <b>Bold white rounded + black outline</b> • ~22% from top
                 <br />
-                Slides: Hook + middle + 📦 Product (last) • Each carousel: different person, scene & angle
+                Slides: 3-8 per carousel (AI picks best types) • Last slide = 📦 Product
               </p>
             </div>
           </div>
@@ -1649,14 +1752,14 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
               style={{ borderColor: `${C.pink}33`, borderTopColor: C.pink }}
             />
             <p className="text-sm font-semibold" style={{ color: C.dark }}>
-              Creating {numCarousels} UGC carousel{numCarousels > 1 ? "s" : ""} with Nano Banana Pro...
+              Creating {numCarousels} carousel{numCarousels > 1 ? "s" : ""} with Nano Banana 2...
             </p>
             <p className="text-xs mt-2" style={{ color: C.textMuted }}>
-              Hook + middle + product slides (text baked into images)
+              3-8 slides per carousel (AI picks the best format)
               <br />
-              {productImageUrl && "Product reference: ON — logo & colors will match your product"}
+              {productImageUrl && "Product reference: ON — all slides will match your product"}
               {productImageUrl && <br />}
-              This may take 2-5 minutes per carousel. Captions are rendered inside each image by AI.
+              This may take 2-5 minutes per carousel. Text overlay will be applied after images are ready.
             </p>
           </div>
         )}
@@ -1695,8 +1798,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" />
                     </svg>
                   ),
-                  title: "UGC iPhone Style",
-                  desc: "Hyperrealistic phone photos, Nano Banana Pro, 3:4 ratio",
+                  title: "Nano Banana 2",
+                  desc: "High-quality AI images, 3:4 ratio, product reference built-in",
                 },
                 {
                   icon: (
@@ -1706,8 +1809,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <line x1="12" y1="4" x2="12" y2="20" />
                     </svg>
                   ),
-                  title: "Text Baked In",
-                  desc: "TikTok captions rendered inside the image by AI (no overlay)",
+                  title: "Bold Text Overlay",
+                  desc: "White rounded font + black outline, baked into each slide",
                 },
                 {
                   icon: (
@@ -1717,8 +1820,8 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                       <polyline points="21 15 16 10 5 21" />
                     </svg>
                   ),
-                  title: "Product Matching",
-                  desc: "Logo, colors & label stay accurate across all slides",
+                  title: "Product Reference",
+                  desc: "Add product image + link, AI matches product in every slide",
                 },
               ].map((feature, i) => (
                 <div

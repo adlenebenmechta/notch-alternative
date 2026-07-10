@@ -777,66 +777,138 @@ export async function POST(req: NextRequest) {
 
     const carouselsContent = await generateCarouselContent(idea.trim(), carouselCount, language || "en", productDescription);
 
-    // Step 2: Generate images for each carousel
-    const carouselsWithImages = [];
-
-    for (let c = 0; c < carouselsContent.length; c++) {
-      const { carouselTitle, slides } = carouselsContent[c];
-      const slidesWithImages = [];
-
-      for (let i = 0; i < slides.length; i++) {
-        const slide = slides[i];
+    // Step 2: Stream progress + generate images IN PARALLEL within each carousel
+    // This keeps the connection alive (no browser timeout) and speeds up generation.
+    const encoder = new TextEncoder();
+    const stream = new ReadableStream({
+      async start(controller) {
+        const send = (obj: Record<string, unknown>) => {
+          controller.enqueue(encoder.encode(JSON.stringify(obj) + "\n"));
+        };
 
         try {
-          let imageUrl: string;
-          if (useKieAi) {
-            imageUrl = await generateSlideImageKie(
-              slide.imagePrompt,
-              finalKieApiKey!,
-              i,
-              slides.length,
-              c,
-              carouselsContent.length,
-              validProductImageUrl || undefined
-            );
-          } else {
-            console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: generating with built-in AI API...`);
-            imageUrl = await generateSlideImageBuiltIn(slide.imagePrompt);
-            console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: image ready!`);
+          // Send initial metadata so the client knows generation has started
+          send({
+            type: "start",
+            totalCarousels: carouselsContent.length,
+            totalSlides: carouselsContent.reduce((acc, c) => acc + c.slides.length, 0),
+          });
+
+          const carouselsWithImages = [];
+
+          for (let c = 0; c < carouselsContent.length; c++) {
+            const { carouselTitle, slides } = carouselsContent[c];
+            send({ type: "carousel_start", carouselIndex: c, carouselTitle, slideCount: slides.length });
+
+            // ─── Generate ALL slides in this carousel IN PARALLEL ───
+            // Each slide takes ~40-50s; sequential = 2.5min for 3 slides, parallel = ~50s
+            const slidePromises = slides.map(async (slide, i) => {
+              try {
+                let imageUrl: string;
+                if (useKieAi) {
+                  imageUrl = await generateSlideImageKie(
+                    slide.imagePrompt,
+                    finalKieApiKey!,
+                    i,
+                    slides.length,
+                    c,
+                    carouselsContent.length,
+                    validProductImageUrl || undefined
+                  );
+                } else {
+                  console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: generating with built-in AI API...`);
+                  imageUrl = await generateSlideImageBuiltIn(slide.imagePrompt);
+                  console.log(`[Carousel] Carousel ${c + 1} Slide ${i + 1}/${slides.length}: image ready!`);
+                }
+
+                // Stream this slide as soon as it's ready
+                send({
+                  type: "slide_ready",
+                  carouselIndex: c,
+                  slideIndex: i,
+                  slide: {
+                    ...slide,
+                    imageUrl,
+                    status: "done",
+                    slideType: slide.slideType || "hook",
+                    headerText: slide.headerText ?? null,
+                    bodyText: slide.bodyText ?? null,
+                    textPosition: slide.textPosition || "top",
+                  },
+                });
+
+                return {
+                  ...slide,
+                  imageUrl,
+                  status: "done" as const,
+                  slideType: slide.slideType || "hook",
+                  headerText: slide.headerText ?? null,
+                  bodyText: slide.bodyText ?? null,
+                  textPosition: slide.textPosition || "top",
+                };
+              } catch (imgErr) {
+                const msg = imgErr instanceof Error ? imgErr.message : String(imgErr);
+                console.error(`[Carousel] Carousel ${c + 1} Slide ${i + 1} image failed:`, msg);
+
+                send({
+                  type: "slide_failed",
+                  carouselIndex: c,
+                  slideIndex: i,
+                  error: msg,
+                });
+
+                return {
+                  ...slide,
+                  imageUrl: null,
+                  status: "image_failed" as const,
+                  error: msg,
+                  slideType: slide.slideType || "hook",
+                  headerText: slide.headerText ?? null,
+                  bodyText: slide.bodyText ?? null,
+                  textPosition: slide.textPosition || "top",
+                };
+              }
+            });
+
+            const slidesWithImages = await Promise.all(slidePromises);
+
+            carouselsWithImages.push({
+              carouselTitle,
+              slides: slidesWithImages.map(s => ({
+                ...s,
+                slideType: s.slideType || "hook",
+                headerText: s.headerText ?? null,
+                bodyText: s.bodyText ?? null,
+                textPosition: s.textPosition || "top",
+              })),
+            });
+
+            send({ type: "carousel_done", carouselIndex: c });
           }
-          slidesWithImages.push({
-            ...slide,
-            imageUrl,
-            status: "done" as const,
+
+          // Send final complete message with all carousels
+          send({
+            type: "complete",
+            success: true,
+            carousels: carouselsWithImages,
+            idea: idea.trim(),
           });
-        } catch (imgErr) {
-          const msg = imgErr instanceof Error ? imgErr.message : String(imgErr);
-          console.error(`[Carousel] Carousel ${c + 1} Slide ${i + 1} image failed:`, msg);
-          slidesWithImages.push({
-            ...slide,
-            imageUrl: null,
-            status: "image_failed" as const,
-            error: msg,
-          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          console.error("[Carousel] Stream error:", msg);
+          send({ type: "error", error: msg });
+        } finally {
+          controller.close();
         }
-      }
+      },
+    });
 
-      carouselsWithImages.push({
-        carouselTitle,
-        slides: slidesWithImages.map(s => ({
-          ...s,
-          slideType: s.slideType || "hero",
-          headerText: s.headerText ?? null,
-          bodyText: s.bodyText ?? null,
-          textPosition: s.textPosition || "top",
-        })),
-      });
-    }
-
-    return NextResponse.json({
-      success: true,
-      carousels: carouselsWithImages,
-      idea: idea.trim(),
+    return new Response(stream, {
+      headers: {
+        "Content-Type": "application/x-ndstream",
+        "Cache-Control": "no-cache, no-transform",
+        Connection: "keep-alive",
+      },
     });
   } catch (error: unknown) {
     const msg = error instanceof Error ? error.message : String(error);
