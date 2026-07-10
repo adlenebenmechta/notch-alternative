@@ -222,16 +222,70 @@ Given a product idea/description (and optionally real product info from a produc
 
 The convo and POV formats work because they feel like a real moment you're eavesdropping on, not an ad.
 
-## STRUCTURING THE CONTENT ACROSS THE CAROUSEL
+## STEP 1: ANALYZE THE PRODUCT FIRST (do this before writing any slides)
 
-Think **problem → shift → proof → product**:
+Before generating slides, analyze the product and choose the best approach:
 
-1. **Hook** — grab attention with the benefit or a relatable pain.
-2. **Agitate/relate** — "you've felt this" (the tired-on-couch, the drawer full of pills).
-3. **Show the fix** — comparison or the product in action.
-4. **Close** — product on white + what to do ("1 a day" with a check emoji).
+1. **Identify the product category:** supplement/health, sports/performance, beauty/skincare, everyday/utility, food/beverage, tech/gadget, apparel/accessory, or other.
+2. **Extract REAL benefits and claims** from the product info provided (or from the idea if no product info). Look for: numbers (98%, UPF 50+, 30 strips), specific features (compression fabric, UV blocking, dissolvable strips), pain points it solves (big pills, sun damage, fatigue).
+3. **Pick the best carousel STRUCTURE** for this product from the menu below — the structure should fit the product's story, not force the product into a template.
+4. **Decide slide count** based on how much story the product needs (3-8 slides). A simple benefit might need only 3; a product with multiple angles or a comparison might need 5-7.
 
-Each slide should make the viewer want to swipe to the next. End slide 1 on curiosity, not a full answer.
+## STEP 2: CHOOSE A CAROUSEL STRUCTURE (pick one per carousel — vary across batch)
+
+Each carousel must use ONE of these structures. If making multiple carousels, each uses a DIFFERENT structure:
+
+### Structure A: Problem → Solution → Product (3-4 slides)
+Best for: products that solve a clear pain point.
+- Slide 1 (problem): Show the pain relatably. Caption names the problem ("can't swallow big pills?").
+- Slide 2 (solution): Introduce the product as the fix. Caption is the benefit ("just use strips").
+- Slide 3 (product): Product on white + CTA.
+- Optional Slide 2.5 (proof): A candid using-it shot or a comparison.
+
+### Structure B: POV → Proof → Product (3-5 slides)
+Best for: lifestyle/wellness products where the viewer should see themselves.
+- Slide 1 (POV hook): "POV: it's week 6 of no sun and your energy is at 2%"
+- Slide 2-3 (proof): Candid moments showing the fix in real life.
+- Last slide (product): Product on white + CTA.
+
+### Structure C: Blunt Claim → Evidence → Product (3-4 slides)
+Best for: products with a strong number/claim (UPF 50+, blocks 98% UV).
+- Slide 1 (claim): "BLOCKS 98% OF UV RAYS" (ALL CAPS, with sun emoji)
+- Slide 2 (evidence): Person using it in the relevant setting (sunny outdoors).
+- Slide 3 (product): Product on white + CTA.
+
+### Structure D: Comparison (Old vs New) → Product (3-4 slides)
+Best for: products that replace an inferior solution (pills vs strips, regular vs compression).
+- Slide 1 (comparison flat-lay): "pills (nausea emoji) vs strips (relieved emoji)" — X over old, check over new.
+- Slide 2 (in action): Person using the new way.
+- Slide 3 (product): Product on white + CTA.
+
+### Structure E: Objection → Answer → Product (3-5 slides)
+Best for: products where people have a common hesitation.
+- Slide 1 (objection): "can't swallow big pills?" or "too busy for skincare?"
+- Slide 2 (answer): "just use strips" or "30 seconds, that's it"
+- Slide 3-4 (proof): Show it being easy.
+- Last slide (product): Product on white + CTA.
+
+### Structure F: Overheard Convo → Product (3-4 slides)
+Best for: products that spark conversation (supplements, wellness, relatable problems).
+- Slide 1 (convo): "bro why am I always tired lately?" / "vitamin D3" / "but I hate pills"
+- Slide 2 (the fix): Show the product as the answer.
+- Slide 3 (product): Product on white + CTA.
+
+### Structure G: Relatable Fail → The Fix → Product (3-4 slides)
+Best for: products that fix a common behavior people laugh at.
+- Slide 1 (the fail): "I buy vitamins and forget them in a drawer"
+- Slide 2 (the fix): Show the product making it effortless.
+- Slide 3 (product): Product on white + CTA.
+
+### Structure H: Benefit Cascade → Product (4-6 slides)
+Best for: products with multiple benefits worth showing separately.
+- Slide 1 (hook): Lead with the biggest benefit.
+- Slides 2-4 (one benefit each): Each slide shows ONE benefit in action.
+- Last slide (product): Product on white + CTA.
+
+**When in doubt:** Pick the structure that best matches the product's strongest selling point. A sun sleeve with UPF 50+ wants Structure C (blunt claim). A dissolvable vitamin strip wants Structure A or E. A compression sleeve wants Structure D or H.
 
 ## MAKING THE SEQUENCE FEEL HUMAN (NOT AI)
 
@@ -244,23 +298,33 @@ Each slide should make the viewer want to swipe to the next. End slide 1 on curi
 
 - **Supplements/health:** reassuring + effortless. "never miss a day", "no pills, no water."
 - **Sports/performance:** punchy, confident. "keeps you going", "built for game day."
+- **Beauty/skincare:** gentle + aspirational. "glow without the 10-step routine."
 - **Everyday/utility:** practical, relatable. "work-ready in seconds", "fits in your pocket."
+- **Food/beverage:** sensory + simple. "melts on your tongue", "no aftertaste."
+- **Tech/gadget:** clever + time-saving. "sets up in 60 seconds."
 
 ## PLANNING EACH CAROUSEL
 
+- **Analyze the product first** (Step 1 above), then pick a structure (Step 2).
 - Give each carousel ONE marketing angle tied to a REAL product benefit.
 - If product info is provided, use its ACTUAL claims (e.g., "UPF 50+", "blocks 98% UV", "24-hour hydration") — NEVER invent claims.
-- If making multiple carousels: each gets a DIFFERENT angle AND different scenes.
+- If making multiple carousels: each gets a DIFFERENT structure AND different angle AND different scenes.
 - Rotate the person across carousels: different gender, age (20s-30s), location, lighting, camera feel.
 - Do NOT reuse the same setup twice across carousels.
 - Mirror selfies: max once per batch.
+- **Slide count is content-driven:** 3 slides for a simple punchy angle, up to 6-8 for a product with multiple benefits or a story arc. Don't pad — if the story is done in 3, stop at 3.
 
-## SLIDE STRUCTURE (mini story)
+## SLIDE TYPES (use the one that matches the structure's slot)
 
-Each carousel has 3-6 slides:
-- Slide 1 (HOOK): product in a real-world scene + big benefit caption (3-6 words, ALL CAPS if it's a blunt claim) + one white hand-drawn arrow pointing at the product.
-- Middle slide(s): a person actually using it (person_using), a candid moment (candid), or a X-vs-check comparison flat-lay (comparison) — reinforcing the benefit with proof or relatability. Captions here are lowercase, casual, texting-style.
-- Last slide: product on pure white background (product) + a plain "do this" nudge.
+- **hook**: The scroll-stopper slide (POV, blunt claim, objection, convo, or relatable fail). ALWAYS slide 1. Includes the white hand-drawn arrow pointing at the product.
+- **problem**: Shows the pain point relatably (used in Structure A, E, G).
+- **solution**: Introduces the product as the fix (used in Structure A, E).
+- **person_using**: A person actually using the product in a real setting.
+- **candid**: A candid unposed moment related to the benefit.
+- **comparison**: X-vs-check flat-lay (used in Structure D).
+- **benefit**: Shows ONE specific benefit in action (used in Structure H).
+- **proof**: Evidence that the claim is true (used in Structure B, C).
+- **product**: ALWAYS the last slide — product on pure white background + CTA.
 
 ## PROMPT TEMPLATES (use these exactly, filling in the brackets)
 
@@ -280,16 +344,17 @@ Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: top-down flat
 Clean studio product photo: the PRODUCT (exactly matching the reference product's design, logo, colors, typography) centered on a pure white seamless background with a soft realistic shadow beneath, logo facing camera perfectly legible, true to life texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline, placed in the upper-middle area above the product (not at the very top edge): "[ACTION LINE]" and directly under it slightly smaller "([supporting detail})". No other text or graphics outside the product and caption. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.
 
 ## RULES
-- Each carousel: 3-6 slides (1 hook + 1-3 middle + 1 product)
-- Each carousel in a batch: DIFFERENT angle, DIFFERENT scene, DIFFERENT person (gender/age 20s-30s)
+- **Analyze the product first** (Step 1), then pick a structure (Step 2), then write slides.
+- Each carousel: 3-8 slides depending on the structure and content (NOT fixed — let the story decide)
+- Each carousel in a batch: DIFFERENT structure, DIFFERENT angle, DIFFERENT scene, DIFFERENT person (gender/age 20s-30s)
 - image_prompt: ALWAYS in English (except the [CAPTION] text which follows the user's language)
 - header_text and body_text: in the user's language (for display + PostPeer caption)
 - The caption text [CAPTION] inside image_prompt MUST MATCH header_text (and body_text if present)
-- Last slide: ALWAYS type "product"
+- First slide: ALWAYS type "hook" (includes the white hand-drawn arrow pointing at the product)
+- Last slide: ALWAYS type "product" (pure white seamless background + soft realistic shadow)
 - **Hook captions: 3-6 words, ALL CAPS if blunt claim, lowercase if POV/convo.** AI image models misspell long text — keep it short.
 - **Middle captions: lowercase, texting-style, one idea, max 8 words.**
 - **Product slide caption: plain "do this" nudge (e.g., "1 a day" + check emoji, "get yours", "link in bio").**
-- The hook slide MUST include the white hand-drawn arrow pointing at the product
 - The product slide MUST have pure white seamless background + soft realistic shadow
 - **One real number or claim per carousel** — pull from product info, never invent
 - **One emoji max per slide** — matching the message, never a string
@@ -308,6 +373,8 @@ Return ONLY valid JSON (no markdown, no code blocks, no extra text):
     {
       "carousel_title": "Short unique title for this carousel",
       "marketing_angle": "The single real product benefit this carousel focuses on",
+      "structure": "One of: problem_solution, pov_proof, blunt_claim, comparison, objection_answer, overheard_convo, relatable_fail, benefit_cascade",
+      "product_category": "One of: supplement_health, sports_performance, beauty_skincare, everyday_utility, food_beverage, tech_gadget, apparel_accessory, other",
       "slides": [
         {
           "slide_number": 1,
@@ -317,7 +384,7 @@ Return ONLY valid JSON (no markdown, no code blocks, no extra text):
           "body_text": "null (hook slides have no body text)",
           "text_position": "top"
         },
-        ...1-3 middle slides (person_using, candid, or comparison)...,
+        ...2-6 middle slides (slide_type matches the chosen structure)...,
         {
           "slide_number": N,
           "slide_type": "product",
@@ -348,11 +415,10 @@ Write like a real person sharing a tip, lead every hook with one concrete benefi
 
 Generate EXACTLY the number of carousels requested. Each must have a completely different creative angle, scene, person, and slide structure. The last slide of EVERY carousel must be type "product".`;
 
-// ─── Template-based fallback (UGC style, 3-5 slides, text baked in) ────────
-// Follows the same caption principles as the AI prompt:
-// - Hook: 3-6 words, ALL CAPS blunt claim OR lowercase POV/objection
-// - Middle: lowercase, texting-style, one idea, max 8 words
-// - Product: plain "do this" nudge + supporting line
+// ─── Template-based fallback (UGC style, VARIED structures, text baked in) ──
+// Each carousel uses a DIFFERENT structure from the menu below.
+// Structure dictates: slide count, slide types, caption style, scene type.
+// This mirrors the AI prompt's structure-variety system.
 function generateTemplateCarousels(
   idea: string,
   numCarousels: number,
@@ -361,32 +427,263 @@ function generateTemplateCarousels(
   const isAr = language === "ar";
   const isFr = language === "fr";
 
-  // UGC hook formulas — each carousel uses a different formula
-  // Format: { caption, angle, emoji }
-  type HookFormula = { caption: string; angle: string; emoji: string; midCaption: string };
+  // ─── 8 carousel structures, each with its own slide pattern ───
+  // Each structure defines: hookCaption, hookEmoji, middleSlides (type + caption + scene),
+  // and the product slide caption. Each carousel in the batch uses a different structure.
+  type StructureDef = {
+    name: string;
+    hookCaption: string;
+    hookEmoji: string;
+    angle: string;
+    middleSlides: Array<{ type: string; caption: string; scene: string }>;
+  };
 
-  const hookFormulas: HookFormula[] = isAr
+  const structures: StructureDef[] = isAr
     ? [
-        { caption: `يعمل بفعالية`, angle: "الفائدة الحقيقية", emoji: "✅", midCaption: "هكذا أستعمله" },
-        { caption: `النتيجة تتكلم`, angle: "الدليل", emoji: "💯", midCaption: "لا أصدق الفرق" },
-        { caption: `جربتها بنفسي`, angle: "تجربة حقيقية", emoji: "🔥", midCaption: "أصبح روتيني" },
-        { caption: `الحل بين يديك`, angle: "الحل", emoji: "💪", midCaption: "بسيط وسريع" },
-        { caption: `تعرف هذا الشعور؟`, angle: "نقطة الألم", emoji: "🤔", midCaption: "انتهى الأمر" },
+        // Structure A: Problem → Solution
+        {
+          name: "problem_solution",
+          hookCaption: "تعرف هذا الشعور؟",
+          hookEmoji: "🤔",
+          angle: "المشكلة والحل",
+          middleSlides: [
+            { type: "solution", caption: "الحل هنا", scene: "person using the product as the fix" },
+          ],
+        },
+        // Structure B: POV
+        {
+          name: "pov_proof",
+          hookCaption: "من وجهة نظري",
+          hookEmoji: "👀",
+          angle: "تجربة شخصية",
+          middleSlides: [
+            { type: "proof", caption: "الفرق حقيقي", scene: "candid moment showing the benefit in real life" },
+            { type: "candid", caption: "أصبح روتيني", scene: "candid daily routine moment with the product" },
+          ],
+        },
+        // Structure C: Blunt Claim
+        {
+          name: "blunt_claim",
+          hookCaption: "يعمل بفعالية",
+          hookEmoji: "✅",
+          angle: "النتيجة المضمونة",
+          middleSlides: [
+            { type: "proof", caption: "النتيجة تتكلم", scene: "person experiencing the claimed benefit" },
+          ],
+        },
+        // Structure D: Comparison
+        {
+          name: "comparison",
+          hookCaption: "القديم مقابل الجديد",
+          hookEmoji: "⚖️",
+          angle: "المقارنة",
+          middleSlides: [
+            { type: "comparison", caption: "الفرق واضح", scene: "top-down flat-lay comparing old way vs the product" },
+            { type: "person_using", caption: "هكذا أستعمله", scene: "person using the new way" },
+          ],
+        },
+        // Structure E: Objection → Answer
+        {
+          name: "objection_answer",
+          hookCaption: "تعاني من هذا؟",
+          hookEmoji: "😤",
+          angle: "الاعتراض والجواب",
+          middleSlides: [
+            { type: "solution", caption: "الحل بسيط", scene: "product as the easy answer" },
+            { type: "proof", caption: "سهل وسريع", scene: "showing how easy it is to use" },
+          ],
+        },
+        // Structure F: Overheard Convo
+        {
+          name: "overheard_convo",
+          hookCaption: "سمعت هذا؟",
+          hookEmoji: "💬",
+          angle: "محادثة",
+          middleSlides: [
+            { type: "solution", caption: "هذا الحل", scene: "product as the answer to the convo" },
+          ],
+        },
+        // Structure G: Relatable Fail
+        {
+          name: "relatable_fail",
+          hookCaption: "فعلت هذا؟",
+          hookEmoji: "😅",
+          angle: "خطأ شائع",
+          middleSlides: [
+            { type: "solution", caption: "انتهى الأمر", scene: "product making it effortless" },
+          ],
+        },
+        // Structure H: Benefit Cascade
+        {
+          name: "benefit_cascade",
+          hookCaption: "فوائد حقيقية",
+          hookEmoji: "🔥",
+          angle: "فوائد متعددة",
+          middleSlides: [
+            { type: "benefit", caption: "فائدة 1", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "فائدة 2", scene: "showing second benefit in action" },
+            { type: "benefit", caption: "فائدة 3", scene: "showing third benefit in action" },
+          ],
+        },
       ]
     : isFr
     ? [
-        { caption: "VRAIMENT EFFICACE", angle: "Le vrai benefice", emoji: "✅", midCaption: "je l'utilise tous les jours" },
-        { caption: "LE RESULTAT PARLE", angle: "La preuve", emoji: "💯", midCaption: "je n'y croyais pas" },
-        { caption: "ESSAYE PAR MOI", angle: "Experience reelle", emoji: "🔥", midCaption: "fait partie de ma routine" },
-        { caption: "LA SOLUTION ICI", angle: "La solution", emoji: "💪", midCaption: "simple et rapide" },
-        { caption: "TU CONNAIS CA ?", angle: "Le probleme", emoji: "🤔", midCaption: "c'est fini" },
+        {
+          name: "problem_solution",
+          hookCaption: "TU CONNAIS CA ?",
+          hookEmoji: "🤔",
+          angle: "Le probleme et la solution",
+          middleSlides: [
+            { type: "solution", caption: "la solution ici", scene: "person using the product as the fix" },
+          ],
+        },
+        {
+          name: "pov_proof",
+          hookCaption: "POV: tu te sens comme ca",
+          hookEmoji: "👀",
+          angle: "Experience personnelle",
+          middleSlides: [
+            { type: "proof", caption: "la difference est reelle", scene: "candid moment showing the benefit in real life" },
+            { type: "candid", caption: "maintenant c'est ma routine", scene: "candid daily routine moment with the product" },
+          ],
+        },
+        {
+          name: "blunt_claim",
+          hookCaption: "VRAIMENT EFFICACE",
+          hookEmoji: "✅",
+          angle: "Le resultat garanti",
+          middleSlides: [
+            { type: "proof", caption: "le resultat parle", scene: "person experiencing the claimed benefit" },
+          ],
+        },
+        {
+          name: "comparison",
+          hookCaption: "ANCIEN VS NOUVEAU",
+          hookEmoji: "⚖️",
+          angle: "La comparaison",
+          middleSlides: [
+            { type: "comparison", caption: "la difference saute aux yeux", scene: "top-down flat-lay comparing old way vs the product" },
+            { type: "person_using", caption: "je l'utilise comme ca", scene: "person using the new way" },
+          ],
+        },
+        {
+          name: "objection_answer",
+          hookCaption: "TU AS DU MAL AVEC CA ?",
+          hookEmoji: "😤",
+          angle: "L'objection et la reponse",
+          middleSlides: [
+            { type: "solution", caption: "c'est simple en fait", scene: "product as the easy answer" },
+            { type: "proof", caption: "simple et rapide", scene: "showing how easy it is to use" },
+          ],
+        },
+        {
+          name: "overheard_convo",
+          hookCaption: "T'AS ENTENDU CA ?",
+          hookEmoji: "💬",
+          angle: "Conversation",
+          middleSlides: [
+            { type: "solution", caption: "c'est la reponse", scene: "product as the answer to the convo" },
+          ],
+        },
+        {
+          name: "relatable_fail",
+          hookCaption: "T'AS DEJA FAIT CA ?",
+          hookEmoji: "😅",
+          angle: "Erreur courante",
+          middleSlides: [
+            { type: "solution", caption: "c'est fini", scene: "product making it effortless" },
+          ],
+        },
+        {
+          name: "benefit_cascade",
+          hookCaption: "DES VRAIS BENEFICES",
+          hookEmoji: "🔥",
+          angle: "Plusieurs benefices",
+          middleSlides: [
+            { type: "benefit", caption: "benefice 1", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "benefice 2", scene: "showing second benefit in action" },
+            { type: "benefit", caption: "benefice 3", scene: "showing third benefit in action" },
+          ],
+        },
       ]
     : [
-        { caption: "ACTUALLY WORKS", angle: "The real benefit", emoji: "✅", midCaption: "this is how i use it" },
-        { caption: "THE PROOF IS REAL", angle: "The proof", emoji: "💯", midCaption: "couldn't believe the difference" },
-        { caption: "I TRIED IT", angle: "Real experience", emoji: "🔥", midCaption: "now it's my routine" },
-        { caption: "THE FIX IS HERE", angle: "The solution", emoji: "💪", midCaption: "simple and fast" },
-        { caption: "KNOW THIS FEELING?", angle: "The pain point", emoji: "🤔", midCaption: "not anymore" },
+        {
+          name: "problem_solution",
+          hookCaption: "KNOW THIS FEELING?",
+          hookEmoji: "🤔",
+          angle: "The problem and the fix",
+          middleSlides: [
+            { type: "solution", caption: "the fix is here", scene: "person using the product as the fix" },
+          ],
+        },
+        {
+          name: "pov_proof",
+          hookCaption: "POV: you feel like this",
+          hookEmoji: "👀",
+          angle: "Personal experience",
+          middleSlides: [
+            { type: "proof", caption: "the difference is real", scene: "candid moment showing the benefit in real life" },
+            { type: "candid", caption: "now it's my routine", scene: "candid daily routine moment with the product" },
+          ],
+        },
+        {
+          name: "blunt_claim",
+          hookCaption: "ACTUALLY WORKS",
+          hookEmoji: "✅",
+          angle: "The guaranteed result",
+          middleSlides: [
+            { type: "proof", caption: "the proof is real", scene: "person experiencing the claimed benefit" },
+          ],
+        },
+        {
+          name: "comparison",
+          hookCaption: "OLD VS NEW",
+          hookEmoji: "⚖️",
+          angle: "The comparison",
+          middleSlides: [
+            { type: "comparison", caption: "the difference is obvious", scene: "top-down flat-lay comparing old way vs the product" },
+            { type: "person_using", caption: "this is how i use it", scene: "person using the new way" },
+          ],
+        },
+        {
+          name: "objection_answer",
+          hookCaption: "STRUGGLING WITH THIS?",
+          hookEmoji: "😤",
+          angle: "The objection and the answer",
+          middleSlides: [
+            { type: "solution", caption: "it's actually simple", scene: "product as the easy answer" },
+            { type: "proof", caption: "simple and fast", scene: "showing how easy it is to use" },
+          ],
+        },
+        {
+          name: "overheard_convo",
+          hookCaption: "HEARD THIS BEFORE?",
+          hookEmoji: "💬",
+          angle: "Conversation",
+          middleSlides: [
+            { type: "solution", caption: "this is the answer", scene: "product as the answer to the convo" },
+          ],
+        },
+        {
+          name: "relatable_fail",
+          hookCaption: "DONE THIS BEFORE?",
+          hookEmoji: "😅",
+          angle: "Common mistake",
+          middleSlides: [
+            { type: "solution", caption: "not anymore", scene: "product making it effortless" },
+          ],
+        },
+        {
+          name: "benefit_cascade",
+          hookCaption: "REAL BENEFITS",
+          hookEmoji: "🔥",
+          angle: "Multiple benefits",
+          middleSlides: [
+            { type: "benefit", caption: "benefit one", scene: "showing first benefit in action" },
+            { type: "benefit", caption: "benefit two", scene: "showing second benefit in action" },
+            { type: "benefit", caption: "benefit three", scene: "showing third benefit in action" },
+          ],
+        },
       ];
 
   // UGC persons — rotate gender/age/setting per carousel (vary scenes so it never smells like a template)
@@ -396,6 +693,9 @@ function generateTemplateCarousels(
     "a 23-year-old woman with glasses, wearing athleisure, holding the product at arm's length",
     "a 30-year-old man with man-bun, wearing a hoodie, using the product mid-task",
     "a 26-year-old woman with straight hair, wearing a denim jacket, candidly using the product",
+    "a 27-year-old man with clean shave, wearing a polo shirt, using the product at work",
+    "a 24-year-old woman with pixie cut, wearing gym gear, using the product post-workout",
+    "a 29-year-old man with stubble, wearing a flannel shirt, using the product outdoors",
   ];
 
   // UGC locations — rotate per carousel, match caption to scene
@@ -405,6 +705,9 @@ function generateTemplateCarousels(
     "cozy bedroom nightstand, warm lamp light, books and phone nearby, wooden surface",
     "office desk, natural daylight from window, laptop and notebook in background, clean white surface",
     "outdoor patio table, golden hour lighting, plants in background, rustic wood surface",
+    "gym bench, harsh overhead lighting, water bottle and towel nearby, rubber floor",
+    "car interior, soft afternoon light through windshield, dashboard and steering wheel visible",
+    "park bench, dappled sunlight through trees, grass and path in background",
   ];
 
   const carousels: Array<{ carouselTitle: string; slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> }> = [];
@@ -415,22 +718,18 @@ function generateTemplateCarousels(
   const seededRandom = () => { seed = (seed * 16807 + 0) % 2147483647; return (seed & 0x7fffffff) / 0x7fffffff; };
 
   for (let c = 0; c < numCarousels; c++) {
-    const formula = hookFormulas[c % hookFormulas.length];
+    const structure = structures[c % structures.length];
     const person = persons[c % persons.length];
     const location = locations[c % locations.length];
-    const carouselTitle = `${formula.angle} — ${idea.slice(0, 30)}`;
+    const carouselTitle = `${structure.angle} — ${idea.slice(0, 30)}`;
     // Product slide nudge — plain "do this" + supporting line (lowercase, texting-style)
     const ctaText = isAr ? "اطلب الآن" : isFr ? "commandez maintenant" : "1 a day";
     const ctaSub = isAr ? "الرابط في البايو" : isFr ? "lien dans la bio" : "link in bio";
 
-    // Random slide count: 3-5 (hook + 1-2 middle + product)
-    const slideCount = 3 + Math.floor(seededRandom() * 3); // 3, 4, or 5
-
     const slides: Array<{ slideNumber: number; slideType: string; title: string; body: string; imagePrompt: string; headerText: string | null; bodyText: string | null; textPosition: string }> = [];
 
-    // ─── Slide 1: HOOK (3-6 words, ALL CAPS, scroll-stopper) ───
-    // Hook caption includes emoji as punctuation (one emoji, matching the message)
-    const hookCaptionWithEmoji = `${formula.caption} ${formula.emoji}`;
+    // ─── Slide 1: HOOK (uses the structure's hook caption) ───
+    const hookCaptionWithEmoji = `${structure.hookCaption} ${structure.hookEmoji}`;
     slides.push({
       slideNumber: 1,
       slideType: "hook",
@@ -444,28 +743,45 @@ function generateTemplateCarousels(
       textPosition: "top" as const,
     });
 
-    // ─── Middle slides: proof or relatability (lowercase, texting-style, one idea) ───
-    const middleCount = slideCount - 2; // minus hook and product
-    const middleCaptions = isAr
-      ? [formula.midCaption, "النتيجة واضحة", "أنصح به بشدة"]
-      : isFr
-      ? [formula.midCaption, "le resultat est clair", "je recommande"]
-      : [formula.midCaption, "the difference is real", "would buy again"];
-    for (let s = 0; s < middleCount; s++) {
-      const midCaption = middleCaptions[s % middleCaptions.length];
-      const midType = s === 0 ? "person_using" : "candid";
-      const midAction = s === 0
-        ? `${person} actually using the ${idea} product in real-time, exactly matching the reference product's design, logo, colors and typography`
-        : `candid unposed moment with the ${idea} product naturally visible in the scene, exactly matching the reference product's design, logo, colors and typography`;
+    // ─── Middle slides: from the structure's middleSlides definition ───
+    for (let s = 0; s < structure.middleSlides.length; s++) {
+      const mid = structure.middleSlides[s];
+      const midCaption = mid.caption;
+      const midType = mid.type;
+
+      // Build the scene description based on slide type
+      let midAction: string;
+      if (midType === "comparison") {
+        midAction = `top-down flat-lay on ${location}. Left side: an old or inferior solution with a bold red X over it. Right side: the ${idea} product (exactly matching the reference product's design, logo, colors and typography) with a bold green check over it`;
+      } else if (midType === "solution") {
+        midAction = `${person} using the ${idea} product as the fix, exactly matching the reference product's design, logo, colors and typography, ${mid.scene}`;
+      } else if (midType === "proof") {
+        midAction = `candid moment proving the benefit, ${person}, the ${idea} product visible, exactly matching the reference product's design, logo, colors and typography, ${mid.scene}`;
+      } else if (midType === "benefit") {
+        midAction = `${person} experiencing one specific benefit of the ${idea} product, exactly matching the reference product's design, logo, colors and typography, ${mid.scene}`;
+      } else {
+        // candid / person_using / default
+        midAction = `${person}, ${mid.scene}, the ${idea} product naturally visible, exactly matching the reference product's design, logo, colors and typography`;
+      }
+
+      // For comparison slides, use the comparison caption format
+      let imagePromptStr: string;
+      if (midType === "comparison") {
+        imagePromptStr = enforceUGCPrompt(
+          `Hyper realistic photorealistic photo shot on an iPhone 15 Pro Max: ${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style captions in bold white rounded sans-serif with solid black outline in the upper third (below the top edge): left "old way" with line "drawback"; right "new way" with line "${midCaption}". No other text or graphics. Authentic unfiltered phone snapshot, slightly imperfect composition, not polished, not cinematic.`
+        );
+      } else {
+        imagePromptStr = enforceUGCPrompt(
+          `${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${midCaption}", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics.`
+        );
+      }
 
       slides.push({
         slideNumber: s + 2,
         slideType: midType,
         title: midCaption,
         body: "",
-        imagePrompt: enforceUGCPrompt(
-          `${midAction}. ${location}. Candid handheld composition, realistic skin and material texture. Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading: "${midCaption}", positioned about 22% down from the top of the frame (not at the very top edge). No other text or graphics.`
-        ),
+        imagePrompt: imagePromptStr,
         headerText: midCaption,
         bodyText: null,
         textPosition: "top" as const,
@@ -473,8 +789,9 @@ function generateTemplateCarousels(
     }
 
     // ─── Last slide: PRODUCT on pure white + plain "do this" nudge ───
+    const lastSlideNumber = slides.length + 1;
     slides.push({
-      slideNumber: slideCount,
+      slideNumber: lastSlideNumber,
       slideType: "product",
       title: ctaText,
       body: ctaSub,
@@ -549,7 +866,7 @@ async function generateCarouselContent(
               slides: generateTemplateCarousels(idea, 1, language)[0].slides,
             };
           }
-          const validSlideTypes = ["hook", "person_using", "candid", "comparison", "hero", "quote", "tip", "stat", "question", "problem", "benefit", "feature", "product"];
+          const validSlideTypes = ["hook", "problem", "solution", "person_using", "candid", "comparison", "benefit", "proof", "hero", "quote", "tip", "stat", "question", "feature", "product"];
           const slides = rawSlides.map((slide: Record<string, unknown>, i: number) => {
             const rawType = (slide.slide_type as string) || "hook";
             // Validate slide type; if invalid, pick a sensible default based on position
@@ -632,10 +949,16 @@ async function pollKieImage(taskId: string, apiKey: string): Promise<string> {
   throw new Error("Image generation timed out after 6 minutes");
 }
 
-// ─── Generate a single slide image via kie.ai (nano-banana-pro with fallback) ──
-// UGC methodology: uses Nano Banana Pro (edit mode) as primary model.
-// Falls back to nano-banana-2 if Pro is unavailable.
-// Always passes product image as reference (image_input) for logo/color consistency.
+// ─── Generate a single slide image — NEVER FAILS (multi-strategy retry) ──
+// Strategy chain (tries each in order until one succeeds):
+//   1. nano-banana-pro + full prompt + product reference
+//   2. nano-banana-pro + full prompt WITHOUT reference (sometimes ref causes issues)
+//   3. nano-banana-2 + full prompt + product reference
+//   4. nano-banana-2 + full prompt WITHOUT reference
+//   5. nano-banana-2 + SIMPLIFIED prompt (no baked-in text, clean image) + reference
+//   6. nano-banana-2 + SIMPLIFIED prompt WITHOUT reference
+//   7. Built-in ZAI image generation (last resort)
+// The goal: EVERY slide gets an image. No "image failed" ever.
 async function generateSlideImageKie(
   imagePrompt: string,
   apiKey: string,
@@ -645,83 +968,174 @@ async function generateSlideImageKie(
   totalCarousels: number,
   referenceImageUrl?: string
 ): Promise<string> {
-  // Build input object for kie.ai API
-  // Use image_size (not aspect_ratio/output_format — those cause "File type not supported")
-  // Include image_input (product reference) whenever available — UGC methodology requires it
-  const input: Record<string, unknown> = {
-    prompt: imagePrompt,
-    image_size: "768x1344",
-  };
-  if (referenceImageUrl) {
-    input.image_input = [referenceImageUrl];
-    console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: using product reference image for UGC consistency`);
+  const logPrefix = `[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}`;
+
+  // ─── Helper: submit a kie.ai task and poll for result ───
+  async function tryKieModel(
+    model: string,
+    prompt: string,
+    useReference: boolean
+  ): Promise<string> {
+    const input: Record<string, unknown> = {
+      prompt,
+      image_size: "768x1344",
+    };
+    if (useReference && referenceImageUrl) {
+      input.image_input = [referenceImageUrl];
+    }
+
+    console.log(`${logPrefix}: trying ${model}${useReference ? " + reference" : " (no reference)"}...`);
+
+    const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${apiKey}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ model, input }),
+    });
+
+    const submitText = await submitRes.text();
+    let submitJson: Record<string, unknown>;
+    try {
+      submitJson = JSON.parse(submitText);
+    } catch {
+      throw new Error(`${model} returned non-JSON: ${submitText.slice(0, 200)}`);
+    }
+
+    if (submitJson.code !== 200) {
+      const errMsg = (submitJson.msg as string) || submitText.slice(0, 200);
+      throw new Error(`${model} submit failed: ${errMsg}`);
+    }
+
+    const taskId = submitJson.data?.taskId;
+    if (!taskId) {
+      throw new Error(`${model} returned no taskId`);
+    }
+
+    console.log(`${logPrefix}: ${model} task ${taskId} submitted, polling...`);
+    const imageUrl = await pollKieImage(taskId, apiKey);
+    console.log(`${logPrefix}: image ready (model: ${model})!`);
+    return imageUrl;
   }
 
-  // Try Nano Banana Pro first (user's preferred model for UGC), fall back to nano-banana-2
-  const models = ["nano-banana-pro", "nano-banana-2"];
-  let lastError: Error | null = null;
+  // ─── Simplified prompt: strip the baked-in text requirement ───
+  // Used as a fallback when the full prompt (with text instructions) fails.
+  // Generates a clean image without text — better than no image.
+  function simplifyPrompt(prompt: string): string {
+    // Remove the "Baked-in TikTok-style caption..." instruction
+    let simplified = prompt.replace(
+      /Baked-in TikTok-style caption in bold white rounded sans-serif with solid black outline reading:\s*"[^"]*"[^.]*\.\s*/gi,
+      ""
+    );
+    // Also remove any secondary caption instruction (for product slide)
+    simplified = simplified.replace(
+      /Baked-in TikTok-style caption[^.]*\.\s*/gi,
+      ""
+    );
+    // Remove "No other text or graphics" since we're not adding text anyway
+    simplified = simplified.replace(/No other text or graphics[^.]*\.\s*/gi, "");
+    // Remove "plus one white hand-drawn arrow" — keep it simple
+    simplified = simplified.replace(/,?\s*plus one white hand-drawn arrow[^.]*\./gi, ".");
+    // Clean up double spaces
+    simplified = simplified.replace(/\s{2,}/g, " ").trim();
+    return simplified;
+  }
 
-  for (const model of models) {
+  const errors: string[] = [];
+
+  // ─── Strategy 1: nano-banana-pro + full prompt + reference ───
+  if (referenceImageUrl) {
     try {
-      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: trying model ${model}...`);
-
-      const submitRes = await fetch("https://api.kie.ai/api/v1/jobs/createTask", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ model, input }),
-      });
-
-      const submitText = await submitRes.text();
-      console.log(`[Carousel] kie.ai (${model}) createTask response for carousel ${carouselIndex + 1} slide ${slideIndex + 1}: ${submitText.slice(0, 300)}`);
-
-      let submitJson: Record<string, unknown>;
-      try {
-        submitJson = JSON.parse(submitText);
-      } catch {
-        throw new Error(`kie.ai (${model}) returned non-JSON: ` + submitText.slice(0, 200));
-      }
-
-      if (submitJson.code !== 200) {
-        const errMsg = (submitJson.msg as string) || submitText.slice(0, 200);
-        // If model not found/supported, try next model
-        if (errMsg.toLowerCase().includes("model") || errMsg.toLowerCase().includes("not found") || errMsg.toLowerCase().includes("not support")) {
-          console.warn(`[Carousel] Model ${model} not available (${errMsg}), trying next...`);
-          lastError = new Error(`Model ${model}: ${errMsg}`);
-          continue;
-        }
-        // For other errors, throw immediately
-        throw new Error(
-          "Failed to submit image for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1) + " (" + model + "): " + errMsg
-        );
-      }
-
-      const taskId = submitJson.data?.taskId;
-      if (!taskId) {
-        throw new Error("No taskId returned for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1) + " (" + model + ")");
-      }
-
-      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: ${model} task ${taskId} submitted, polling...`);
-      const imageUrl = await pollKieImage(taskId, apiKey);
-      console.log(`[Carousel] Carousel ${carouselIndex + 1}/${totalCarousels} Slide ${slideIndex + 1}/${totalSlides}: image ready (model: ${model})!`);
-      return imageUrl;
+      return await tryKieModel("nano-banana-pro", imagePrompt, true);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
-      // If this is a "model not available" error, continue to next model
-      if (msg.includes("not available") || msg.toLowerCase().includes("not support") || msg.toLowerCase().includes("not found")) {
-        console.warn(`[Carousel] Model ${model} failed (${msg}), trying next...`);
-        lastError = err instanceof Error ? err : new Error(msg);
-        continue;
-      }
-      // For other errors (timeout, generation failure), throw immediately
-      throw err;
+      errors.push(`pro+ref: ${msg}`);
+      console.warn(`${logPrefix}: Strategy 1 failed: ${msg}`);
     }
   }
 
-  throw lastError || new Error("All kie.ai models failed for carousel " + (carouselIndex + 1) + " slide " + (slideIndex + 1));
+  // ─── Strategy 2: nano-banana-pro + full prompt WITHOUT reference ───
+  try {
+    return await tryKieModel("nano-banana-pro", imagePrompt, false);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`pro-only: ${msg}`);
+    console.warn(`${logPrefix}: Strategy 2 failed: ${msg}`);
+  }
+
+  // ─── Strategy 3: nano-banana-2 + full prompt + reference ───
+  if (referenceImageUrl) {
+    try {
+      return await tryKieModel("nano-banana-2", imagePrompt, true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`v2+ref: ${msg}`);
+      console.warn(`${logPrefix}: Strategy 3 failed: ${msg}`);
+    }
+  }
+
+  // ─── Strategy 4: nano-banana-2 + full prompt WITHOUT reference ───
+  try {
+    return await tryKieModel("nano-banana-2", imagePrompt, false);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`v2-only: ${msg}`);
+    console.warn(`${logPrefix}: Strategy 4 failed: ${msg}`);
+  }
+
+  // ─── Strategy 5: nano-banana-2 + SIMPLIFIED prompt + reference ───
+  const simplifiedPrompt = simplifyPrompt(imagePrompt);
+  if (referenceImageUrl && simplifiedPrompt !== imagePrompt) {
+    try {
+      console.log(`${logPrefix}: trying simplified prompt (no baked-in text) + reference...`);
+      return await tryKieModel("nano-banana-2", simplifiedPrompt, true);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`v2+simplified+ref: ${msg}`);
+      console.warn(`${logPrefix}: Strategy 5 failed: ${msg}`);
+    }
+  }
+
+  // ─── Strategy 6: nano-banana-2 + SIMPLIFIED prompt WITHOUT reference ───
+  if (simplifiedPrompt !== imagePrompt) {
+    try {
+      console.log(`${logPrefix}: trying simplified prompt (no baked-in text, no reference)...`);
+      return await tryKieModel("nano-banana-2", simplifiedPrompt, false);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      errors.push(`v2+simplified-only: ${msg}`);
+      console.warn(`${logPrefix}: Strategy 6 failed: ${msg}`);
+    }
+  }
+
+  // ─── Strategy 7: Built-in ZAI image generation (last resort) ───
+  try {
+    console.log(`${logPrefix}: trying built-in ZAI image generation as last resort...`);
+    const zaiImageUrl = await generateSlideImageBuiltIn(simplifiedPrompt || imagePrompt);
+    console.log(`${logPrefix}: ZAI image ready!`);
+    return zaiImageUrl;
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    errors.push(`zai: ${msg}`);
+    console.warn(`${logPrefix}: Strategy 7 failed: ${msg}`);
+  }
+
+  // ─── ABSOLUTE LAST RESORT: Return a placeholder SVG data URL ───
+  // This ensures the slide ALWAYS has an image, even if every AI API is down.
+  // The user can regenerate later. Better than showing "image failed".
+  console.error(`${logPrefix}: ALL strategies failed. Generating placeholder image.`);
+  console.error(`${logPrefix} errors: ${errors.join(" | ")}`);
+  const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1344" viewBox="0 0 768 1344">
+    <rect width="768" height="1344" fill="#1A1A1A"/>
+    <rect x="40" y="40" width="688" height="1264" rx="20" fill="none" stroke="#E461AD" stroke-width="3" stroke-dasharray="10 8"/>
+    <text x="384" y="620" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="42" font-weight="bold" fill="#E461AD">Image unavailable</text>
+    <text x="384" y="680" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="24" fill="#888">Slide ${slideIndex + 1} of ${totalSlides}</text>
+    <text x="384" y="720" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="18" fill="#666">Try regenerating this carousel</text>
+  </svg>`;
+  return `data:image/svg+xml;base64,${Buffer.from(placeholderSvg).toString("base64")}`;
 }
+
 
 // ─── Generate slide image using built-in AI API ──────────────────────
 async function generateSlideImageBuiltIn(prompt: string): Promise<string> {

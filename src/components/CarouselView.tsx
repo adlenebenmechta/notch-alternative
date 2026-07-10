@@ -48,16 +48,23 @@ interface CarouselViewProps {
 
 // ─── Slide type colors/icons ───────────────────────────────────────────────
 const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
+  // UGC methodology slide types (primary)
+  hook: { color: "#E461AD", bg: "#E461AD25", label: "Hook", emoji: "🎯" },
+  problem: { color: "#EF4444", bg: "#EF444425", label: "Problem", emoji: "😤" },
+  solution: { color: "#22C55E", bg: "#22C55E25", label: "Solution", emoji: "💡" },
+  person_using: { color: "#22C55E", bg: "#22C55E25", label: "Person Using", emoji: "📱" },
+  candid: { color: "#3B82F6", bg: "#3B82F625", label: "Candid", emoji: "💬" },
+  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
+  benefit: { color: "#22C55E", bg: "#22C55E25", label: "Benefit", emoji: "✨" },
+  proof: { color: "#06B6D4", bg: "#06B6D425", label: "Proof", emoji: "📊" },
+  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
+  // Legacy slide types (kept for backward compatibility)
   hero: { color: "#E461AD", bg: "#E461AD25", label: "Hero Shot", emoji: "🎯" },
   quote: { color: "#3B82F6", bg: "#3B82F625", label: "Quote", emoji: "💬" },
-  comparison: { color: "#F59E0B", bg: "#F59E0B25", label: "❌/✅", emoji: "⚖️" },
   tip: { color: "#8B5CF6", bg: "#8B5CF625", label: "Tip", emoji: "💡" },
   stat: { color: "#06B6D4", bg: "#06B6D425", label: "Stat", emoji: "📊" },
   question: { color: "#EC4899", bg: "#EC489925", label: "Question", emoji: "🤔" },
-  problem: { color: "#EF4444", bg: "#EF444425", label: "Problem", emoji: "😤" },
-  benefit: { color: "#22C55E", bg: "#22C55E25", label: "Benefit", emoji: "✨" },
   feature: { color: "#6366F1", bg: "#6366F125", label: "Feature", emoji: "🔬" },
-  product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
 };
 
 // ─── Word wrap helper ────────────────────────────────────────────────────────
