@@ -702,8 +702,16 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         return;
       }
 
-      const imgRes = await fetch(downloadUrl);
+      // Use proxy to bypass CORS for external URLs (kie.ai, etc.)
+      const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(downloadUrl)}`;
+      const imgRes = await fetch(proxyUrl);
+      if (!imgRes.ok) {
+        throw new Error(`Failed to fetch image (${imgRes.status})`);
+      }
       const blob = await imgRes.blob();
+      if (blob.size === 0) {
+        throw new Error("Empty blob");
+      }
       const url = URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
@@ -712,7 +720,9 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch {
+    } catch (err) {
+      console.error(`[Carousel] Download slide failed:`, err);
+      // Last resort: open in new tab
       window.open(downloadUrl, "_blank");
     }
   };
@@ -732,6 +742,21 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   // ─── Download carousel as ZIP file ──────────────────────────────────
   const [downloadingZip, setDownloadingZip] = useState<number | null>(null);
 
+  // Helper: fetch image as blob, using proxy for external URLs to bypass CORS
+  const fetchImageAsBlob = async (url: string): Promise<Blob> => {
+    if (url.startsWith("data:")) {
+      const res = await fetch(url);
+      return await res.blob();
+    }
+    // Use the proxy route for external URLs to avoid CORS issues
+    const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
+    const res = await fetch(proxyUrl);
+    if (!res.ok) {
+      throw new Error(`Failed to fetch image via proxy (${res.status})`);
+    }
+    return await res.blob();
+  };
+
   const downloadCarouselAsZip = async (carouselIdx: number) => {
     const carousel = carousels[carouselIdx];
     if (!carousel) return;
@@ -745,26 +770,30 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
         .slice(0, 40) || `carousel-${carouselIdx + 1}`;
       const folder = zip.folder(folderName);
 
+      let addedCount = 0;
       for (let i = 0; i < carousel.slides.length; i++) {
         const slide = carousel.slides[i];
         const downloadUrl = slide.textOverlayUrl || slide.imageUrl;
         if (!downloadUrl) continue;
 
         try {
-          let blob: Blob;
-          if (downloadUrl.startsWith("data:")) {
-            const res = await fetch(downloadUrl);
-            blob = await res.blob();
-          } else {
-            const res = await fetch(downloadUrl);
-            blob = await res.blob();
+          const blob = await fetchImageAsBlob(downloadUrl);
+          if (blob.size === 0) {
+            console.warn(`[Carousel] Slide ${i + 1} blob is empty, skipping`);
+            continue;
           }
           const slideType = slide.slideType || "slide";
           const fileName = `${String(i + 1).padStart(2, "0")}-${slideType}.png`;
           folder!.file(fileName, blob);
+          addedCount++;
         } catch (err) {
           console.error(`[Carousel] Failed to add slide ${i + 1} to ZIP:`, err);
         }
+      }
+
+      if (addedCount === 0) {
+        alert("No images could be downloaded. Please try again.");
+        return;
       }
 
       const zipBlob = await zip.generateAsync({ type: "blob" });
@@ -778,6 +807,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       URL.revokeObjectURL(url);
     } catch (err) {
       console.error("[Carousel] ZIP download failed:", err);
+      alert("ZIP download failed. Please try downloading slides individually.");
     } finally {
       setDownloadingZip(null);
     }
@@ -1062,9 +1092,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
 
             {/* Slide Image */}
             <div
-              className="relative rounded-3xl overflow-hidden"
+              className="relative rounded-3xl overflow-hidden mx-auto"
               style={{
                 aspectRatio: "9/16",
+                maxWidth: "360px",
+                width: "100%",
                 backgroundColor: "#1A1A1A",
                 border: `2px solid #333333`,
                 boxShadow: `0 8px 40px rgba(0,0,0,0.5)`,
@@ -1074,7 +1106,9 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 <img
                   src={displayUrl}
                   alt={activeSlide.title}
-                  className="w-full h-full object-cover"
+                  className="w-full h-full"
+                  style={{ objectFit: "contain" }}
+                  crossOrigin="anonymous"
                 />
               ) : (
                 <div className="w-full h-full flex items-center justify-center p-8">
