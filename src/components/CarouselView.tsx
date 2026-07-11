@@ -1064,7 +1064,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
             <div
               className="relative rounded-3xl overflow-hidden"
               style={{
-                aspectRatio: "3/4",
+                aspectRatio: "9/16",
                 backgroundColor: "#1A1A1A",
                 border: `2px solid #333333`,
                 boxShadow: `0 8px 40px rgba(0,0,0,0.5)`,
@@ -1508,7 +1508,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                 Locked Settings
               </p>
               <p className="text-[10px] leading-relaxed mt-0.5" style={{ color: C.textMuted }}>
-                Model: <b>Nano Banana 2</b> • 3:4 ratio • Product image as reference (product always matches)
+                Model: <b>Nano Banana Pro</b> • 9:16 ratio (TikTok/Reels native) • Product image as reference (product always matches)
                 <br />
                 Text: <b>Bold white rounded + black outline</b> • ~22% from top
                 <br />
@@ -1839,7 +1839,7 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
                     </svg>
                   ),
                   title: "Nano Banana 2",
-                  desc: "High-quality AI images, 3:4 ratio, product reference built-in",
+                  desc: "Hyperrealistic phone photos, Nano Banana Pro, 9:16 TikTok ratio",
                 },
                 {
                   icon: (

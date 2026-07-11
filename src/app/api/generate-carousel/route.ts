@@ -211,7 +211,7 @@ function enforceUGCPrompt(prompt: string): string {
 }
 
 // ─── Carousel Skill Prompt (UGC Methodology) ───────────────────────────────
-// Model: Nano Banana Pro (edit mode), 3:4 aspect ratio (768x1344)
+// Model: Nano Banana Pro (edit mode), 9:16 aspect ratio (1080x1920) — TikTok/Reels native
 // Text is BAKED INTO the image (bold white rounded sans-serif + solid black outline)
 // Text position: ~22% down from the top, never touching the top edge
 // Slide count: 3-6 per carousel (hook + 1-3 middle + product), last slide always "product"
@@ -1121,7 +1121,7 @@ async function generateSlideImageKie(
   ): Promise<string> {
     const input: Record<string, unknown> = {
       prompt,
-      image_size: "768x1344",
+      image_size: "1080x1920",
     };
     if (useReference && referenceImageUrl) {
       input.image_input = [referenceImageUrl];
@@ -1282,7 +1282,7 @@ async function generateSlideImageKie(
 
 // ─── Generate slide image using built-in AI API ──────────────────────
 async function generateSlideImageBuiltIn(prompt: string): Promise<string> {
-  const response = await imageGeneration(prompt, "768x1344");
+  const response = await imageGeneration(prompt, "1080x1920");
 
   if (response) {
     const data = (response as Record<string, unknown>)?.data;
@@ -1298,7 +1298,7 @@ async function generateSlideImageBuiltIn(prompt: string): Promise<string> {
 }
 
 // ─── Image generation with fallback to z-ai-web-dev-sdk ────────────────
-async function imageGeneration(prompt: string, size: string = "768x1344"): Promise<Record<string, unknown> | null> {
+async function imageGeneration(prompt: string, size: string = "1080x1920"): Promise<Record<string, unknown> | null> {
   const config = getAIConfig();
   if (config) {
     try {
@@ -1323,7 +1323,7 @@ async function imageGeneration(prompt: string, size: string = "768x1344"): Promi
 }
 
 // ─── Direct image generation API call ────────────────────────────────
-async function imageGenerationDirect(config: AIConfig, prompt: string, size: string = "768x1344") {
+async function imageGenerationDirect(config: AIConfig, prompt: string, size: string = "1080x1920") {
   const url = `${config.baseUrl}/images/generations`;
 
   const headers: Record<string, string> = {
