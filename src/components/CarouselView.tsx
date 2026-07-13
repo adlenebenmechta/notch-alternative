@@ -742,19 +742,37 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
   // ─── Download carousel as ZIP file ──────────────────────────────────
   const [downloadingZip, setDownloadingZip] = useState<number | null>(null);
 
-  // Helper: fetch image as blob, using proxy for external URLs to bypass CORS
-  const fetchImageAsBlob = async (url: string): Promise<Blob> => {
+  // Helper: fetch image as blob with retry, using proxy for external URLs to bypass CORS
+  const fetchImageAsBlob = async (url: string, maxRetries = 3): Promise<Blob> => {
     if (url.startsWith("data:")) {
       const res = await fetch(url);
       return await res.blob();
     }
+
     // Use the proxy route for external URLs to avoid CORS issues
     const proxyUrl = `/api/proxy-image?url=${encodeURIComponent(url)}`;
-    const res = await fetch(proxyUrl);
-    if (!res.ok) {
-      throw new Error(`Failed to fetch image via proxy (${res.status})`);
+
+    let lastError: Error | null = null;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        const res = await fetch(proxyUrl);
+        if (!res.ok) {
+          throw new Error(`Proxy returned ${res.status}`);
+        }
+        const blob = await res.blob();
+        if (blob.size === 0) {
+          throw new Error("Empty blob");
+        }
+        return blob;
+      } catch (err) {
+        lastError = err instanceof Error ? err : new Error(String(err));
+        console.warn(`[Carousel] Fetch attempt ${attempt}/${maxRetries} failed:`, lastError.message);
+        if (attempt < maxRetries) {
+          await new Promise(r => setTimeout(r, attempt * 1500)); // 1.5s, 3s backoff
+        }
+      }
     }
-    return await res.blob();
+    throw lastError || new Error("All retries failed");
   };
 
   const downloadCarouselAsZip = async (carouselIdx: number) => {
@@ -771,28 +789,33 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       const folder = zip.folder(folderName);
 
       let addedCount = 0;
+      const failedSlides: number[] = [];
+
+      // Download slides SEQUENTIALLY (not parallel) to avoid overwhelming the proxy
       for (let i = 0; i < carousel.slides.length; i++) {
         const slide = carousel.slides[i];
         const downloadUrl = slide.textOverlayUrl || slide.imageUrl;
         if (!downloadUrl) continue;
 
         try {
-          const blob = await fetchImageAsBlob(downloadUrl);
-          if (blob.size === 0) {
-            console.warn(`[Carousel] Slide ${i + 1} blob is empty, skipping`);
-            continue;
-          }
+          const blob = await fetchImageAsBlob(downloadUrl, 3);
           const slideType = slide.slideType || "slide";
           const fileName = `${String(i + 1).padStart(2, "0")}-${slideType}.png`;
           folder!.file(fileName, blob);
           addedCount++;
         } catch (err) {
-          console.error(`[Carousel] Failed to add slide ${i + 1} to ZIP:`, err);
+          console.error(`[Carousel] Failed to add slide ${i + 1} to ZIP after retries:`, err);
+          failedSlides.push(i + 1);
+        }
+
+        // Small delay between downloads to avoid rate limiting
+        if (i < carousel.slides.length - 1) {
+          await new Promise(r => setTimeout(r, 500));
         }
       }
 
       if (addedCount === 0) {
-        alert("No images could be downloaded. Please try again.");
+        alert("No images could be downloaded. Please try again or download slides individually.");
         return;
       }
 
@@ -805,6 +828,11 @@ export default function CarouselView({ onBack, isAdmin = false }: CarouselViewPr
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
+
+      // Notify user if some slides failed
+      if (failedSlides.length > 0) {
+        alert(`Downloaded ${addedCount} of ${carousel.slides.length} slides. Failed slides: ${failedSlides.join(", ")}. Try downloading those individually.`);
+      }
     } catch (err) {
       console.error("[Carousel] ZIP download failed:", err);
       alert("ZIP download failed. Please try downloading slides individually.");
