@@ -1,10 +1,14 @@
 // Blotato API Service - Modern Blotato API integration
 // Docs: https://docs.blotato.com
-// REST API Base URL: https://api.blotato.com/v1/api
-// Auth: Authorization: Bearer blt_xxxxx
 //
-// The newer Blotato API uses Bearer token auth (different from PostPeer's x-access-key).
-// Endpoints use POST for many reads (Blotato quirk) and include:
+// Blotato (formerly PostPeer) has two API surfaces:
+//   1. Newer: https://api.blotato.com/v1/api  (Bearer auth)
+//   2. Legacy: https://api.postpeer.dev/v1   (x-access-key OR Bearer auth)
+//
+// This service tries the newer API first, then falls back to the legacy one.
+// Both auth headers are sent simultaneously to maximize compatibility.
+//
+// Key endpoints (newer API):
 //   POST /v1/api/accounts            - List connected accounts (body: {pagination, filter})
 //   POST /v1/api/posts               - Create/publish/schedule a post
 //   POST /v1/api/posts/{id}/get      - Get post status
@@ -12,7 +16,10 @@
 //   DELETE /v1/api/posts/{id}        - Delete a scheduled post
 //   POST /v1/api/posts/list          - List posts (body: {pagination, filter})
 
-const BLOTATO_BASE_URL = 'https://api.blotato.com/v1/api';
+const BLOTATO_BASE_URLS = [
+  'https://api.blotato.com/v1/api',  // newer Blotato API
+  'https://api.postpeer.dev/v1',     // legacy PostPeer API (same product)
+];
 
 export interface BlotatoAccount {
   id: string;
@@ -88,6 +95,47 @@ export class BlotatoService {
     }
   }
 
+  /**
+   * Try a single fetch against one base URL.
+   * Sends BOTH auth headers (Bearer + x-access-key) for max compatibility.
+   */
+  private async tryFetch(
+    baseUrl: string,
+    method: string,
+    endpoint: string,
+    body?: any
+  ): Promise<{ ok: boolean; status: number; data: any; error?: string }> {
+    const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+
+    const headers: Record<string, string> = {
+      'Authorization': `Bearer ${this.apiKey}`,
+      'x-access-key': this.apiKey, // some Blotato/PostPeer versions use this header
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+    };
+
+    try {
+      const response = await fetch(url, {
+        method,
+        headers,
+        body: body ? JSON.stringify(body) : undefined,
+        signal: AbortSignal.timeout(30000),
+      });
+
+      const text = await response.text();
+      let data: any;
+      try {
+        data = text ? JSON.parse(text) : {};
+      } catch {
+        data = { raw: text };
+      }
+
+      return { ok: response.ok, status: response.status, data };
+    } catch (err: any) {
+      return { ok: false, status: 0, data: null, error: err.message };
+    }
+  }
+
   private async request<T = any>(
     method: string,
     endpoint: string,
@@ -98,71 +146,92 @@ export class BlotatoService {
       throw new Error('BLOTATO_API_KEY is not configured');
     }
 
-    const url = endpoint.startsWith('http') ? endpoint : `${BLOTATO_BASE_URL}${endpoint}`;
-    console.log(`[Blotato] ${method} ${url}`);
+    let lastError: string | null = null;
 
-    const headers: Record<string, string> = {
-      'Authorization': `Bearer ${this.apiKey}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    };
+    // Try each base URL until one works
+    for (let i = 0; i < BLOTATO_BASE_URLS.length; i++) {
+      const baseUrl = BLOTATO_BASE_URLS[i];
+      const url = endpoint.startsWith('http') ? endpoint : `${baseUrl}${endpoint}`;
+      console.log(`[Blotato] ${method} ${url} (try ${i + 1}/${BLOTATO_BASE_URLS.length})`);
 
-    const response = await fetch(url, {
-      method,
-      headers,
-      body: body ? JSON.stringify(body) : undefined,
-      signal: AbortSignal.timeout(60000),
-    });
+      const result = await this.tryFetch(baseUrl, method, endpoint, body);
 
-    const text = await response.text();
-    let data: any;
-    try {
-      data = text ? JSON.parse(text) : {};
-    } catch {
-      data = { raw: text };
+      // Network error (DNS, timeout, etc.) — try next base URL
+      if (result.status === 0) {
+        console.warn(`[Blotato] Network error on ${baseUrl}: ${result.error}`);
+        lastError = result.error || 'Network error';
+        continue;
+      }
+
+      // Auth error — the URL resolved but the key was rejected.
+      // Don't bother trying the other base URL since they share the same auth.
+      if (result.status === 401 || result.status === 403) {
+        const errMsg = result.data?.message || result.data?.error || `HTTP ${result.status}`;
+        console.error(`[Blotato] Auth error on ${baseUrl}:`, errMsg);
+        throw new Error(`Blotato API auth error: ${errMsg}`);
+      }
+
+      if (!result.ok) {
+        const errMsg = result.data?.message || result.data?.error || result.data?.raw || `HTTP ${result.status}`;
+        console.error(`[Blotato] Error ${result.status} on ${baseUrl}:`, errMsg);
+        // For 404s and other client errors, throw immediately (not a base URL issue)
+        throw new Error(`Blotato API error: ${errMsg}`);
+      }
+
+      // Success!
+      return result.data as T;
     }
 
-    if (!response.ok) {
-      const errMsg = data.message || data.error || data.raw || `HTTP ${response.status}`;
-      console.error(`[Blotato] Error ${response.status}:`, errMsg);
-      throw new Error(`Blotato API error: ${errMsg}`);
-    }
-
-    return data as T;
+    // All base URLs failed with network errors
+    throw new Error(
+      `Blotato API unreachable. Tried: ${BLOTATO_BASE_URLS.join(', ')}. Last error: ${lastError}`
+    );
   }
 
   // ─── Accounts ──────────────────────────────────────────────────────────────
 
   /**
    * List all connected social accounts.
-   * Blotato uses POST /accounts with a pagination body.
+   * Tries multiple endpoint paths across Blotato/PostPeer API versions:
+   *   1. POST /accounts (newer Blotato)
+   *   2. GET /accounts (some Blotato versions)
+   *   3. GET /connect/integrations (legacy PostPeer)
    */
   async getAccounts(): Promise<BlotatoAccount[]> {
-    try {
-      const data = await this.request<any>('POST', '/accounts', {
-        pagination: { limit: 100, cursor: null },
-      });
-      // Handle multiple possible response shapes
-      const list =
-        data?.data ||
-        data?.accounts ||
-        data?.items ||
-        data?.results ||
-        (Array.isArray(data) ? data : []);
-      return list.map((a: any) => this.normalizeAccount(a));
-    } catch (err: any) {
-      console.error('[Blotato] getAccounts failed:', err.message);
-      // Try fallback GET (some Blotato API versions support GET /accounts)
+    // Strategy: try each (method, endpoint) combination until one returns a list
+    const attempts: { method: string; endpoint: string; body?: any }[] = [
+      { method: 'POST', endpoint: '/accounts', body: { pagination: { limit: 100, cursor: null } } },
+      { method: 'GET', endpoint: '/accounts' },
+      { method: 'GET', endpoint: '/connect/integrations' }, // PostPeer legacy
+    ];
+
+    let lastErr: any = null;
+    for (const attempt of attempts) {
       try {
-        const data = await this.request<any>('GET', '/accounts');
+        const data = await this.request<any>(attempt.method, attempt.endpoint, attempt.body);
         const list =
-          data?.data || data?.accounts || data?.items || (Array.isArray(data) ? data : []);
-        return list.map((a: any) => this.normalizeAccount(a));
-      } catch (fallbackErr: any) {
-        console.error('[Blotato] getAccounts fallback also failed:', fallbackErr.message);
-        throw err;
+          data?.data ||
+          data?.accounts ||
+          data?.integrations ||
+          data?.items ||
+          data?.results ||
+          (Array.isArray(data) ? data : []);
+
+        if (Array.isArray(list) && list.length > 0) {
+          return list.map((a: any) => this.normalizeAccount(a));
+        }
+        // Empty list — keep trying other endpoints in case this one is just empty
+        if (Array.isArray(list)) {
+          return list.map((a: any) => this.normalizeAccount(a));
+        }
+      } catch (err: any) {
+        console.warn(`[Blotato] getAccounts attempt ${attempt.method} ${attempt.endpoint} failed:`, err.message);
+        lastErr = err;
       }
     }
+
+    if (lastErr) throw lastErr;
+    return [];
   }
 
   /**
