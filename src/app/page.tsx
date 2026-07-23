@@ -15,6 +15,7 @@ import BOFVideosMachine from "@/components/BOFVideosMachine";
 import ClaymotionVideosMachine from "@/components/ClaymotionVideosMachine";
 import AllInOneMachine from "@/components/AllInOneMachine";
 import AutoPublishMachine from "@/components/AutoPublishMachine";
+import ScheduleMachine from "@/components/ScheduleMachine";
 
 // ─── Colors (matching the existing design) ────────────────────────────────────
 
@@ -304,7 +305,7 @@ function SubscriptionScreen({ userData, onComplete }: {
 export default function Home() {
   const { user, loading, signOut } = useAuth();
   const [showSubscription, setShowSubscription] = useState(false);
-  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion" | "allinone">("menu");
+  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion" | "allinone" | "autopublish" | "schedule">("menu");
   const [initialView, setInitialView] = useState<string>("create");
   const [libraryEditorUrl, setLibraryEditorUrl] = useState("");
   const [libraryCaptionUrl, setLibraryCaptionUrl] = useState("");
@@ -315,7 +316,7 @@ export default function Home() {
 
   // Redirect to menu if user logs out while on a sub-view
   useEffect(() => {
-    if (!loading && !user && (currentView === "avatar" || currentView === "carousel" || currentView === "podcast" || currentView === "library" || currentView === "bof" || currentView === "claymotion" || currentView === "allinone")) {
+    if (!loading && !user && (currentView === "avatar" || currentView === "carousel" || currentView === "podcast" || currentView === "library" || currentView === "bof" || currentView === "claymotion" || currentView === "allinone" || currentView === "autopublish" || currentView === "schedule")) {
       setCurrentView("menu");
     }
   }, [user, loading, currentView]);
@@ -363,6 +364,8 @@ export default function Home() {
             setCurrentView("allinone");
           } else if (dest === "autopublish-machine") {
             setCurrentView("autopublish");
+          } else if (dest === "schedule-machine") {
+            setCurrentView("schedule");
           }
         }}
         onOpenLibrary={() => {
@@ -411,6 +414,8 @@ export default function Home() {
             setCurrentView("claymotion");
           } else if (dest === "autopublish-machine") {
             setCurrentView("autopublish");
+          } else if (dest === "schedule-machine") {
+            setCurrentView("schedule");
           }
         }}
       />
@@ -420,6 +425,11 @@ export default function Home() {
   // Auto-Publish Machine view
   if (currentView === "autopublish") {
     return <AutoPublishMachine onBack={() => setCurrentView("menu")} isAdmin={!!isAdmin} />;
+  }
+
+  // Schedule Machine view
+  if (currentView === "schedule") {
+    return <ScheduleMachine onBack={() => setCurrentView("menu")} isAdmin={!!isAdmin} />;
   }
 
   // Unified Library view

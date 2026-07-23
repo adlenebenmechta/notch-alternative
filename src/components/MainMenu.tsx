@@ -1377,7 +1377,6 @@ export default function MainMenu({
       ),
       accentColor: "#8B5CF6",
     },
-  ,
     {
       id: "autopublish-machine",
       title: "Auto-Publish Machine",
@@ -1394,6 +1393,27 @@ export default function MainMenu({
         </svg>
       ),
       accentColor: "#FF0050",
+    },
+    {
+      id: "schedule-machine",
+      title: "Schedule Machine",
+      subtitle: "AI Calendar & Smart Scheduling",
+      description: "Plan your whole TikTok calendar with drag-and-drop, best-time recommendations, and an AI bot that fills your schedule automatically.",
+      icon: (
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <rect x="6" y="8" width="36" height="34" rx="5" stroke="#10B981" strokeWidth="2.5" fill="none" />
+          <path d="M6 18h36" stroke="#10B981" strokeWidth="2" strokeLinecap="round" />
+          <path d="M16 4v8M32 4v8" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" />
+          <rect x="12" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.85" />
+          <rect x="21" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.5" />
+          <rect x="30" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.25" />
+          <rect x="12" y="33" width="6" height="6" rx="1" fill="#10B981" opacity="0.5" />
+          <rect x="21" y="33" width="6" height="6" rx="1" fill="#10B981" opacity="0.85" />
+          <circle cx="36" cy="38" r="6" fill="#10B981" />
+          <path d="M33.5 38l1.8 1.8 3.2-3.6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+        </svg>
+      ),
+      accentColor: "#10B981",
     }];
 
   return (
@@ -1613,7 +1633,8 @@ export default function MainMenu({
                 const isClaymotionCard = !item.disabled && item.id === "claymotion-videos-machine";
                 const isAllInOneCard = !item.disabled && item.id === "allinone-machine";
                 const isAutoPublishCard = !item.disabled && item.id === "autopublish-machine";
-                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard || isAutoPublishCard;
+                const isScheduleCard = !item.disabled && item.id === "schedule-machine";
+                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard || isAutoPublishCard || isScheduleCard;
                 const isHovered = activeCard === index && !item.disabled;
                 return (
                 <div
