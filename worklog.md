@@ -67,3 +67,80 @@ Stage Summary:
   show this account and the user can start scheduling posts.
 - The /api/schedule/debug endpoint now provides a live diagnostic report
   with a clear summary and recommendation.
+
+---
+Task ID: schedule-postpeer-switch
+Agent: Main Agent
+Task: Switch Schedule Machine from Blotato to PostPeer API (user provided PostPeer key)
+
+Work Log:
+- Tested user's PostPeer key (jySqBLF9h6SGen) against api.postpeer.dev:
+  * GET /v1/health/auth -> 200, {ok:true} (key valid)
+  * GET /v1/connect/integrations -> 200, returned 5 TikTok accounts:
+    @armoray.deals, @viral_deals4u, @armorayusa, @outdoordeals4u, @armorayactiva
+- PostPeer returns 5 accounts vs Blotato's 1 — clearly better choice.
+- Updated .env: added POSTPEER_API_KEY=jySqBLF9h6SGen
+- Updated src/lib/scheduleService.ts: replaced BlotatoService with PostPeerService
+  singleton. createPost calls split into publishPost (video) and
+  publishImagePost (images) per PostPeer's API design. DB column names
+  kept as blotatoPostId/blotatoStatus for backward compat with existing rows.
+- Updated src/app/api/schedule/accounts/route.ts: now checks POSTPEER_API_KEY
+  and returns PostPeer diagnostics.
+- Updated src/app/api/schedule/debug/route.ts: now hits the REAL PostPeer
+  endpoints (/v1/health/auth and /v1/connect/integrations) for diagnostics.
+- Updated src/components/ScheduleMachine.tsx: all user-facing text switched
+  from 'Blotato' to 'PostPeer'. Dashboard link points to app.postpeer.dev.
+- Updated src/lib/scheduleBot.ts: all bot messages now say PostPeer.
+- TypeScript type-check passed (src/ is clean).
+- Committed (46f5be3) and pushed to GitHub. Railway will auto-redeploy.
+
+Stage Summary:
+- Schedule Machine now uses PostPeer API which returns all 5 TikTok accounts.
+- After Railway redeploys (~2-3 min), the Schedule Machine should immediately
+  show all 5 accounts (@armoray.deals, @viral_deals4u, @armorayusa,
+  @outdoordeals4u, @armorayactiva) and the user can start scheduling posts.
+- The /api/schedule/debug endpoint now tests PostPeer endpoints specifically.
+
+---
+Task ID: gdrive-import
+Agent: Main Agent
+Task: Add Google Drive → TikTok scheduler feature (paste folder URL + bot instructions → bot auto-generates captions/hashtags and schedules videos via PostPeer)
+
+Work Log:
+- Verified PostPeer API key jySqBLF9h6SGen still works (GET /v1/health/auth → {ok:true}, GET /v1/connect/integrations → 5 TikTok accounts)
+- Created new API endpoint /api/schedule/gdrive-import/route.ts:
+  * POST handler: takes folderUrl + instructions + accountIds + userEmail
+    1. Lists video files in the Google Drive folder via listFolderFiles()
+    2. Parses user's natural-language instructions with ZAI → structured plan
+       (postsPerDay, timesOfDay, daysAhead, startDate, accountIds, captionTone, hashtagsFocus)
+    3. Generates unique captions + 5-8 hashtags per video with ZAI (uses filename + tone + focus topics)
+    4. Creates schedule slots via createSlot() — each slot auto-publishes to PostPeer as a scheduled post
+    5. Returns plan summary + created slot details (filename, scheduledAt, account, caption, hashtags)
+  * GET handler: previews folder contents without scheduling (used by modal's "Preview" button)
+- Enhanced src/lib/googleDriveService.ts:
+  * Reordered listFolderFiles() to try HTML parsing FIRST (more reliable for public folders than the API)
+  * Rewrote listFilesFromHtml() to use embeddedfolderview endpoint as primary strategy
+    (works for ANY public folder without needing an API key)
+  * Added parseEmbeddedFolderHtml() helper that pairs file/d/ID links with .flip-entry-title divs
+  * Removed hardcoded broken Google Drive API key — now reads GOOGLE_DRIVE_API_KEY from env (optional)
+  * Three-tier fallback: embeddedfolderview → regular folder page → Drive API (if key set)
+- Added GoogleDriveImportModal component to ScheduleMachine.tsx:
+  * 3-step UI: ① folder URL + Preview button, ② instructions textarea with 4 presets, ③ account multi-select
+  * Shows preview of found videos before scheduling (filename + size)
+  * Shows detailed results after scheduling (filename, scheduled time, account, caption, hashtags)
+  * Posts rotate across all selected accounts (e.g. 10 videos × 5 accounts = 2 posts per account)
+  * Emerald green theme matching the rest of Schedule Machine
+- Wired "Google Drive Import" button into the Schedule Machine header (next to Bot/Library buttons)
+- TypeScript check passes (only unrelated pre-existing error in download/ad_generator_new.tsx)
+- Pushing to main → Railway will auto-redeploy
+
+Stage Summary:
+- New feature: user can now paste a Google Drive folder URL, give natural-language instructions
+  (e.g. "2 posts per day at 12pm and 8pm for 7 days, funny captions about outdoor deals"),
+  and the bot will:
+    1. List all videos in the folder (no API key needed for public folders)
+    2. Generate unique captions + hashtags for each video using ZAI
+    3. Schedule them across selected TikTok accounts via PostPeer
+    4. Show a detailed results panel with every scheduled slot
+- Files added: src/app/api/schedule/gdrive-import/route.ts
+- Files modified: src/components/ScheduleMachine.tsx (+502 lines), src/lib/googleDriveService.ts

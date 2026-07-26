@@ -222,6 +222,9 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   const [newSlotHashtags, setNewSlotHashtags] = useState("");
   const [creatingSlot, setCreatingSlot] = useState(false);
 
+  // Google Drive Import modal state
+  const [showGDriveModal, setShowGDriveModal] = useState(false);
+
   // Chat state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -602,6 +605,23 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              <button
+                onClick={() => setShowGDriveModal(true)}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
+                style={{
+                  backgroundColor: C.emerald,
+                  color: C.white,
+                  border: `1.5px solid ${C.emerald}`,
+                  boxShadow: `0 4px 14px ${C.emerald}40`,
+                }}
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none">
+                  <path d="M9 3h6l4 6-3 5H4L9 3z" fill="#FFC107" stroke="#FFC107" strokeWidth="1" strokeLinejoin="round"/>
+                  <path d="M9 3L4 14l4 7h6l-3-7 3-4-5-7z" fill="#1976D2" stroke="#1976D2" strokeWidth="1" strokeLinejoin="round"/>
+                  <path d="M9 3l3 4h8l-3-4H9z" fill="#4CAF50" stroke="#4CAF50" strokeWidth="1" strokeLinejoin="round"/>
+                </svg>
+                Google Drive Import
+              </button>
               <button
                 onClick={() => setShowBot(!showBot)}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
@@ -1020,6 +1040,18 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           onHashtagsChange={setNewSlotHashtags}
           onCreate={handleCreateSlot}
           onClose={() => setShowNewSlotModal(false)}
+        />
+      )}
+
+      {/* Google Drive Import modal */}
+      {showGDriveModal && (
+        <GoogleDriveImportModal
+          accounts={accounts}
+          userEmail={userEmail}
+          onSlotsCreated={() => {
+            fetchSlots();
+          }}
+          onClose={() => setShowGDriveModal(false)}
         />
       )}
     </div>
@@ -2068,4 +2100,474 @@ function safeJsonParse<T>(s: string, fallback: T): T {
   } catch {
     return fallback;
   }
+}
+
+// ─── Google Drive Import Modal ─────────────────────────────────────────────
+
+interface GDrivePreviewFile {
+  id: string;
+  name: string;
+  mimeType: string;
+  size?: number;
+}
+
+interface GDriveImportResult {
+  ok: boolean;
+  plan?: {
+    postsPerDay: number;
+    timesOfDay: string[];
+    daysAhead: number;
+    captionTone: string;
+    hashtagsFocus: string[];
+    explanation: string;
+  };
+  videosFound?: number;
+  slotsCreated?: number;
+  slots?: Array<{
+    slotId: string;
+    filename: string;
+    scheduledAt: string;
+    account: string;
+    caption: string;
+    hashtags: string[];
+  }>;
+  errors?: string[];
+  error?: string;
+}
+
+interface GoogleDriveImportModalProps {
+  accounts: ScheduleAccount[];
+  userEmail: string;
+  onSlotsCreated: () => void;
+  onClose: () => void;
+}
+
+const GDRIVE_INSTRUCTION_PRESETS = [
+  "2 posts per day at 12pm and 8pm for the next 7 days. Use funny captions about outdoor gear deals.",
+  "1 post per day at 6pm for 14 days. Casual tone, viral hashtags.",
+  "3 posts per day at 9am, 1pm, and 8pm for 5 days. Hype tone, focus on deals and discounts.",
+  "Post every day at 8pm for 10 days. Educational tone, include hashtags about products.",
+];
+
+function GoogleDriveImportModal({
+  accounts,
+  userEmail,
+  onSlotsCreated,
+  onClose,
+}: GoogleDriveImportModalProps) {
+  const [folderUrl, setFolderUrl] = useState("");
+  const [instructions, setInstructions] = useState(GDRIVE_INSTRUCTION_PRESETS[0]);
+  const [selectedAccountIds, setSelectedAccountIds] = useState<string[]>([]);
+  const [previewing, setPreviewing] = useState(false);
+  const [previewFiles, setPreviewFiles] = useState<GDrivePreviewFile[]>([]);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+  const [importResult, setImportResult] = useState<GDriveImportResult | null>(null);
+
+  // Default: select all accounts
+  useEffect(() => {
+    if (accounts.length > 0 && selectedAccountIds.length === 0) {
+      setSelectedAccountIds(accounts.map((a) => a.id));
+    }
+  }, [accounts, selectedAccountIds.length]);
+
+  const previewFolder = async () => {
+    if (!folderUrl.trim()) {
+      setPreviewError("Please paste your Google Drive folder URL first.");
+      return;
+    }
+    setPreviewing(true);
+    setPreviewError(null);
+    setPreviewFiles([]);
+    setImportResult(null);
+    try {
+      const res = await fetch(`/api/schedule/gdrive-import?folderUrl=${encodeURIComponent(folderUrl.trim())}`);
+      const data = await res.json();
+      if (data.ok) {
+        setPreviewFiles(data.files || []);
+        if ((data.files || []).length === 0) {
+          setPreviewError("No video files found in this folder.");
+        }
+      } else {
+        setPreviewError(data.error || "Failed to preview folder.");
+      }
+    } catch (err: any) {
+      setPreviewError(err.message || "Network error while previewing folder.");
+    } finally {
+      setPreviewing(false);
+    }
+  };
+
+  const handleImport = async () => {
+    if (!folderUrl.trim()) {
+      setPreviewError("Please paste your Google Drive folder URL first.");
+      return;
+    }
+    if (!instructions.trim()) {
+      setPreviewError("Please tell the bot how to schedule your videos.");
+      return;
+    }
+    if (selectedAccountIds.length === 0) {
+      setPreviewError("Please select at least one TikTok account.");
+      return;
+    }
+    if (accounts.length === 0) {
+      setPreviewError("No TikTok accounts connected. Connect an account in PostPeer first.");
+      return;
+    }
+
+    setImporting(true);
+    setPreviewError(null);
+    setImportResult(null);
+    try {
+      const res = await fetch("/api/schedule/gdrive-import", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          folderUrl: folderUrl.trim(),
+          instructions: instructions.trim(),
+          accountIds: selectedAccountIds,
+          userEmail,
+        }),
+      });
+      const data: GDriveImportResult = await res.json();
+      setImportResult(data);
+      if (data.ok && (data.slotsCreated || 0) > 0) {
+        onSlotsCreated();
+      }
+    } catch (err: any) {
+      setImportResult({
+        ok: false,
+        error: err.message || "Network error while importing.",
+      });
+    } finally {
+      setImporting(false);
+    }
+  };
+
+  const toggleAccount = (id: string) => {
+    setSelectedAccountIds((prev) =>
+      prev.includes(id) ? prev.filter((x) => x !== id) : [...prev, id]
+    );
+  };
+
+  const totalSizeLabel = (bytes?: number) => {
+    if (!bytes) return "";
+    if (bytes >= 1_000_000_000) return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+    if (bytes >= 1_000_000) return `${(bytes / 1_000_000).toFixed(1)} MB`;
+    if (bytes >= 1_000) return `${(bytes / 1_000).toFixed(0)} KB`;
+    return `${bytes} B`;
+  };
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(10, 10, 10, 0.6)", backdropFilter: "blur(4px)" }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget && !importing) onClose();
+      }}
+    >
+      <div
+        className="rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden"
+        style={{ backgroundColor: C.white, border: `2px solid ${C.emerald}` }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        {/* Header */}
+        <div
+          className="flex items-center justify-between p-5"
+          style={{
+            background: `linear-gradient(135deg, ${C.emerald}, ${C.emeraldDark})`,
+            color: C.white,
+          }}
+        >
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="none">
+                <path d="M9 3h6l4 6-3 5H4L9 3z" fill="#FFC107"/>
+                <path d="M9 3L4 14l4 7h6l-3-7 3-4-5-7z" fill="#1976D2"/>
+                <path d="M9 3l3 4h8l-3-4H9z" fill="#4CAF50"/>
+              </svg>
+            </div>
+            <div>
+              <h2 className="text-lg font-bold">Google Drive → TikTok Scheduler</h2>
+              <p className="text-xs opacity-90">Paste a folder link, give the bot instructions, and it schedules everything with captions & hashtags.</p>
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={importing}
+            className="w-8 h-8 rounded-xl flex items-center justify-center text-sm font-bold disabled:opacity-40"
+            style={{ backgroundColor: "rgba(255,255,255,0.2)" }}
+          >
+            ✕
+          </button>
+        </div>
+
+        {/* Body */}
+        <div className="overflow-y-auto p-5 space-y-5 flex-1">
+          {/* Step 1: Folder URL */}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wide mb-2 block" style={{ color: C.textMuted }}>
+              ① Google Drive folder URL
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={folderUrl}
+                onChange={(e) => setFolderUrl(e.target.value)}
+                placeholder="https://drive.google.com/drive/folders/XXXXXXX..."
+                disabled={importing}
+                className="flex-1 px-3 py-2.5 rounded-xl text-sm border-0 outline-none disabled:opacity-60"
+                style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+              />
+              <button
+                onClick={previewFolder}
+                disabled={previewing || importing || !folderUrl.trim()}
+                className="px-4 py-2.5 rounded-xl text-sm font-bold whitespace-nowrap transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+                style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+              >
+                {previewing ? "Checking…" : "🔍 Preview"}
+              </button>
+            </div>
+            <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
+              ⚠️ The folder must be shared as <strong>“Anyone with the link can view”</strong>. Only video files (MP4, MOV, etc.) will be imported.
+            </p>
+          </div>
+
+          {/* Preview results */}
+          {previewFiles.length > 0 && (
+            <div
+              className="rounded-2xl p-4"
+              style={{ backgroundColor: C.emeraldSoft, border: `1.5px solid ${C.cardBorder}` }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-sm font-bold" style={{ color: C.emeraldDark }}>
+                  ✓ Found {previewFiles.length} video{previewFiles.length !== 1 ? "s" : ""}
+                </p>
+                <p className="text-[10px]" style={{ color: C.textMuted }}>
+                  {previewFiles.reduce((s, f) => s + (f.size || 0), 0) > 0
+                    ? totalSizeLabel(previewFiles.reduce((s, f) => s + (f.size || 0), 0)) + " total"
+                    : ""}
+                </p>
+              </div>
+              <div className="max-h-32 overflow-y-auto space-y-1">
+                {previewFiles.slice(0, 50).map((f) => (
+                  <div key={f.id} className="flex items-center gap-2 text-xs">
+                    <span style={{ color: C.emerald }}>🎬</span>
+                    <span className="font-mono truncate flex-1" style={{ color: C.text }}>{f.name}</span>
+                    <span className="text-[10px]" style={{ color: C.textMuted }}>{totalSizeLabel(f.size)}</span>
+                  </div>
+                ))}
+                {previewFiles.length > 50 && (
+                  <p className="text-[10px] italic" style={{ color: C.textMuted }}>
+                    … and {previewFiles.length - 50} more
+                  </p>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 2: Instructions */}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wide mb-2 block" style={{ color: C.textMuted }}>
+              ② Instructions for the bot
+            </label>
+            <textarea
+              value={instructions}
+              onChange={(e) => setInstructions(e.target.value)}
+              disabled={importing}
+              rows={3}
+              placeholder="e.g. 2 posts per day at 12pm and 8pm for 7 days. Funny captions about outdoor gear deals. Include hashtags #fyp #viral #outdoor."
+              className="w-full px-3 py-2.5 rounded-xl text-sm border-0 outline-none resize-none disabled:opacity-60"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+            />
+            <div className="flex flex-wrap gap-1.5 mt-2">
+              <span className="text-[10px] font-semibold" style={{ color: C.textMuted }}>Try:</span>
+              {GDRIVE_INSTRUCTION_PRESETS.map((preset, i) => (
+                <button
+                  key={i}
+                  onClick={() => setInstructions(preset)}
+                  disabled={importing}
+                  className="text-[10px] px-2 py-1 rounded-full font-semibold transition-all hover:scale-105 disabled:opacity-40"
+                  style={{
+                    backgroundColor: instructions === preset ? C.emerald : C.emeraldSoft,
+                    color: instructions === preset ? C.white : C.emeraldDark,
+                    border: `1px solid ${C.cardBorder}`,
+                  }}
+                >
+                  Preset {i + 1}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Step 3: Account selection */}
+          <div>
+            <label className="text-xs font-bold uppercase tracking-wide mb-2 block" style={{ color: C.textMuted }}>
+              ③ Publish to ({selectedAccountIds.length} selected)
+            </label>
+            {accounts.length === 0 ? (
+              <p className="text-xs px-3 py-2 rounded-lg" style={{ backgroundColor: "#FEE2E2", color: C.error }}>
+                ⚠️ No TikTok accounts connected. Connect one in PostPeer first, then refresh this page.
+              </p>
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {accounts.map((a) => {
+                  const selected = selectedAccountIds.includes(a.id);
+                  return (
+                    <button
+                      key={a.id}
+                      onClick={() => toggleAccount(a.id)}
+                      disabled={importing}
+                      className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105 disabled:opacity-60"
+                      style={{
+                        backgroundColor: selected ? C.emerald : C.white,
+                        color: selected ? C.white : C.text,
+                        border: `1.5px solid ${selected ? C.emerald : C.cardBorder}`,
+                      }}
+                    >
+                      {a.avatarUrl ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={a.avatarUrl} alt="" className="w-5 h-5 rounded-full" />
+                      ) : (
+                        <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px]" style={{ backgroundColor: selected ? "rgba(255,255,255,0.3)" : C.emeraldSoft }}>
+                          @{a.username.slice(0, 1).toUpperCase()}
+                        </span>
+                      )}
+                      @{a.username}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+            <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
+              Videos rotate across selected accounts. If you select 5 accounts and have 10 videos, each account gets ~2 posts.
+            </p>
+          </div>
+
+          {/* Error */}
+          {previewError && (
+            <div className="rounded-xl p-3 text-xs" style={{ backgroundColor: "#FEE2E2", color: C.error }}>
+              ⚠️ {previewError}
+            </div>
+          )}
+
+          {/* Result */}
+          {importResult && (
+            <div
+              className="rounded-2xl p-4"
+              style={{
+                backgroundColor: importResult.ok ? C.emeraldSoft : "#FEE2E2",
+                border: `1.5px solid ${importResult.ok ? C.emerald : C.error}`,
+              }}
+            >
+              {importResult.ok ? (
+                <>
+                  <p className="text-sm font-bold mb-2" style={{ color: C.emeraldDark }}>
+                    ✓ Scheduled {importResult.slotsCreated} of {importResult.videosFound} videos!
+                  </p>
+                  {importResult.plan && (
+                    <p className="text-xs mb-3" style={{ color: C.text }}>
+                      <strong>Plan:</strong> {importResult.plan.postsPerDay} posts/day at{" "}
+                      {importResult.plan.timesOfDay.join(", ")} for {importResult.plan.daysAhead} days · Tone:{" "}
+                      {importResult.plan.captionTone}
+                      {importResult.plan.hashtagsFocus.length > 0
+                        ? ` · Focus: ${importResult.plan.hashtagsFocus.join(", ")}`
+                        : ""}
+                    </p>
+                  )}
+                  {importResult.slots && importResult.slots.length > 0 && (
+                    <div className="max-h-48 overflow-y-auto space-y-2 mt-2">
+                      {importResult.slots.map((s) => (
+                        <div
+                          key={s.slotId}
+                          className="rounded-xl p-2.5 text-xs"
+                          style={{ backgroundColor: C.white, border: `1px solid ${C.cardBorder}` }}
+                        >
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <span className="font-mono font-bold truncate flex-1" style={{ color: C.text }}>
+                              🎬 {s.filename}
+                            </span>
+                            <span className="text-[10px] whitespace-nowrap font-semibold" style={{ color: C.emeraldDark }}>
+                              {new Date(s.scheduledAt).toLocaleString("en-US", {
+                                weekday: "short",
+                                month: "short",
+                                day: "numeric",
+                                hour: "numeric",
+                                minute: "2-digit",
+                                hour12: true,
+                              })}
+                            </span>
+                          </div>
+                          <p className="text-[11px] mb-1" style={{ color: C.textMuted }}>
+                            → @{s.account}
+                          </p>
+                          <p className="text-[11px] italic" style={{ color: C.text }}>
+                            “{s.caption}”
+                          </p>
+                          {s.hashtags.length > 0 && (
+                            <p className="text-[10px] mt-1 font-semibold" style={{ color: C.emeraldDark }}>
+                              {s.hashtags.map((h) => `#${h}`).join(" ")}
+                            </p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {importResult.errors && importResult.errors.length > 0 && (
+                    <p className="text-[10px] mt-2" style={{ color: C.warning }}>
+                      ⚠️ {importResult.errors.length} video(s) failed to schedule. Check console for details.
+                    </p>
+                  )}
+                </>
+              ) : (
+                <p className="text-xs" style={{ color: C.error }}>
+                  ⚠️ {importResult.error || "Import failed."}
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+
+        {/* Footer */}
+        <div
+          className="flex items-center justify-between gap-3 p-4 border-t"
+          style={{ borderColor: C.cardBorder, backgroundColor: C.cream }}
+        >
+          <p className="text-[10px]" style={{ color: C.textMuted }}>
+            {importing ? "🤖 Bot is generating captions and scheduling…" : "The bot will generate unique captions and hashtags for each video based on your instructions."}
+          </p>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              disabled={importing}
+              className="px-4 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 disabled:opacity-40"
+              style={{ backgroundColor: C.white, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+            >
+              {importResult?.ok ? "Done" : "Cancel"}
+            </button>
+            <button
+              onClick={handleImport}
+              disabled={importing || accounts.length === 0 || !folderUrl.trim() || !instructions.trim()}
+              className="px-5 py-2.5 rounded-xl text-sm font-bold transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 flex items-center gap-2"
+              style={{
+                backgroundColor: C.emerald,
+                color: C.white,
+                boxShadow: `0 4px 14px ${C.emerald}40`,
+              }}
+            >
+              {importing ? (
+                <>
+                  <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  Scheduling…
+                </>
+              ) : (
+                <>🚀 Schedule All Videos</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }

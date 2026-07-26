@@ -54,8 +54,12 @@ export function extractFolderId(url: string): string | null {
 }
 
 /**
- * List files in a public Google Drive folder
- * Uses Google Drive API v3 with the folder's sharing key
+ * List files in a public Google Drive folder.
+ *
+ * Strategy order (most reliable first):
+ *   1. embeddedfolderview HTML — works for any public folder, no API key needed
+ *   2. regular folder page HTML — fallback if embed view fails
+ *   3. Google Drive API v3 — last resort (only useful if a valid API key is set)
  */
 export async function listFolderFiles(folderUrl: string): Promise<DriveFile[]> {
   const folderId = extractFolderId(folderUrl);
@@ -65,49 +69,93 @@ export async function listFolderFiles(folderUrl: string): Promise<DriveFile[]> {
 
   console.log(`[GoogleDrive] Listing files in folder: ${folderId}`);
 
-  // Try Google Drive API to list files in the folder
-  // This works for public/shared folders
-  const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=AIzaSyC1qbk75NzWBvSaDh6KnUvjbjV0MZ1A8&fields=files(id,name,mimeType,size)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
-
+  // ── Strategy 1 & 2: HTML parsing (embeddedfolderview → regular folder page) ──
   try {
-    const response = await fetch(apiUrl);
-    
-    if (!response.ok) {
-      // If API fails, try alternative method - parse the folder HTML page
-      console.log('[GoogleDrive] API failed, trying HTML parsing...');
-      return await listFilesFromHtml(folderId);
+    const htmlFiles = await listFilesFromHtml(folderId);
+    if (htmlFiles.length > 0) {
+      console.log(`[GoogleDrive] HTML parsing found ${htmlFiles.length} video files`);
+      return htmlFiles;
     }
-
-    const data = await response.json();
-    const files: DriveFile[] = (data.files || [])
-      .filter((f: any) => isVideoFile(f.name, f.mimeType))
-      .map((f: any) => ({
-        id: f.id,
-        name: f.name,
-        mimeType: f.mimeType,
-        downloadUrl: `https://drive.google.com/uc?export=download&id=${f.id}`,
-        size: parseInt(f.size || '0'),
-      }));
-
-    console.log(`[GoogleDrive] Found ${files.length} video files`);
-    return files;
+    console.warn('[GoogleDrive] HTML parsing returned 0 files, trying API...');
   } catch (err: any) {
-    console.error('[GoogleDrive] API error:', err.message);
-    // Fallback to HTML parsing
-    return await listFilesFromHtml(folderId);
+    console.warn('[GoogleDrive] HTML parsing failed:', err.message, '— trying API...');
   }
+
+  // ── Strategy 3: Google Drive API v3 (only if a valid API key is set) ──
+  const apiKey = process.env.GOOGLE_DRIVE_API_KEY;
+  if (apiKey && apiKey.length > 20) {
+    const apiUrl = `https://www.googleapis.com/drive/v3/files?q='${folderId}'+in+parents&key=${apiKey}&fields=files(id,name,mimeType,size)&supportsAllDrives=true&includeItemsFromAllDrives=true`;
+    try {
+      const response = await fetch(apiUrl);
+      if (response.ok) {
+        const data = await response.json();
+        const files: DriveFile[] = (data.files || [])
+          .filter((f: any) => isVideoFile(f.name, f.mimeType))
+          .map((f: any) => ({
+            id: f.id,
+            name: f.name,
+            mimeType: f.mimeType,
+            downloadUrl: `https://drive.google.com/uc?export=download&id=${f.id}`,
+            size: parseInt(f.size || '0'),
+          }));
+        console.log(`[GoogleDrive] API found ${files.length} video files`);
+        return files;
+      }
+    } catch (err: any) {
+      console.error('[GoogleDrive] API error:', err.message);
+    }
+  }
+
+  // If everything failed, throw the most useful error
+  throw new Error('Could not access the Google Drive folder. Make sure it is shared as "Anyone with the link can view" and contains video files (MP4, MOV, etc.).');
 }
 
 /**
  * Alternative: Parse Google Drive folder HTML page to extract file IDs
+ *
+ * Uses the reliable `embeddedfolderview` endpoint, which returns clean HTML
+ * for ANY public folder ("Anyone with the link can view") without needing
+ * an API key. Each file appears as:
+ *   <div class="flip-entry-title">Filename.mp4</div>
+ *   <a href="https://drive.google.com/file/d/FILE_ID/view">
+ *
+ * Falls back to the regular folder page if the embed view fails.
  */
 async function listFilesFromHtml(folderId: string): Promise<DriveFile[]> {
+  // ── Strategy 1: embeddedfolderview (most reliable for public folders) ──
+  try {
+    const embedUrl = `https://drive.google.com/embeddedfolderview?id=${folderId}#list`;
+    const response = await fetch(embedUrl, {
+      headers: {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+      },
+      signal: AbortSignal.timeout(20000),
+    });
+
+    if (response.ok) {
+      const html = await response.text();
+      const files = parseEmbeddedFolderHtml(html);
+      if (files.length > 0) {
+        console.log(`[GoogleDrive] embeddedfolderview found ${files.length} files`);
+        return files;
+      }
+    }
+  } catch (err: any) {
+    console.warn('[GoogleDrive] embeddedfolderview failed:', err.message);
+  }
+
+  // ── Strategy 2: regular folder page HTML ──────────────────────────────
   try {
     const url = `https://drive.google.com/drive/folders/${folderId}`;
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
       },
+      signal: AbortSignal.timeout(20000),
     });
 
     if (!response.ok) {
@@ -115,38 +163,9 @@ async function listFilesFromHtml(folderId: string): Promise<DriveFile[]> {
     }
 
     const html = await response.text();
-    const files: DriveFile[] = [];
+    const files = parseEmbeddedFolderHtml(html);
 
-    // Extract file IDs and names from the HTML
-    // Google Drive embeds file data in JSON within the HTML
-    const filePatterns = [
-      /\["([a-zA-Z0-9_-]{25,})",\s*"([^"]+)",\s*"[^"]*",\s*"[^"]*",\s*"[^"]*",\s*"[^"]*",\s*"([^"]*)"/g,
-      /window\['\w+'\]\s*=\s*(\[.*?\]);/g,
-    ];
-
-    // Try to find file entries
-    const fileIdRegex = /\/file\/d\/([a-zA-Z0-9_-]{25,})/g;
-    const fileNameRegex = /data-tooltip="([^"]+)"/g;
-
-    let match;
-    const fileIds: string[] = [];
-    while ((match = fileIdRegex.exec(html)) !== null) {
-      if (!fileIds.includes(match[1])) {
-        fileIds.push(match[1]);
-      }
-    }
-
-    // If we found file IDs, create DriveFile objects
-    for (const id of fileIds) {
-      files.push({
-        id,
-        name: `Video_${id.substring(0, 8)}`,
-        mimeType: 'video/mp4',
-        downloadUrl: `https://drive.google.com/uc?export=download&id=${id}`,
-      });
-    }
-
-    // Also try to extract from embedded JSON
+    // Also try the embedded JSON array pattern
     const jsonMatch = html.match(/\[\"([a-zA-Z0-9_-]{25,})\",\"([^\"]+)\"[^\]]*\"video\/[^\"]*\"[^\]]*\]/g);
     if (jsonMatch) {
       for (const entry of jsonMatch) {
@@ -163,12 +182,59 @@ async function listFilesFromHtml(folderId: string): Promise<DriveFile[]> {
       }
     }
 
-    console.log(`[GoogleDrive] HTML parsing found ${files.length} files`);
-    return files;
+    console.log(`[GoogleDrive] Regular page parsing found ${files.length} files`);
+    if (files.length > 0) return files;
   } catch (err: any) {
-    console.error('[GoogleDrive] HTML parsing failed:', err.message);
-    throw new Error('Could not access the Google Drive folder. Make sure it is shared as "Anyone with the link can view".');
+    console.error('[GoogleDrive] Regular page parsing failed:', err.message);
   }
+
+  throw new Error('Could not access the Google Drive folder. Make sure it is shared as "Anyone with the link can view".');
+}
+
+/**
+ * Parse HTML from embeddedfolderview or regular folder page to extract video files.
+ * Looks for: <a href="https://drive.google.com/file/d/FILE_ID/view"> + sibling/child .flip-entry-title
+ */
+function parseEmbeddedFolderHtml(html: string): DriveFile[] {
+  const files: DriveFile[] = [];
+  const seenIds = new Set<string>();
+
+  // Pattern 1: pairs of (file/d/ID, flip-entry-title)
+  // The embedded view structure:
+  //   <a href="https://drive.google.com/file/d/FILE_ID/view" ...>
+  //   ...
+  //   <div class="flip-entry-title">FILENAME</div>
+  const linkRegex = /href="https:\/\/drive\.google\.com\/file\/d\/([a-zA-Z0-9_-]{25,})\/view"/g;
+  const titleRegex = /class="flip-entry-title"[^>]*>([^<]+)</g;
+
+  const ids: string[] = [];
+  const titles: string[] = [];
+  let m: RegExpExecArray | null;
+
+  while ((m = linkRegex.exec(html)) !== null) {
+    if (!ids.includes(m[1])) ids.push(m[1]);
+  }
+  while ((m = titleRegex.exec(html)) !== null) {
+    titles.push(m[1].trim());
+  }
+
+  // Pair them by index
+  for (let i = 0; i < ids.length; i++) {
+    const id = ids[i];
+    if (seenIds.has(id)) continue;
+    seenIds.add(id);
+    const name = titles[i] || `Video_${id.substring(0, 8)}`;
+    if (isVideoFile(name, 'video/mp4')) {
+      files.push({
+        id,
+        name,
+        mimeType: 'video/mp4',
+        downloadUrl: `https://drive.google.com/uc?export=download&id=${id}`,
+      });
+    }
+  }
+
+  return files;
 }
 
 /**
