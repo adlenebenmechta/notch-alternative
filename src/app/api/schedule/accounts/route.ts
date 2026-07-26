@@ -8,7 +8,9 @@ export const runtime = 'nodejs';
 // GET /api/schedule/accounts — list TikTok accounts connected to Blotato
 // Always returns 200 with a structured body so the UI can render diagnostics.
 export async function GET() {
-  const apiKey = process.env.BLOTATO_API_KEY || '';
+  const rawKey = process.env.BLOTATO_API_KEY || '';
+  // Strip surrounding quotes if present (in case .env sourcing didn't strip them)
+  const apiKey = rawKey.replace(/^"(.*)"$/, '$1');
   const keyPresent = !!apiKey;
   const keyPrefix = apiKey ? `${apiKey.slice(0, 8)}...${apiKey.slice(-4)}` : '(not set)';
 
