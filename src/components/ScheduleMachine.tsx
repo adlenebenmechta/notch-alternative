@@ -198,6 +198,8 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
 
   // State
   const [accounts, setAccounts] = useState<ScheduleAccount[]>([]);
+  const [accountsError, setAccountsError] = useState<string | null>(null);
+  const [accountsDebug, setAccountsDebug] = useState<any>(null);
   const [slots, setSlots] = useState<ScheduleSlot[]>([]);
   const [libraryVideos, setLibraryVideos] = useState<LibraryVideo[]>([]);
   const [bestTimes, setBestTimes] = useState<BestTimeSlot[]>([]);
@@ -236,12 +238,15 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
       const res = await fetch("/api/schedule/accounts");
       const data = await res.json();
       setAccounts(data.accounts || []);
+      setAccountsError(data.ok === false ? (data.error || "Failed to load accounts") : null);
+      setAccountsDebug(data.diagnostics || null);
       if (data.accounts?.length > 0 && !newSlotAccountId) {
         setNewSlotAccountId(data.accounts[0].id);
       }
     } catch (err: any) {
       console.error("Failed to fetch accounts:", err);
       setAccounts([]);
+      setAccountsError(err.message || "Network error while loading accounts");
     }
   }, [newSlotAccountId]);
 
@@ -643,21 +648,108 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
         {accounts.length === 0 && !loading && (
           <div
             className="rounded-2xl p-5 shadow-lg mb-5"
-            style={{ background: `linear-gradient(135deg, ${C.emerald}, ${C.emeraldDark})` }}
+            style={{
+              background: accountsError
+                ? `linear-gradient(135deg, #EF4444, #B91C1C)`
+                : `linear-gradient(135deg, ${C.emerald}, ${C.emeraldDark})`,
+            }}
           >
             <div className="flex items-start gap-3 text-white">
               <svg width="28" height="28" viewBox="0 0 24 24" fill="none" className="flex-shrink-0 mt-1">
-                <path d="M12 2L3 7v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V7l-9-5z" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />
-                <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                {accountsError ? (
+                  <path d="M12 9v4M12 17h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" stroke="white" strokeWidth="2" fill="none" strokeLinecap="round" strokeLinejoin="round" />
+                ) : (
+                  <>
+                    <path d="M12 2L3 7v6c0 5.5 3.8 10.7 9 12 5.2-1.3 9-6.5 9-12V7l-9-5z" stroke="white" strokeWidth="2" fill="none" strokeLinejoin="round" />
+                    <path d="M9 12l2 2 4-4" stroke="white" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                  </>
+                )}
               </svg>
-              <div className="flex-1">
-                <h2 className="text-base font-bold mb-1">Connect your Blotato account</h2>
-                <p className="text-sm opacity-95 mb-3">
-                  Schedule Machine uses the Blotato API to publish to TikTok. Once the <code className="bg-white/20 px-1 rounded">BLOTATO_API_KEY</code> environment variable is set on Railway, your connected TikTok accounts will appear here automatically.
-                </p>
-                <p className="text-xs opacity-90">
-                  Already set? Click Refresh — accounts typically load within seconds.
-                </p>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-base font-bold mb-1">
+                  {accountsError ? "Could not load Blotato accounts" : "Connect your Blotato account"}
+                </h2>
+
+                {accountsError ? (
+                  <div className="space-y-2">
+                    <p className="text-sm opacity-95 break-words">
+                      <span className="font-semibold">Error:</span>{" "}
+                      <code className="bg-white/20 px-1.5 py-0.5 rounded text-xs break-all">{accountsError}</code>
+                    </p>
+                    {accountsDebug && (
+                      <p className="text-xs opacity-90">
+                        API key:{" "}
+                        <code className="bg-white/20 px-1 rounded">{accountsDebug.keyPresent ? `present (${accountsDebug.keyPrefix})` : "NOT SET"}</code>
+                        {" · "}
+                        NODE_ENV: <code className="bg-white/20 px-1 rounded">{accountsDebug.nodeEnv || "unknown"}</code>
+                      </p>
+                    )}
+                    <p className="text-xs opacity-90">
+                      If the key is present but you still see an auth error, the key may be invalid or your Blotato
+                      workspace has no TikTok accounts connected yet. Open the Blotato dashboard and connect a TikTok
+                      account, then click Refresh.
+                    </p>
+                    <div className="flex flex-wrap gap-2 pt-1">
+                      <a
+                        href="/api/schedule/debug"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        🔍 Open debug report
+                      </a>
+                      <a
+                        href="https://app.blotato.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        ↗ Open Blotato dashboard
+                      </a>
+                      <button
+                        onClick={() => fetchAll()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-emerald-700 hover:bg-emerald-50 transition-colors"
+                      >
+                        ↻ Refresh now
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    <p className="text-sm opacity-95 mb-1">
+                      Your Blotato API key is set, but no TikTok accounts were returned. This usually means you
+                      haven't connected a TikTok account to your Blotato workspace yet.
+                    </p>
+                    <p className="text-xs opacity-90 mb-2">
+                      Go to the Blotato dashboard → Connections → connect at least one TikTok account, then come back
+                      and click Refresh.
+                    </p>
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href="https://app.blotato.com"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-emerald-700 hover:bg-emerald-50 transition-colors"
+                      >
+                        ↗ Open Blotato dashboard
+                      </a>
+                      <a
+                        href="/api/schedule/debug"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        🔍 Debug connection
+                      </a>
+                      <button
+                        onClick={() => fetchAll()}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
+                      >
+                        ↻ Refresh
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             </div>
           </div>

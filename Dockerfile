@@ -50,8 +50,15 @@ COPY --from=builder /app/public ./public
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 
+# Copy .env file so we can source it at runtime.
+# Next.js standalone mode does NOT auto-load .env in production, so we explicitly
+# export the variables before starting the server. This lets us ship secrets like
+# BLOTATO_API_KEY, ATLAS_KEY, KIE_API_KEY inside the image without requiring the
+# user to re-set them on the Railway dashboard.
+COPY --from=builder --chown=nextjs:nodejs /app/.env ./.env
+
 # Ensure nextjs user owns the prisma files for db push
-RUN chown -R nextjs:nodejs /app/prisma /app/node_modules
+RUN chown -R nextjs:nodejs /app/prisma /app/node_modules /app/.env
 
 USER nextjs
 
@@ -59,6 +66,7 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 
-# Run prisma db push then start the server
-# db push creates/updates tables without migration files
-CMD ["sh", "-c", "npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || echo 'DB push failed, continuing anyway'; node server.js"]
+# Run prisma db push then start the server.
+# `set -a; . /app/.env; set +a` exports every VAR=value in .env into the
+# process environment so child processes (node server.js) inherit them.
+CMD ["sh", "-c", "set -a && . /app/.env && set +a && npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || echo 'DB push failed, continuing anyway'; node server.js"]
