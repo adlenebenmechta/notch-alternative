@@ -450,7 +450,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   // ─── Slot actions ──────────────────────────────────────────────────────
 
   const handleDeleteSlot = async (slotId: string) => {
-    if (!confirm("Cancel this scheduled slot? This will also delete the Blotato scheduled post.")) return;
+    if (!confirm("Cancel this scheduled slot? This will also delete the PostPeer scheduled post.")) return;
     try {
       await fetch(`/api/schedule/slots/${slotId}`, { method: "DELETE" });
       setSelectedSlot(null);
@@ -667,7 +667,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
               </svg>
               <div className="flex-1 min-w-0">
                 <h2 className="text-base font-bold mb-1">
-                  {accountsError ? "Could not load Blotato accounts" : "Connect your Blotato account"}
+                  {accountsError ? "Could not load PostPeer accounts" : "Connect your PostPeer account"}
                 </h2>
 
                 {accountsError ? (
@@ -685,8 +685,8 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                       </p>
                     )}
                     <p className="text-xs opacity-90">
-                      If the key is present but you still see an auth error, the key may be invalid or your Blotato
-                      workspace has no TikTok accounts connected yet. Open the Blotato dashboard and connect a TikTok
+                      If the key is present but you still see an auth error, the key may be invalid or your PostPeer
+                      workspace has no TikTok accounts connected yet. Open the PostPeer dashboard and connect a TikTok
                       account, then click Refresh.
                     </p>
                     <div className="flex flex-wrap gap-2 pt-1">
@@ -699,12 +699,12 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                         🔍 Open debug report
                       </a>
                       <a
-                        href="https://app.blotato.com"
+                        href="https://app.postpeer.dev"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white/20 hover:bg-white/30 transition-colors"
                       >
-                        ↗ Open Blotato dashboard
+                        ↗ Open PostPeer dashboard
                       </a>
                       <button
                         onClick={() => fetchAll()}
@@ -717,21 +717,21 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                 ) : (
                   <div className="space-y-2">
                     <p className="text-sm opacity-95 mb-1">
-                      Your Blotato API key is set, but no TikTok accounts were returned. This usually means you
-                      haven't connected a TikTok account to your Blotato workspace yet.
+                      Your PostPeer API key is set, but no TikTok accounts were returned. This usually means you
+                      haven't connected a TikTok account to your PostPeer workspace yet.
                     </p>
                     <p className="text-xs opacity-90 mb-2">
-                      Go to the Blotato dashboard → Connections → connect at least one TikTok account, then come back
+                      Go to the PostPeer dashboard → Connections → connect at least one TikTok account, then come back
                       and click Refresh.
                     </p>
                     <div className="flex flex-wrap gap-2">
                       <a
-                        href="https://app.blotato.com"
+                        href="https://app.postpeer.dev"
                         target="_blank"
                         rel="noopener noreferrer"
                         className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-white text-emerald-700 hover:bg-emerald-50 transition-colors"
                       >
-                        ↗ Open Blotato dashboard
+                        ↗ Open PostPeer dashboard
                       </a>
                       <a
                         href="/api/schedule/debug"
@@ -1546,7 +1546,7 @@ function BotPanel({
             <p className="text-[10px] mb-3" style={{ color: C.textMuted }}>
               {accountsCount > 0
                 ? `Connected to ${accountsCount} account(s), ${libraryCount} videos in library.`
-                : "Connect a Blotato account to get started."}
+                : "Connect a PostPeer account to get started."}
             </p>
             <p className="text-[10px] mb-2 font-semibold" style={{ color: C.emeraldDark }}>Try:</p>
             <div className="flex flex-wrap gap-1.5 justify-center">

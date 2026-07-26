@@ -1,14 +1,23 @@
 // Schedule Service - core scheduling logic for the Schedule Machine
 // Handles: account sync, slot CRUD, recurring rules, best-time recommendations,
-// publishing slots to Blotato, and polling publish status.
+// publishing slots to PostPeer, and polling publish status.
+//
+// NOTE: Originally built on Blotato. Switched to PostPeer API (api.postpeer.dev)
+// because PostPeer returns richer account data (5 TikTok accounts vs 1 from
+// Blotato) and the user's PostPeer key is already verified working.
+// The DB column names still say 'blotatoPostId' / 'blotatoStatus' for backward
+// compatibility with existing rows — they now store PostPeer post IDs.
 
 import { db } from '@/lib/db';
-import { getBlotatoService, type BlotatoAccount } from '@/lib/blotato';
+import { PostPeerService, type PostPeerAccount } from '@/lib/postpeer';
+
+// Singleton PostPeer service (uses POSTPEER_API_KEY env var)
+const postpeer = new PostPeerService();
 
 // ─── Types ─────────────────────────────────────────────────────────────────
 
 export interface ScheduleAccount {
-  id: string;        // blotato account id
+  id: string;        // postpeer integration id
   username: string;
   displayName: string;
   platform: string;
@@ -101,12 +110,11 @@ export function getBestTimeRecommendations(days = 7, timezone = 'UTC'): BestTime
 // ─── Account sync ──────────────────────────────────────────────────────────
 
 /**
- * Fetch accounts from Blotato and return a normalized list.
+ * Fetch accounts from PostPeer and return a normalized list.
  * (We do NOT persist these into TikTokAccount — that table belongs to AutoPublish.)
  */
 export async function getScheduleAccounts(): Promise<ScheduleAccount[]> {
-  const blotato = getBlotatoService();
-  const accounts: BlotatoAccount[] = await blotato.getTikTokAccounts();
+  const accounts: PostPeerAccount[] = await postpeer.getTikTokAccounts();
 
   return accounts.map((a) => ({
     id: a.id,
@@ -140,10 +148,10 @@ export async function createSlot(input: CreateSlotInput) {
     },
   });
 
-  // If content is assigned, push to Blotato immediately as a scheduled post
+  // If content is assigned, push to PostPeer immediately as a scheduled post
   if (input.videoUrl || (input.imageUrls && input.imageUrls.length > 0)) {
     publishSlotToBlotato(slot.id).catch((err) => {
-      console.error(`[Schedule] Background Blotato publish failed for slot ${slot.id}:`, err);
+      console.error(`[Schedule] Background PostPeer publish failed for slot ${slot.id}:`, err);
     });
   }
 
@@ -172,15 +180,14 @@ export async function updateSlot(slotId: string, input: UpdateSlotInput) {
   if (input.status !== undefined) data.status = input.status;
 
   // If scheduledAt or accountId changed AND slot already has a blotatoPostId, we need to
-  // delete the old Blotato post and create a new one
+  // delete the old PostPeer post and create a new one
   const needsReschedule =
     (input.scheduledAt || input.accountId) &&
     existing.blotatoPostId &&
     existing.status === 'scheduled';
 
   if (needsReschedule) {
-    const blotato = getBlotatoService();
-    await blotato.deletePost(existing.blotatoPostId).catch(() => {});
+    await postpeer.deletePost(existing.blotatoPostId).catch(() => {});
     data.blotatoPostId = null;
     data.blotatoStatus = null;
   }
@@ -190,10 +197,10 @@ export async function updateSlot(slotId: string, input: UpdateSlotInput) {
     data,
   });
 
-  // If we rescheduled, push the new post to Blotato
+  // If we rescheduled, push the new post to PostPeer
   if (needsReschedule && (updated.videoUrl || (updated.imageUrls && JSON.parse(updated.imageUrls).length > 0))) {
     publishSlotToBlotato(updated.id).catch((err) => {
-      console.error(`[Schedule] Re-publish to Blotato failed for slot ${updated.id}:`, err);
+      console.error(`[Schedule] Re-publish to PostPeer failed for slot ${updated.id}:`, err);
     });
   }
 
@@ -208,10 +215,9 @@ export async function deleteSlot(slotId: string): Promise<boolean> {
   const slot = await db.scheduleSlot.findUnique({ where: { id: slotId } });
   if (!slot) return false;
 
-  // If the slot has a Blotato scheduled post, cancel it
+  // If the slot has a PostPeer scheduled post, cancel it
   if (slot.blotatoPostId && slot.status === 'scheduled') {
-    const blotato = getBlotatoService();
-    await blotato.deletePost(slot.blotatoPostId).catch(() => {});
+    await postpeer.deletePost(slot.blotatoPostId).catch(() => {});
   }
 
   await db.scheduleSlot.delete({ where: { id: slotId } });
@@ -355,11 +361,11 @@ export async function deleteRule(ruleId: string): Promise<boolean> {
   }
 }
 
-// ─── Blotato publishing ────────────────────────────────────────────────────
+// ─── PostPeer publishing ────────────────────────────────────────────────────
 
 /**
- * Push a scheduled slot to Blotato as a scheduled post.
- * Updates the slot with the returned blotatoPostId.
+ * Push a scheduled slot to PostPeer as a scheduled post.
+ * Updates the slot with the returned blotatoPostId (column name kept for compat).
  */
 export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
   const slot = await db.scheduleSlot.findUnique({ where: { id: slotId } });
@@ -374,7 +380,7 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
   }
 
   if (slot.blotatoPostId) {
-    console.log(`[Schedule] Slot ${slotId} already has Blotato post ${slot.blotatoPostId}`);
+    console.log(`[Schedule] Slot ${slotId} already has PostPeer post ${slot.blotatoPostId}`);
     return true;
   }
 
@@ -383,11 +389,11 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
     return false;
   }
 
-  // Scheduled time must be in the future for Blotato
+  // Scheduled time must be in the future for PostPeer
   const scheduledAt = new Date(slot.scheduledAt);
   const now = new Date();
   if (scheduledAt.getTime() <= now.getTime() + 60000) {
-    // Blotato requires scheduledAt > now (with buffer) — bump to 5 min from now
+    // PostPeer requires scheduledFor > now (with buffer) — bump to 5 min from now
     scheduledAt.setMinutes(now.getMinutes() + 5);
   }
 
@@ -397,20 +403,30 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
   });
 
   try {
-    const blotato = getBlotatoService();
     const hashtags = slot.hashtags ? JSON.parse(slot.hashtags) : [];
     const imageUrls = slot.imageUrls ? JSON.parse(slot.imageUrls) : [];
 
-    const result = await blotato.createPost({
-      accountId: slot.accountId,
-      videoUrl: slot.videoUrl || undefined,
-      imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
-      caption: slot.caption || '',
-      hashtags,
-      musicTitle: slot.musicTitle || undefined,
-      scheduledAt,
-      platforms: ['tiktok'],
-    });
+    // PostPeer uses publishPost (video) or publishImagePost (images)
+    const result =
+      imageUrls.length > 0
+        ? await postpeer.publishImagePost({
+            accountId: slot.accountId,
+            imageUrls,
+            caption: slot.caption || '',
+            hashtags,
+            musicTitle: slot.musicTitle || undefined,
+            scheduledAt,
+            platforms: ['tiktok'],
+          })
+        : await postpeer.publishPost({
+            accountId: slot.accountId,
+            videoUrl: slot.videoUrl!,
+            caption: slot.caption || '',
+            hashtags,
+            musicTitle: slot.musicTitle || undefined,
+            scheduledAt,
+            platforms: ['tiktok'],
+          });
 
     await db.scheduleSlot.update({
       where: { id: slotId },
@@ -423,10 +439,10 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
       },
     });
 
-    console.log(`[Schedule] Slot ${slotId} pushed to Blotato as post ${result.id}`);
+    console.log(`[Schedule] Slot ${slotId} pushed to PostPeer as post ${result.id}`);
     return true;
   } catch (err: any) {
-    console.error(`[Schedule] Blotato publish failed for slot ${slotId}:`, err.message);
+    console.error(`[Schedule] PostPeer publish failed for slot ${slotId}:`, err.message);
     await db.scheduleSlot.update({
       where: { id: slotId },
       data: {
@@ -440,11 +456,11 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
 }
 
 /**
- * Sync the status of scheduled slots from Blotato.
+ * Sync the status of scheduled slots from PostPeer.
  * Called periodically (or on-demand) to detect when posts have been published.
  */
 export async function syncSlotStatuses(): Promise<{ checked: number; published: number }> {
-  // Find all slots that are scheduled in Blotato but not yet marked as published
+  // Find all slots that are scheduled in PostPeer but not yet marked as published
   const slots = await db.scheduleSlot.findMany({
     where: {
       blotatoPostId: { not: null },
@@ -454,12 +470,11 @@ export async function syncSlotStatuses(): Promise<{ checked: number; published: 
   });
 
   let published = 0;
-  const blotato = getBlotatoService();
 
   for (const slot of slots) {
     if (!slot.blotatoPostId) continue;
     try {
-      const status = await blotato.getPost(slot.blotatoPostId);
+      const status = await postpeer.getPostStatus(slot.blotatoPostId);
 
       if (status.status === 'published') {
         await db.scheduleSlot.update({
@@ -473,7 +488,7 @@ export async function syncSlotStatuses(): Promise<{ checked: number; published: 
         published++;
 
         // Fetch analytics in the background
-        blotato.getPostAnalytics(slot.blotatoPostId).then(async (analytics) => {
+        postpeer.getPostAnalytics(slot.blotatoPostId).then(async (analytics) => {
           if (analytics.views > 0 || analytics.likes > 0) {
             await db.scheduleSlot.update({
               where: { id: slot.id },
@@ -486,7 +501,7 @@ export async function syncSlotStatuses(): Promise<{ checked: number; published: 
           where: { id: slot.id },
           data: {
             blotatoStatus: 'failed',
-            errorMessage: status.error || 'Blotato reported failure',
+            errorMessage: status.error || 'PostPeer reported failure',
           },
         });
       }

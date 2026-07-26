@@ -153,7 +153,7 @@ You must output ONLY valid JSON (no markdown fences) matching this schema:
   "interval": <number or null>,
   "weekdays": [<0-6 array, 0=Sunday> or null],
   "timeOfDay": "<HH:MM 24h or null>",
-  "accountIds": ["<blotato account id>", ...] or null,
+  "accountIds": ["<postpeer account id>", ...] or null,
   "caption": "<caption text or null>",
   "hashtags": ["tag1", "tag2"] or null,
   "scheduledAt": "<ISO datetime or null>",
@@ -362,7 +362,7 @@ async function executeScheduleCommand(
     ) {
       return {
         ok: false,
-        message: '⚠️ No TikTok accounts connected. Please connect an account in Blotato first, then refresh this page.',
+        message: '⚠️ No TikTok accounts connected. Please connect an account in PostPeer first, then refresh this page.',
         action: parsed.action,
       };
     }
@@ -520,7 +520,7 @@ async function executePlanCalendar(
   return {
     ok: true,
     action: 'plan_calendar',
-    message: `📅 Created a ${days}-day content calendar with ${slotsCreated.length} scheduled posts across ${accountsToUse.length} account(s). Each post is scheduled at a peak engagement time and filled with videos from your library. All posts are now queued in Blotato and will publish automatically.`,
+    message: `📅 Created a ${days}-day content calendar with ${slotsCreated.length} scheduled posts across ${accountsToUse.length} account(s). Each post is scheduled at a peak engagement time and filled with videos from your library. All posts are now queued in PostPeer and will publish automatically.`,
     slotsCreated: slotsCreated.length,
     planCreated: true,
     slotIds: slotsCreated,
@@ -646,7 +646,7 @@ async function executeBulkSchedule(
   return {
     ok: true,
     action: 'bulk_schedule',
-    message: `📊 Bulk scheduled ${slotIds.length} videos with 2-hour intervals starting tomorrow at 6pm on @${accountsToUse[0].username}. All posts are queued in Blotato and will publish automatically.`,
+    message: `📊 Bulk scheduled ${slotIds.length} videos with 2-hour intervals starting tomorrow at 6pm on @${accountsToUse[0].username}. All posts are queued in PostPeer and will publish automatically.`,
     slotsCreated: slotIds.length,
     slotIds,
   };
@@ -715,7 +715,7 @@ async function executeReschedule(parsed: ParsedScheduleCommand): Promise<BotExec
   return {
     ok: true,
     action: 'reschedule',
-    message: `🔄 Moved ${moved} slot(s) from ${parsed.fromDay} to ${parsed.toDay}. Blotato scheduled posts have been updated automatically.`,
+    message: `🔄 Moved ${moved} slot(s) from ${parsed.fromDay} to ${parsed.toDay}. PostPeer scheduled posts have been updated automatically.`,
     slotsModified: moved,
   };
 }
@@ -743,7 +743,7 @@ async function executeCancelSlot(parsed: ParsedScheduleCommand): Promise<BotExec
   return {
     ok: true,
     action: 'cancel_slot',
-    message: `🗑️ Cancelled the slot scheduled for ${new Date(slot.scheduledAt).toLocaleString()} on @${slot.accountLabel || 'unknown'}. The Blotato scheduled post has been deleted.`,
+    message: `🗑️ Cancelled the slot scheduled for ${new Date(slot.scheduledAt).toLocaleString()} on @${slot.accountLabel || 'unknown'}. The PostPeer scheduled post has been deleted.`,
     slotsCancelled: 1,
   };
 }
@@ -796,7 +796,7 @@ async function executeFillGaps(
   return {
     ok: true,
     action: 'fill_gaps',
-    message: `✨ Filled ${filled} open slot(s) with videos from your library. They are now scheduled in Blotato.`,
+    message: `✨ Filled ${filled} open slot(s) with videos from your library. They are now scheduled in PostPeer.`,
     slotsModified: filled,
   };
 }
@@ -936,5 +936,5 @@ I execute your commands immediately — no confirmation needed. Here's what I ca
 • "best times to post" — show engagement peaks
 • "help" — show this help
 
-All scheduled posts go directly to Blotato and publish automatically at the scheduled time.`;
+All scheduled posts go directly to PostPeer and publish automatically at the scheduled time.`;
 }
