@@ -222,6 +222,18 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   const [newSlotHashtags, setNewSlotHashtags] = useState("");
   const [creatingSlot, setCreatingSlot] = useState(false);
 
+  // New slot: video upload state (separate from library pick)
+  const [newSlotSource, setNewSlotSource] = useState<"upload" | "library">("upload");
+  const [newSlotUploadedVideo, setNewSlotUploadedVideo] = useState<{
+    videoUrl: string;
+    title: string;
+    fileName: string;
+    sizeMB: number;
+    mimeType: string;
+  } | null>(null);
+  const [newSlotUploading, setNewSlotUploading] = useState(false);
+  const [newSlotUploadError, setNewSlotUploadError] = useState<string | null>(null);
+
   // Google Drive Import modal state
   const [showGDriveModal, setShowGDriveModal] = useState(false);
 
@@ -530,6 +542,60 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     }
   };
 
+  // Upload a video file from the user's computer, to be attached to the new
+  // slot being created via the NewSlotModal. Stores the returned hosted URL
+  // in `newSlotUploadedVideo` so it gets sent to /api/schedule/slots on create.
+  const handleUploadVideoForNewSlot = async (file: File): Promise<{ ok: boolean; error?: string }> => {
+    setNewSlotUploadError(null);
+    setNewSlotUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+      const uploadRes = await fetch("/api/schedule/upload-video", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        const msg = uploadData.error || "Upload failed";
+        setNewSlotUploadError(msg);
+        return { ok: false, error: msg };
+      }
+      setNewSlotUploadedVideo({
+        videoUrl: uploadData.videoUrl,
+        title: uploadData.title || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim(),
+        fileName: uploadData.fileName || file.name,
+        sizeMB: uploadData.sizeMB ?? Math.round(file.size / 1024 / 1024 * 10) / 10,
+        mimeType: uploadData.mimeType || file.type || "video/mp4",
+      });
+      // Pre-fill caption with the friendly filename if user hasn't typed one yet
+      if (!newSlotCaption) {
+        setNewSlotCaption(uploadData.title || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim());
+      }
+      // Selecting an upload should clear any library pick
+      setNewSlotVideo(null);
+      return { ok: true };
+    } catch (err: any) {
+      const msg = err.message || "Network error during upload";
+      setNewSlotUploadError(msg);
+      return { ok: false, error: msg };
+    } finally {
+      setNewSlotUploading(false);
+    }
+  };
+
+  // Reset all new-slot state when the modal closes
+  const resetNewSlotState = () => {
+    setNewSlotVideo(null);
+    setNewSlotUploadedVideo(null);
+    setNewSlotCaption("");
+    setNewSlotHashtags("");
+    setNewSlotTime("18:00");
+    setNewSlotSource("upload");
+    setNewSlotUploading(false);
+    setNewSlotUploadError(null);
+  };
+
   const handleCreateSlot = async () => {
     if (!newSlotDate || !newSlotAccountId) return;
     setCreatingSlot(true);
@@ -538,6 +604,15 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
       const scheduledAt = new Date(newSlotDate);
       scheduledAt.setHours(hh, mm, 0, 0);
 
+      // Resolve the video source: upload takes priority, then library pick, then open slot.
+      const hasUpload = !!newSlotUploadedVideo;
+      const hasLibrary = !!newSlotVideo;
+      const videoUrl = hasUpload ? newSlotUploadedVideo!.videoUrl : newSlotVideo?.videoUrl;
+      const thumbnailUrl = hasUpload ? undefined : newSlotVideo?.thumbnailUrl;
+      const caption = newSlotCaption || (hasUpload ? newSlotUploadedVideo!.title : newSlotVideo?.title) || "";
+      const sourceVideoId = hasLibrary ? newSlotVideo?.id : undefined;
+      const source = hasUpload ? "manual_upload" : hasLibrary ? "manual" : "manual";
+
       await fetch("/api/schedule/slots", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -545,22 +620,19 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           accountId: newSlotAccountId,
           accountLabel: accounts.find((a) => a.id === newSlotAccountId)?.username,
           scheduledAt: scheduledAt.toISOString(),
-          videoUrl: newSlotVideo?.videoUrl,
-          thumbnailUrl: newSlotVideo?.thumbnailUrl,
-          caption: newSlotCaption || newSlotVideo?.title,
+          videoUrl,
+          thumbnailUrl,
+          caption,
           hashtags: newSlotHashtags
             ? newSlotHashtags.split(/[,\s]+/).filter(Boolean)
             : undefined,
-          sourceVideoId: newSlotVideo?.id,
-          source: "manual",
+          sourceVideoId,
+          source,
         }),
       });
 
       setShowNewSlotModal(false);
-      setNewSlotVideo(null);
-      setNewSlotCaption("");
-      setNewSlotHashtags("");
-      setNewSlotTime("18:00");
+      resetNewSlotState();
       fetchSlots();
     } catch (err) {
       alert("Failed to create slot.");
@@ -1081,14 +1153,29 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           hashtags={newSlotHashtags}
           libraryVideos={libraryVideos}
           creating={creatingSlot}
+          source={newSlotSource}
+          uploadedVideo={newSlotUploadedVideo}
+          uploading={newSlotUploading}
+          uploadError={newSlotUploadError}
           onDateChange={setNewSlotDate}
           onAccountChange={setNewSlotAccountId}
           onTimeChange={setNewSlotTime}
-          onVideoChange={setNewSlotVideo}
+          onVideoChange={(v) => {
+            setNewSlotVideo(v);
+            // Picking from library clears any upload
+            if (v) setNewSlotUploadedVideo(null);
+          }}
           onCaptionChange={setNewSlotCaption}
           onHashtagsChange={setNewSlotHashtags}
+          onSourceChange={setNewSlotSource}
+          onUploadFile={handleUploadVideoForNewSlot}
+          onClearUpload={() => setNewSlotUploadedVideo(null)}
+          onClearUploadError={() => setNewSlotUploadError(null)}
           onCreate={handleCreateSlot}
-          onClose={() => setShowNewSlotModal(false)}
+          onClose={() => {
+            setShowNewSlotModal(false);
+            resetNewSlotState();
+          }}
         />
       )}
 
@@ -2085,6 +2172,14 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
 
 // ─── New Slot Modal ────────────────────────────────────────────────────────
 
+interface NewSlotUploadedVideo {
+  videoUrl: string;
+  title: string;
+  fileName: string;
+  sizeMB: number;
+  mimeType: string;
+}
+
 interface NewSlotModalProps {
   date: Date | null;
   accountId: string;
@@ -2095,12 +2190,21 @@ interface NewSlotModalProps {
   hashtags: string;
   libraryVideos: LibraryVideo[];
   creating: boolean;
+  // New: upload-related props
+  source: "upload" | "library";
+  uploadedVideo: NewSlotUploadedVideo | null;
+  uploading: boolean;
+  uploadError: string | null;
   onDateChange: (d: Date) => void;
   onAccountChange: (id: string) => void;
   onTimeChange: (t: string) => void;
   onVideoChange: (v: LibraryVideo | null) => void;
   onCaptionChange: (s: string) => void;
   onHashtagsChange: (s: string) => void;
+  onSourceChange: (s: "upload" | "library") => void;
+  onUploadFile: (file: File) => Promise<{ ok: boolean; error?: string }>;
+  onClearUpload: () => void;
+  onClearUploadError: () => void;
   onCreate: () => void;
   onClose: () => void;
 }
@@ -2115,17 +2219,62 @@ function NewSlotModal({
   hashtags,
   libraryVideos,
   creating,
+  source,
+  uploadedVideo,
+  uploading,
+  uploadError,
   onDateChange,
   onAccountChange,
   onTimeChange,
   onVideoChange,
   onCaptionChange,
   onHashtagsChange,
+  onSourceChange,
+  onUploadFile,
+  onClearUpload,
+  onClearUploadError,
   onCreate,
   onClose,
 }: NewSlotModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
   if (!date) return null;
   const dateStr = date.toISOString().slice(0, 10);
+
+  const pickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onClearUploadError();
+    await onUploadFile(file);
+    // Reset input value so the same file can be re-selected later
+    e.target.value = "";
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      onClearUploadError();
+      // Surface a friendly inline error via the same uploadError channel
+      await onUploadFile(file); // server will reject with "File must be a video"
+      return;
+    }
+    onClearUploadError();
+    await onUploadFile(file);
+  };
+
+  const hasVideo = !!uploadedVideo || !!video;
+  const createBtnLabel = creating
+    ? "Creating…"
+    : hasVideo
+      ? "📅 Schedule post"
+      : "➕ Create open slot";
 
   return (
     <div
@@ -2187,60 +2336,228 @@ function NewSlotModal({
             </select>
           </div>
 
-          {/* Video picker */}
+          {/* Video picker — tabbed: Upload from device / Pick from library */}
           <div>
-            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>
-              Video from library (optional — leave empty to create an open slot)
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1.5 block" style={{ color: C.textMuted }}>
+              Video source
             </label>
-            {video ? (
-              <div
-                className="flex items-center gap-2 p-2 rounded-xl"
-                style={{ backgroundColor: C.emeraldSoft, border: `1px solid ${C.cardBorder}` }}
+
+            {/* Tab switch */}
+            <div
+              className="grid grid-cols-2 p-1 rounded-xl mb-2.5"
+              style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+            >
+              <button
+                type="button"
+                onClick={() => onSourceChange("upload")}
+                className="py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={{
+                  backgroundColor: source === "upload" ? C.emerald : "transparent",
+                  color: source === "upload" ? C.white : C.textMuted,
+                }}
               >
-                <div
-                  className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden"
-                  style={{ backgroundColor: C.dark }}
-                >
-                  {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-bold truncate" style={{ color: C.text }}>{video.title}</p>
-                  <p className="text-[10px]" style={{ color: C.textMuted }}>{video.provider} · {video.scenesCount} scenes</p>
-                </div>
-                <button
-                  onClick={() => onVideoChange(null)}
-                  className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
-                  style={{ backgroundColor: C.white, color: C.textMuted }}
-                >✕</button>
-              </div>
-            ) : (
-              <div className="max-h-40 overflow-y-auto rounded-xl" style={{ border: `1px solid ${C.cardBorder}` }}>
-                {libraryVideos.length === 0 ? (
-                  <p className="text-xs italic p-3 text-center" style={{ color: C.textMuted }}>
-                    Your library is empty. Create videos in other machines first.
-                  </p>
-                ) : (
-                  libraryVideos.slice(0, 20).map((v) => (
-                    <button
-                      key={v.id}
-                      onClick={() => {
-                        onVideoChange(v);
-                        if (!caption) onCaptionChange(v.title);
-                      }}
-                      className="w-full flex items-center gap-2 p-2 text-left hover:bg-emerald-50 transition-colors"
-                      style={{ borderBottom: `1px solid ${C.cardBorder}` }}
-                    >
-                      <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden" style={{ backgroundColor: C.dark }}>
-                        {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
+                ⬆️ Upload from device
+              </button>
+              <button
+                type="button"
+                onClick={() => onSourceChange("library")}
+                className="py-1.5 rounded-lg text-xs font-bold transition-all"
+                style={{
+                  backgroundColor: source === "library" ? C.emerald : "transparent",
+                  color: source === "library" ? C.white : C.textMuted,
+                }}
+              >
+                🎬 Pick from library
+              </button>
+            </div>
+
+            {/* Hidden file input shared by click-to-browse */}
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska,.mp4,.mov,.webm,.avi,.mkv"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+
+            {/* === UPLOAD TAB === */}
+            {source === "upload" && (
+              <div>
+                {uploadedVideo ? (
+                  // Uploaded video preview
+                  <div
+                    className="rounded-xl p-3"
+                    style={{ backgroundColor: C.emeraldSoft, border: `1.5px solid ${C.emerald}` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center text-xl"
+                        style={{ backgroundColor: C.emerald, color: C.white }}
+                      >
+                        ▶
                       </div>
                       <div className="flex-1 min-w-0">
-                        <p className="text-xs font-semibold truncate" style={{ color: C.text }}>{v.title}</p>
-                        <p className="text-[10px]" style={{ color: C.textMuted }}>{v.provider}</p>
+                        <p className="text-xs font-bold truncate" style={{ color: C.text }}>
+                          {uploadedVideo.title}
+                        </p>
+                        <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
+                          {uploadedVideo.fileName} · {uploadedVideo.sizeMB} MB · {(uploadedVideo.mimeType || "video/mp4").replace("video/", "").toUpperCase()}
+                        </p>
+                        <p className="text-[10px] mt-0.5 font-semibold flex items-center gap-1" style={{ color: C.emeraldDark }}>
+                          ✓ Uploaded & ready to schedule
+                        </p>
                       </div>
+                      <button
+                        type="button"
+                        onClick={onClearUpload}
+                        disabled={uploading}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+                        style={{ backgroundColor: C.white, color: C.textMuted, border: `1px solid ${C.cardBorder}` }}
+                        title="Remove uploaded video"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    {/* Replace with another file */}
+                    <button
+                      type="button"
+                      onClick={pickFile}
+                      disabled={uploading}
+                      className="mt-2 w-full py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-[1.01] disabled:opacity-50"
+                      style={{ backgroundColor: C.white, color: C.emeraldDark, border: `1px solid ${C.cardBorder}` }}
+                    >
+                      Replace with a different file
                     </button>
-                  ))
+                  </div>
+                ) : uploading ? (
+                  // Uploading state
+                  <div
+                    className="rounded-xl p-6 text-center"
+                    style={{ backgroundColor: C.cream, border: `2px dashed ${C.emerald}` }}
+                  >
+                    <div className="inline-flex items-center gap-2 mb-2">
+                      <div
+                        className="w-4 h-4 rounded-full animate-spin"
+                        style={{ border: `2px solid ${C.emeraldLight}`, borderTopColor: C.emerald }}
+                      />
+                      <p className="text-xs font-bold" style={{ color: C.text }}>Uploading…</p>
+                    </div>
+                    <p className="text-[10px]" style={{ color: C.textMuted }}>
+                      Large videos may take 30–60 seconds. Please keep this window open.
+                    </p>
+                  </div>
+                ) : (
+                  // Drop zone (initial state)
+                  <button
+                    type="button"
+                    onClick={pickFile}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className="w-full rounded-xl p-6 text-center transition-all hover:scale-[1.01]"
+                    style={{
+                      backgroundColor: dragOver ? C.emeraldSoft : C.cream,
+                      border: `2px dashed ${dragOver ? C.emerald : C.cardBorder}`,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-2 text-xl"
+                      style={{ backgroundColor: C.emeraldLight, color: C.emeraldDark }}
+                    >
+                      ⬆️
+                    </div>
+                    <p className="text-xs font-bold mb-0.5" style={{ color: C.text }}>
+                      Click to browse or drop a video here
+                    </p>
+                    <p className="text-[10px]" style={{ color: C.textMuted }}>
+                      MP4, MOV, WebM, AVI, MKV · up to 200 MB
+                    </p>
+                  </button>
+                )}
+
+                {/* Error message */}
+                {uploadError && (
+                  <div
+                    className="mt-2 rounded-lg p-2 flex items-start gap-2"
+                    style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", border: `1px solid ${C.error}` }}
+                  >
+                    <span className="text-xs" style={{ color: C.error }}>⚠️</span>
+                    <p className="text-[11px] flex-1" style={{ color: C.error }}>{uploadError}</p>
+                    <button
+                      type="button"
+                      onClick={onClearUploadError}
+                      className="text-[11px] font-bold"
+                      style={{ color: C.error }}
+                    >✕</button>
+                  </div>
                 )}
               </div>
+            )}
+
+            {/* === LIBRARY TAB === */}
+            {source === "library" && (
+              <div>
+                {video ? (
+                  <div
+                    className="flex items-center gap-2 p-2 rounded-xl"
+                    style={{ backgroundColor: C.emeraldSoft, border: `1px solid ${C.cardBorder}` }}
+                  >
+                    <div
+                      className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden"
+                      style={{ backgroundColor: C.dark }}
+                    >
+                      {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate" style={{ color: C.text }}>{video.title}</p>
+                      <p className="text-[10px]" style={{ color: C.textMuted }}>{video.provider} · {video.scenesCount} scenes</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onVideoChange(null)}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-xs"
+                      style={{ backgroundColor: C.white, color: C.textMuted }}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-xl" style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white }}>
+                    {libraryVideos.length === 0 ? (
+                      <p className="text-xs italic p-3 text-center" style={{ color: C.textMuted }}>
+                        Your library is empty. Switch to “Upload from device” to add a video directly.
+                      </p>
+                    ) : (
+                      libraryVideos.slice(0, 20).map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            onVideoChange(v);
+                            if (!caption) onCaptionChange(v.title);
+                          }}
+                          className="w-full flex items-center gap-2 p-2 text-left hover:bg-emerald-50 transition-colors"
+                          style={{ borderBottom: `1px solid ${C.cardBorder}` }}
+                        >
+                          <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden" style={{ backgroundColor: C.dark }}>
+                            {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: C.text }}>{v.title}</p>
+                            <p className="text-[10px]" style={{ color: C.textMuted }}>{v.provider}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Helper note when no video is selected */}
+            {!uploadedVideo && !video && !uploading && (
+              <p className="text-[10px] mt-1.5 italic" style={{ color: C.textMuted }}>
+                💡 Leave empty to create an open slot you can fill later.
+              </p>
             )}
           </div>
 
@@ -2283,11 +2600,11 @@ function NewSlotModal({
           </button>
           <button
             onClick={onCreate}
-            disabled={creating || !accountId}
+            disabled={creating || uploading || !accountId}
             className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
             style={{ backgroundColor: C.emerald, color: C.white }}
           >
-            {creating ? "Creating…" : video ? "📅 Schedule post" : "➕ Create open slot"}
+            {createBtnLabel}
           </button>
         </div>
       </div>
