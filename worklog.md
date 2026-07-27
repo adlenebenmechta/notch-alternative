@@ -144,3 +144,43 @@ Stage Summary:
     4. Show a detailed results panel with every scheduled slot
 - Files added: src/app/api/schedule/gdrive-import/route.ts
 - Files modified: src/components/ScheduleMachine.tsx (+502 lines), src/lib/googleDriveService.ts
+
+---
+Task ID: schedule-dockerfile-fix
+Agent: Main Agent
+Task: Schedule Machine still showed "Connect your Blotato account" in production despite commits 46f5be3 (PostPeer switch) and 5861cdd (Google Drive) being pushed to GitHub. User provided Railway token to verify directly.
+
+Work Log:
+- Re-cloned project_repo (had been cleared between sessions)
+- Verified local code is correct: ScheduleMachine.tsx says "PostPeer", accounts/route.ts uses PostPeerService, .env has POSTPEER_API_KEY=jySqBLF9h6SGen
+- Discovered Railway token via `railway status`:
+  * Project: ai-avatar-machine (ID: 3fcea460-955b-4192-aa4b-1633847c4daf)
+  * Service: my-project (https://www.kobisto.com)
+  * Service status: "Online · Deploy failed (4m)" — latest deploy FAILED
+- Listed deployments: BOTH recent deploys (57ba2e6 empty commit + 5861cdd Google Drive) had status=FAILED
+- Fetched build logs for failed deploy — found the exact error:
+    [ERRO] [runner 12/13] COPY --from=builder --chown=nextjs:nodejs /app/.env ./.env
+    Build Failed: ... "/app/.env": not found
+- Root cause: .dockerignore excludes `.env*` (line 6 of .dockerignore), but Dockerfile line 58 tried to COPY /app/.env from the builder stage — which never had it. This broke EVERY deploy since commit 46f5be3 was pushed.
+- Verified Railway Variables are already set correctly: POSTPEER_API_KEY=jySqBLF9h6SGen, DATABASE_URL (PostgreSQL), ATLAS_KEY, KIE_API_KEY, FAL_API_KEY. No .env file is needed.
+- Edited Dockerfile to:
+  * Remove the broken `COPY --from=builder /app/.env ./.env` line
+  * Remove `/app/.env` from the chown command
+  * Remove `set -a && . /app/.env && set +a` from CMD (Railway Variables are already in process.env)
+  * Updated comments explaining the new approach
+- Committed (89a2794) and pushed
+- Monitored build via `railway logs` — confirmed it progressed past the previous failure point (12/12 steps instead of 12/13)
+- After ~3 min, deployment status changed to SUCCESS
+- Verified production: GET https://kobisto.com/api/schedule/accounts now returns:
+  * 5 PostPeer TikTok accounts: @armoray.deals, @viral_deals4u, @armorayusa, @outdoordeals4u, @armorayactiva
+  * provider: "postpeer", keyPrefix: "jySq...en"
+  * No more "Blotato API auth error"!
+
+Stage Summary:
+- The root cause was a Dockerfile bug introduced when .dockerignore started excluding .env* but the Dockerfile still tried to COPY /app/.env. This silently broke every Railway deploy since commit 46f5be3 — production kept serving the OLD Blotato code from the last successful deploy.
+- Fix: removed the .env COPY from Dockerfile. Railway Variables (already set on the dashboard) provide all secrets at runtime.
+- Production at kobisto.com is now serving the latest code (commit 89a2794):
+  * Schedule Machine uses PostPeer (5 TikTok accounts visible)
+  * "Connect your Blotato account" banner is gone — replaced with PostPeer diagnostics
+  * Google Drive → TikTok auto-scheduler feature is live
+- User can now visit https://kobisto.com and use Schedule Machine normally.
