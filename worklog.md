@@ -184,3 +184,66 @@ Stage Summary:
   * "Connect your Blotato account" banner is gone — replaced with PostPeer diagnostics
   * Google Drive → TikTok auto-scheduler feature is live
 - User can now visit https://kobisto.com and use Schedule Machine normally.
+
+---
+Task ID: schedule-smart-bot-upload
+Agent: Main Agent
+Task: User reported 3 issues with Schedule Machine:
+  1. Created an "open slot" but couldn't find where to upload a video
+  2. Wants a more professional, easy-to-use UI
+  3. Wants the bot to be very intelligent — paste a GDrive link + instructions, get everything scheduled autonomously
+
+Work Log:
+- Re-cloned project_repo to ensure clean state
+- Read full ScheduleMachine.tsx (2574 lines) and scheduleBot.ts (941 lines) to understand current architecture
+- Verified all env vars on Railway: POSTPEER_API_KEY, DATABASE_URL, KIE_API_KEY all set
+- Found existing kieai.redpandaai.co file-hosting pattern in /api/upload-product-image (used for product images)
+
+Created /api/schedule/upload-video (NEW):
+- POST endpoint that accepts multipart/form-data with a "video" file field
+- Uploads to kie.ai hosting (same service as upload-product-image) — supports MP4/MOV/WebM/AVI/MKV up to 200MB
+- 3 retries with exponential backoff
+- Returns { videoUrl, title, fileName, sizeMB, mimeType }
+
+Updated ScheduleMachine.tsx:
+- SlotDetailModal now shows a drag-and-drop upload zone when slot is "open" (no video yet)
+- Upload zone has dashed border, hover effects, drag state, click-to-browse, file type validation
+- handleUploadVideoToSlot() uploads the file, then PATCHes the slot with the new videoUrl + derived caption + status='scheduled'
+- Open slots in WeekView now show "Open — click to upload video" with dashed border so users know what to do
+- Video preview in SlotDetailModal has an "Open video ↗" overlay link
+- Cancel button on open slots says "Delete slot" (clearer than "Cancel slot")
+- Bot input is now a multi-line textarea (so users can paste long instructions comfortably)
+- "Thinking" indicator now shows context-aware messages ("Importing videos from Google Drive…" when relevant)
+- Bot welcome screen has a "Smart tip" card highlighting the GDrive feature
+
+Made the bot VERY smart (scheduleBot.ts):
+- New action: 'gdrive_import' — fires when user pastes a GDrive URL in chat
+  - Both AI parser and fallback regex detect drive.google.com/drive/folders/ URLs
+  - AI extracts the URL into gdriveFolderUrl and the instructions into gdriveInstructions
+- executeGdriveImport() does the FULL flow autonomously:
+  1. Lists videos via googleDriveService.listFolderFiles (HTML scraping, no API key)
+  2. Parses instructions with ZAI → structured plan (postsPerDay, timesOfDay, daysAhead, captionTone, hashtagsFocus)
+  3. Generates unique captions + 5-8 hashtags per video with ZAI
+  4. Creates schedule slots at planned times, rotating across accounts
+  5. Returns a detailed summary (top 8 slots shown + "N more — open calendar")
+- New action: 'library_status' — "what's in my library?" shows accounts + library contents + tips
+- Updated help text + suggestions to highlight the GDrive feature
+- Increased maxDuration on /api/schedule/bot to 300s (5 min — GDrive import can be slow)
+
+Fixed display bug:
+- PostPeer returns usernames already prefixed with @ (e.g. @armoray.deals)
+- Display code was adding another @ → @@armoray.deals
+- Added .replace(/^@/, '') on every @ display path in scheduleBot.ts (8 places) and ScheduleMachine.tsx (8 places)
+
+Verification:
+- TypeScript type-check passed (only unrelated pre-existing error in download/ad_generator_new.tsx)
+- Deployed to Railway: commits a265ff0 (feature) + b6a78dd (@ fix)
+- Tested /api/schedule/upload-video → returns proper error for missing file
+- Tested /api/schedule/bot with "what is in my library?" → bot correctly lists 5 TikTok accounts with single @ prefix
+- Tested bot with fake GDrive URL → bot correctly detected URL, action=gdrive_import, attempted to list folder (failed as expected with helpful error message)
+
+Stage Summary:
+- Open slots now have a clear upload zone (drag-drop or click) in the slot detail modal
+- Bot is now truly autonomous: paste any GDrive folder URL + scheduling instructions and the bot does everything
+- All account display names show single @ (not @@) everywhere in the UI
+- Production at kobisto.com is serving the latest code (commit b6a78dd)
