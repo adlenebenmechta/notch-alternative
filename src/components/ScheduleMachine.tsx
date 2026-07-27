@@ -926,7 +926,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
               >
                 <option value="all">All accounts</option>
                 {accounts.map((a) => (
-                  <option key={a.id} value={a.id}>@{a.username}</option>
+                  <option key={a.id} value={a.id}>@{(a.username || '').replace(/^@/, '')}</option>
                 ))}
               </select>
             </div>
@@ -1234,7 +1234,7 @@ function WeekView({
                     </div>
                     {slot.accountLabel && (
                       <div className="text-[10px] mt-0.5 font-semibold" style={{ color: C.emeraldDark }}>
-                        @{slot.accountLabel}
+                        @{(slot.accountLabel || '').replace(/^@/, '')}
                       </div>
                     )}
                   </div>
@@ -1444,7 +1444,7 @@ function ListView({ slots, onSlotClick }: { slots: ScheduleSlot[]; onSlotClick: 
                   </div>
                   {slot.accountLabel && (
                     <div className="text-[10px] mt-0.5 font-semibold" style={{ color: C.emeraldDark }}>
-                      @{slot.accountLabel}
+                      @{(slot.accountLabel || '').replace(/^@/, '')}
                       {slot.views > 0 && (
                         <span className="ml-2" style={{ color: C.textMuted }}>
                           👁 {formatNumber(slot.views)} · ❤ {formatNumber(slot.likes)}
@@ -1845,7 +1845,7 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
           {/* Account */}
           <div>
             <p className="text-[10px] uppercase tracking-wide font-bold mb-1" style={{ color: C.textMuted }}>Account</p>
-            <p className="text-sm font-semibold" style={{ color: C.emeraldDark }}>@{slot.accountLabel || slot.accountId}</p>
+            <p className="text-sm font-semibold" style={{ color: C.emeraldDark }}>@{(slot.accountLabel || slot.accountId || '').replace(/^@/, '')}</p>
           </div>
 
           {/* ─── Video upload zone (for OPEN slots — no video yet) ─── */}
@@ -2182,7 +2182,7 @@ function NewSlotModal({
               style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
             >
               {accounts.map((a) => (
-                <option key={a.id} value={a.id}>@{a.username}</option>
+                <option key={a.id} value={a.id}>@{(a.username || '').replace(/^@/, '')}</option>
               ))}
             </select>
           </div>
@@ -2634,10 +2634,10 @@ function GoogleDriveImportModal({
                         <img src={a.avatarUrl} alt="" className="w-5 h-5 rounded-full" />
                       ) : (
                         <span className="w-5 h-5 rounded-full flex items-center justify-center text-[9px]" style={{ backgroundColor: selected ? "rgba(255,255,255,0.3)" : C.emeraldSoft }}>
-                          @{a.username.slice(0, 1).toUpperCase()}
+                          @{(a.username || '').slice(0, 1).toUpperCase()}
                         </span>
                       )}
-                      @{a.username}
+                      @{(a.username || '').replace(/^@/, '')}
                     </button>
                   );
                 })}
@@ -2703,7 +2703,7 @@ function GoogleDriveImportModal({
                             </span>
                           </div>
                           <p className="text-[11px] mb-1" style={{ color: C.textMuted }}>
-                            → @{s.account}
+                            → @{(s.account || '').replace(/^@/, '')}
                           </p>
                           <p className="text-[11px] italic" style={{ color: C.text }}>
                             “{s.caption}”

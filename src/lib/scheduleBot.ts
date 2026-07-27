@@ -130,12 +130,12 @@ async function parseScheduleCommand(
       .join('\n');
 
     const accountList = context.accounts
-      .map((a, i) => `${i + 1}. @${a.username} (id: ${a.id})`)
+      .map((a, i) => `${i + 1}. @${(a.username || '').replace(/^@/, '')} (id: ${a.id})`)
       .join('\n');
 
     const upcomingSlots = (context.existingSlots || [])
       .slice(0, 10)
-      .map((s) => `- ${s.scheduledAt} on @${s.accountLabel || s.accountId} (${s.status})`)
+      .map((s) => `- ${s.scheduledAt} on @${(s.accountLabel || s.accountId || '').replace(/^@/, '')} (${s.status})`)
       .join('\n');
 
     const now = new Date().toISOString();
@@ -641,7 +641,7 @@ async function executeScheduleVideo(
   return {
     ok: true,
     action: 'schedule_video',
-    message: `📅 Scheduled "${video.title}" for ${scheduledAt.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })} on @${accountsToUse[0].username}. It will publish automatically at that time.`,
+    message: `📅 Scheduled "${video.title}" for ${scheduledAt.toLocaleString('en-US', { dateStyle: 'full', timeStyle: 'short' })} on @${(accountsToUse[0].username || '').replace(/^@/, '')}. It will publish automatically at that time.`,
     slotsCreated: 1,
     slotIds: [slot.id],
   };
@@ -696,7 +696,7 @@ async function executeBulkSchedule(
   return {
     ok: true,
     action: 'bulk_schedule',
-    message: `📊 Bulk scheduled ${slotIds.length} videos with 2-hour intervals starting tomorrow at 6pm on @${accountsToUse[0].username}. All posts are queued in PostPeer and will publish automatically.`,
+    message: `📊 Bulk scheduled ${slotIds.length} videos with 2-hour intervals starting tomorrow at 6pm on @${(accountsToUse[0].username || '').replace(/^@/, '')}. All posts are queued in PostPeer and will publish automatically.`,
     slotsCreated: slotIds.length,
     slotIds,
   };
@@ -793,7 +793,7 @@ async function executeCancelSlot(parsed: ParsedScheduleCommand): Promise<BotExec
   return {
     ok: true,
     action: 'cancel_slot',
-    message: `🗑️ Cancelled the slot scheduled for ${new Date(slot.scheduledAt).toLocaleString()} on @${slot.accountLabel || 'unknown'}. The PostPeer scheduled post has been deleted.`,
+    message: `🗑️ Cancelled the slot scheduled for ${new Date(slot.scheduledAt).toLocaleString()} on @${(slot.accountLabel || 'unknown').replace(/^@/, '')}. The PostPeer scheduled post has been deleted.`,
     slotsCancelled: 1,
   };
 }
@@ -926,7 +926,7 @@ async function executeListUpcoming(): Promise<BotExecutionResult> {
         minute: '2-digit',
       });
       const status = s.status === 'scheduled' ? '✅' : s.status === 'open' ? '⚪' : s.status === 'published' ? '🚀' : '❌';
-      return `${i + 1}. ${status} ${dt} — @${s.accountLabel || 'unknown'}${s.caption ? ` "${s.caption.slice(0, 30)}${s.caption.length > 30 ? '...' : ''}"` : ''}`;
+      return `${i + 1}. ${status} ${dt} — @${(s.accountLabel || 'unknown').replace(/^@/, '')}${s.caption ? ` "${s.caption.slice(0, 30)}${s.caption.length > 30 ? '...' : ''}"` : ''}`;
     })
     .join('\n');
 
@@ -1122,7 +1122,7 @@ async function executeGdriveImport(
       weekday: 'short', month: 'short', day: 'numeric',
       hour: 'numeric', minute: '2-digit', hour12: true,
     });
-    return `${i + 1}. 🎬 ${s.filename}\n   → ${dt} on @${s.account}\n   "${s.caption.slice(0, 80)}${s.caption.length > 80 ? '…' : ''}"`;
+    return `${i + 1}. 🎬 ${s.filename}\n   → ${dt} on @${(s.account || '').replace(/^@/, '')}\n   "${s.caption.slice(0, 80)}${s.caption.length > 80 ? '…' : ''}"`;
   }).join('\n');
 
   const more = createdSlots.length > 8 ? `\n\n… and ${createdSlots.length - 8} more — open the calendar to see all.` : '';
@@ -1146,7 +1146,7 @@ async function executeLibraryStatus(
   context: { libraryVideos: any[]; accounts: ScheduleAccount[] }
 ): Promise<BotExecutionResult> {
   const accountList = context.accounts.length > 0
-    ? context.accounts.map((a, i) => `   ${i + 1}. @${a.username} (${a.platform})`).join('\n')
+    ? context.accounts.map((a, i) => `   ${i + 1}. @${(a.username || '').replace(/^@/, '')} (${a.platform})`).join('\n')
     : '   (none connected — connect one in PostPeer first)';
 
   const videoList = context.libraryVideos.length > 0
@@ -1203,7 +1203,7 @@ async function parseGdriveInstructions(
   const today = now.split('T')[0];
 
   const accountList = availableAccounts
-    .map((a, i) => `${i + 1}. @${a.username} (id: ${a.id})`)
+    .map((a, i) => `${i + 1}. @${(a.username || '').replace(/^@/, '')} (id: ${a.id})`)
     .join('\n');
 
   const systemPrompt = `You are an AI scheduling assistant. Parse the user's natural-language instructions about how to schedule ${videoCount} videos from a Google Drive folder.
