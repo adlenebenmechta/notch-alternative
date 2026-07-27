@@ -7,6 +7,7 @@ import { loadVideosFromStorage } from '@/lib/video-store';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
+export const maxDuration = 300; // 5 minutes — gdrive_import action can be slow
 
 // GET /api/schedule/bot?conversationId=... — get conversation messages
 //     /api/schedule/bot?list=1            — list all conversations

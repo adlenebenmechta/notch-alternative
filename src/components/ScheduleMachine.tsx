@@ -463,6 +463,54 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     }
   };
 
+  // Upload a video file from the user's computer and assign it to an existing open slot.
+  // Used by SlotDetailModal when the user clicks "Upload Video" on an open slot.
+  const handleUploadVideoToSlot = async (slotId: string, file: File): Promise<{ ok: boolean; error?: string }> => {
+    try {
+      // Step 1: upload the file to hosting (kie.ai)
+      const formData = new FormData();
+      formData.append("video", file);
+      const uploadRes = await fetch("/api/schedule/upload-video", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        return { ok: false, error: uploadData.error || "Upload failed" };
+      }
+
+      // Step 2: update the slot with the new video URL, caption, and status
+      const derivedCaption = uploadData.title || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim();
+      await fetch(`/api/schedule/slots/${slotId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          videoUrl: uploadData.videoUrl,
+          caption: derivedCaption,
+          status: "scheduled",
+          source: "manual_upload",
+        }),
+      });
+
+      // Refresh and update the selected slot in-place
+      await fetchSlots();
+      const updated = slots.find((s) => s.id === slotId);
+      if (updated) {
+        setSelectedSlot({
+          ...updated,
+          videoUrl: uploadData.videoUrl,
+          caption: derivedCaption,
+          status: "scheduled",
+          source: "manual_upload",
+        });
+      }
+      return { ok: true };
+    } catch (err: any) {
+      console.error("Upload video to slot failed:", err);
+      return { ok: false, error: err.message || "Network error" };
+    }
+  };
+
   const handleRescheduleSlot = async (slotId: string, newDate: Date) => {
     try {
       const current = slots.find((s) => s.id === slotId);
@@ -1017,6 +1065,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
             handleRescheduleSlot(selectedSlot.id, newDate);
             setSelectedSlot(null);
           }}
+          onUploadVideo={(file) => handleUploadVideoToSlot(selectedSlot.id, file)}
         />
       )}
 
@@ -1159,6 +1208,7 @@ function WeekView({
               {/* Slots */}
               {daySlots.map((slot) => {
                 const sc = statusConfig(slot.status);
+                const isSlotOpen = slot.status === "open";
                 return (
                   <div
                     key={slot.id}
@@ -1168,7 +1218,7 @@ function WeekView({
                     className="rounded-lg p-2 cursor-pointer transition-all hover:scale-[1.02] hover:shadow-md text-xs"
                     style={{
                       backgroundColor: dragOverSlot === slot.id ? C.emeraldLight : sc.bg,
-                      border: `1px solid ${dragOverSlot === slot.id ? C.emerald : sc.color + "40"}`,
+                      border: `1px ${isSlotOpen ? "dashed" : "solid"} ${dragOverSlot === slot.id ? C.emerald : sc.color + "40"}`,
                     }}
                   >
                     <div className="flex items-center gap-1 mb-0.5">
@@ -1178,7 +1228,9 @@ function WeekView({
                       </span>
                     </div>
                     <div className="text-[10px] truncate" style={{ color: C.textMuted }}>
-                      {slot.caption || (slot.status === "open" ? "Empty slot" : "Scheduled")}
+                      {isSlotOpen
+                        ? "Open — click to upload video"
+                        : (slot.caption || "Scheduled")}
                     </div>
                     {slot.accountLabel && (
                       <div className="text-[10px] mt-0.5 font-semibold" style={{ color: C.emeraldDark }}>
@@ -1530,11 +1582,11 @@ function BotPanel({
 }: BotPanelProps) {
   const suggestions = [
     "Plan my week with 2 posts per day",
-    "Schedule my latest video for tomorrow 8pm",
+    "What's in my library?",
     "Best times to post",
-    "Bulk schedule 5 videos",
-    "Every day at 6pm",
     "What's coming up?",
+    "Fill empty slots",
+    "Every day at 8pm",
   ];
 
   return (
@@ -1580,6 +1632,17 @@ function BotPanel({
                 ? `Connected to ${accountsCount} account(s), ${libraryCount} videos in library.`
                 : "Connect a PostPeer account to get started."}
             </p>
+            <div
+              className="rounded-xl p-2.5 text-left mb-3"
+              style={{ backgroundColor: C.emeraldSoft, border: `1px solid ${C.cardBorder}` }}
+            >
+              <p className="text-[10px] font-bold mb-1" style={{ color: C.emeraldDark }}>
+                💡 Smart tip
+              </p>
+              <p className="text-[10px] leading-relaxed" style={{ color: C.text }}>
+                Paste a Google Drive folder URL + your scheduling instructions, and I'll list every video, write unique captions & hashtags, and schedule them all automatically.
+              </p>
+            </div>
             <p className="text-[10px] mb-2 font-semibold" style={{ color: C.emeraldDark }}>Try:</p>
             <div className="flex flex-wrap gap-1.5 justify-center">
               {suggestions.map((s) => (
@@ -1627,11 +1690,16 @@ function BotPanel({
               className="rounded-2xl px-3 py-2 text-xs"
               style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
             >
-              <span className="inline-flex gap-1">
-                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "0ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "150ms" }} />
-                <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "300ms" }} />
-              </span>
+              <div className="flex items-center gap-2">
+                <span className="inline-flex gap-1">
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "0ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "150ms" }} />
+                  <span className="w-1.5 h-1.5 rounded-full animate-bounce" style={{ backgroundColor: C.emerald, animationDelay: "300ms" }} />
+                </span>
+                <span className="text-[10px]" style={{ color: C.textMuted }}>
+                  {chatInput.match(/drive\.google\.com/i) ? "Importing videos from Google Drive…" : "Working on it…"}
+                </span>
+              </div>
             </div>
           </div>
         )}
@@ -1640,9 +1708,8 @@ function BotPanel({
 
       {/* Input */}
       <div className="p-3 border-t" style={{ borderColor: C.cardBorder }}>
-        <div className="flex gap-2">
-          <input
-            type="text"
+        <div className="flex gap-2 items-end">
+          <textarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => {
@@ -1651,17 +1718,22 @@ function BotPanel({
                 onSend();
               }
             }}
-            placeholder="Tell me what to schedule…"
-            className="flex-1 px-3 py-2 rounded-xl text-xs border-0 outline-none"
-            style={{ backgroundColor: C.cream, color: C.text }}
+            placeholder="Tell me what to schedule…  (Tip: paste a Google Drive link + your instructions)"
+            rows={2}
+            className="flex-1 px-3 py-2 rounded-xl text-xs border-0 outline-none resize-none"
+            style={{ backgroundColor: C.cream, color: C.text, minHeight: "44px", maxHeight: "120px" }}
           />
           <button
             onClick={onSend}
             disabled={thinking || !input.trim()}
-            className="px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100"
+            className="px-4 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-105 disabled:opacity-40 disabled:hover:scale-100 flex-shrink-0"
             style={{ backgroundColor: C.emerald, color: C.white }}
           >
-            Send
+            {thinking ? (
+              <span className="w-3 h-3 rounded-full border-2 border-white border-t-transparent animate-spin inline-block" />
+            ) : (
+              "Send"
+            )}
           </button>
         </div>
       </div>
@@ -1676,9 +1748,10 @@ interface SlotDetailModalProps {
   onClose: () => void;
   onDelete: () => void;
   onReschedule: (newDate: Date) => void;
+  onUploadVideo: (file: File) => Promise<{ ok: boolean; error?: string }>;
 }
 
-function SlotDetailModal({ slot, onClose, onDelete, onReschedule }: SlotDetailModalProps) {
+function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo }: SlotDetailModalProps) {
   const sc = statusConfig(slot.status);
   const scheduledDate = new Date(slot.scheduledAt);
   const [showReschedule, setShowReschedule] = useState(false);
@@ -1688,9 +1761,43 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule }: SlotDetailMo
   const [newTime, setNewTime] = useState(
     `${String(scheduledDate.getHours()).padStart(2, "0")}:${String(scheduledDate.getMinutes()).padStart(2, "0")}`
   );
+  // Upload state (for open slots)
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<string>("");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [isDragOver, setIsDragOver] = useState(false);
 
   const hashtags = slot.hashtags ? safeJsonParse(slot.hashtags, []) : [];
   const imageUrls = slot.imageUrls ? safeJsonParse(slot.imageUrls, []) : [];
+  const isOpen = slot.status === "open";
+
+  const handleFileSelected = async (file: File | undefined | null) => {
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      setUploadError("Please select a video file (MP4, MOV, WebM, etc.)");
+      return;
+    }
+    if (file.size > 200 * 1024 * 1024) {
+      setUploadError("Video is too large (max 200MB)");
+      return;
+    }
+    setUploadError(null);
+    setUploading(true);
+    setUploadProgress(`Uploading "${file.name}" (${(file.size / 1024 / 1024).toFixed(1)}MB)…`);
+    try {
+      const result = await onUploadVideo(file);
+      if (!result.ok) {
+        setUploadError(result.error || "Upload failed");
+      } else {
+        setUploadProgress("✅ Video uploaded and scheduled in PostPeer!");
+      }
+    } catch (err: any) {
+      setUploadError(err.message || "Network error");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <div
@@ -1741,14 +1848,110 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule }: SlotDetailMo
             <p className="text-sm font-semibold" style={{ color: C.emeraldDark }}>@{slot.accountLabel || slot.accountId}</p>
           </div>
 
-          {/* Video preview */}
+          {/* ─── Video upload zone (for OPEN slots — no video yet) ─── */}
+          {isOpen && !slot.videoUrl && (
+            <div>
+              <p className="text-[10px] uppercase tracking-wide font-bold mb-2" style={{ color: C.textMuted }}>
+                Upload a video to fill this slot
+              </p>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska,.mp4,.mov,.webm,.avi,.mkv"
+                className="hidden"
+                onChange={(e) => {
+                  const file = e.target.files?.[0];
+                  handleFileSelected(file);
+                  // Reset so the same file can be selected again later
+                  if (fileInputRef.current) fileInputRef.current.value = "";
+                }}
+              />
+              <div
+                onClick={() => !uploading && fileInputRef.current?.click()}
+                onDragOver={(e) => {
+                  e.preventDefault();
+                  if (!uploading) setIsDragOver(true);
+                }}
+                onDragLeave={() => setIsDragOver(false)}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setIsDragOver(false);
+                  if (uploading) return;
+                  const file = e.dataTransfer.files?.[0];
+                  handleFileSelected(file);
+                }}
+                className="rounded-2xl p-6 text-center cursor-pointer transition-all"
+                style={{
+                  backgroundColor: isDragOver ? C.emeraldSoft : C.cream,
+                  border: `2px dashed ${isDragOver ? C.emerald : C.cardBorder}`,
+                  opacity: uploading ? 0.7 : 1,
+                }}
+              >
+                {uploading ? (
+                  <div className="flex flex-col items-center gap-2">
+                    <div
+                      className="w-8 h-8 rounded-full border-3 border-t-transparent animate-spin"
+                      style={{ borderColor: `${C.emerald}33`, borderTopColor: C.emerald }}
+                    />
+                    <p className="text-xs font-semibold" style={{ color: C.text }}>{uploadProgress}</p>
+                  </div>
+                ) : (
+                  <>
+                    <div
+                      className="w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-3"
+                      style={{ backgroundColor: C.emerald, boxShadow: `0 6px 20px ${C.emerald}40` }}
+                    >
+                      <svg width="26" height="26" viewBox="0 0 24 24" fill="none">
+                        <path d="M12 16V4M12 4l-4 4M12 4l4 4" stroke={C.white} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                        <path d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2" stroke={C.white} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"/>
+                      </svg>
+                    </div>
+                    <p className="text-sm font-bold mb-1" style={{ color: C.text }}>
+                      {isDragOver ? "Drop your video here" : "Click to upload or drag & drop"}
+                    </p>
+                    <p className="text-[10px]" style={{ color: C.textMuted }}>
+                      MP4, MOV, WebM, AVI · max 200MB
+                    </p>
+                  </>
+                )}
+              </div>
+              {uploadError && (
+                <div className="mt-2 rounded-xl p-2.5 text-xs" style={{ backgroundColor: "#FEE2E2", color: C.error }}>
+                  ⚠️ {uploadError}
+                </div>
+              )}
+              {uploadProgress.startsWith("✅") && (
+                <div className="mt-2 rounded-xl p-2.5 text-xs font-semibold" style={{ backgroundColor: C.emeraldSoft, color: C.emeraldDark }}>
+                  {uploadProgress}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ─── Video preview (for slots that already have a video) ─── */}
           {slot.videoUrl && (
             <div>
               <p className="text-[10px] uppercase tracking-wide font-bold mb-1" style={{ color: C.textMuted }}>Content</p>
-              <div className="rounded-xl overflow-hidden" style={{ backgroundColor: C.dark }}>
+              <div className="rounded-xl overflow-hidden relative" style={{ backgroundColor: C.dark }}>
                 {slot.thumbnailUrl && (
                   <img src={slot.thumbnailUrl} alt="thumbnail" className="w-full h-32 object-cover" />
                 )}
+                {!slot.thumbnailUrl && (
+                  <div className="w-full h-32 flex items-center justify-center">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill={C.white}>
+                      <path d="M8 5v14l11-7z" />
+                    </svg>
+                  </div>
+                )}
+                <a
+                  href={slot.videoUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="absolute bottom-2 right-2 px-2 py-1 rounded-lg text-[10px] font-bold"
+                  style={{ backgroundColor: "rgba(0,0,0,0.7)", color: C.white }}
+                >
+                  Open video ↗
+                </a>
               </div>
             </div>
           )}
@@ -1861,7 +2064,7 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule }: SlotDetailMo
                 className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02]"
                 style={{ backgroundColor: "#FEE2E2", color: C.error }}
               >
-                🗑 Cancel slot
+                {isOpen ? "🗑 Delete slot" : "🗑 Cancel slot"}
               </button>
             </>
           )}
