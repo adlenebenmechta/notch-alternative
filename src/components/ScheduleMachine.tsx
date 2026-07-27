@@ -140,6 +140,13 @@ function formatDateKey(d: Date): string {
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
 }
 
+// Format a Date as YYYY-MM-DD using LOCAL time (NOT UTC).
+// Critical: toISOString().slice(0,10) shifts the day backwards in timezones
+// behind UTC (e.g. Africa/Algiers UTC+1 — picking "27" would display as "26").
+function toLocalDateStr(d: Date): string {
+  return formatDateKey(d);
+}
+
 function formatTime(d: Date): string {
   return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
 }
@@ -1842,9 +1849,8 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
   const sc = statusConfig(slot.status);
   const scheduledDate = new Date(slot.scheduledAt);
   const [showReschedule, setShowReschedule] = useState(false);
-  const [newDate, setNewDate] = useState(
-    scheduledDate.toISOString().slice(0, 10)
-  );
+  // IMPORTANT: use LOCAL date so reschedule input shows the correct day.
+  const [newDate, setNewDate] = useState(toLocalDateStr(scheduledDate));
   const [newTime, setNewTime] = useState(
     `${String(scheduledDate.getHours()).padStart(2, "0")}:${String(scheduledDate.getMinutes()).padStart(2, "0")}`
   );
@@ -2239,7 +2245,9 @@ function NewSlotModal({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [dragOver, setDragOver] = useState(false);
   if (!date) return null;
-  const dateStr = date.toISOString().slice(0, 10);
+  // IMPORTANT: use LOCAL date (not toISOString) so picking "27" shows "27"
+  // regardless of timezone. toISOString().slice(0,10) would shift the day back.
+  const dateStr = toLocalDateStr(date);
 
   const pickFile = () => {
     fileInputRef.current?.click();
