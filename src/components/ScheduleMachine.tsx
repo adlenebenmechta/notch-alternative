@@ -779,6 +779,82 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     }
   };
 
+  // Create the current slot but KEEP the modal open with per-slot fields
+  // cleared (date + account + time preserved). Lets the user chain-create
+  // multiple slots without reopening the modal each time.
+  // Returns true on success so the modal knows the save worked.
+  const handleCreateSlotAndKeepOpen = async (): Promise<boolean> => {
+    if (!newSlotDate || !newSlotAccountId) return false;
+    setCreatingSlot(true);
+    try {
+      const [hh, mm] = newSlotTime.split(":").map(Number);
+      const scheduledAt = new Date(newSlotDate);
+      scheduledAt.setHours(hh, mm, 0, 0);
+
+      const hasUpload = !!newSlotUploadedVideo;
+      const hasLibrary = !!newSlotVideo;
+      const videoUrl = hasUpload ? newSlotUploadedVideo!.videoUrl : newSlotVideo?.videoUrl;
+      const thumbnailUrl = hasUpload ? undefined : newSlotVideo?.thumbnailUrl;
+      const caption = newSlotCaption || (hasUpload ? newSlotUploadedVideo!.title : newSlotVideo?.title) || "";
+      const sourceVideoId = hasLibrary ? newSlotVideo?.id : undefined;
+      const source = hasUpload ? "manual_upload" : hasLibrary ? "manual" : "manual";
+
+      const res = await fetch("/api/schedule/slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: newSlotAccountId,
+          accountLabel: accounts.find((a) => a.id === newSlotAccountId)?.username,
+          scheduledAt: scheduledAt.toISOString(),
+          videoUrl,
+          thumbnailUrl,
+          caption,
+          hashtags: newSlotHashtags
+            ? newSlotHashtags.split(/[,\s]+/).filter(Boolean)
+            : undefined,
+          musicTitle: newSlotMusic.trim() || undefined,
+          sourceVideoId,
+          source,
+        }),
+      });
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        alert(`Failed to create slot: ${data.error || res.statusText}`);
+        return false;
+      }
+
+      // Clear per-slot fields but KEEP date + account + time so the user
+      // can immediately add another slot to the same day.
+      setNewSlotVideo(null);
+      setNewSlotUploadedVideo(null);
+      setNewSlotCaption("");
+      setNewSlotHashtags("");
+      setNewSlotMusic("");
+      setNewSlotSource("upload");
+      setNewSlotUploadError(null);
+      // Bump the time by 30 minutes so the next slot is auto-set to a
+      // reasonable non-conflicting time. The user can still override it.
+      try {
+        const [h, m] = newSlotTime.split(":").map(Number);
+        const next = new Date();
+        next.setHours(h, m + 30, 0, 0);
+        const nh = String(next.getHours()).padStart(2, "0");
+        const nm = String(next.getMinutes()).padStart(2, "0");
+        setNewSlotTime(`${nh}:${nm}`);
+      } catch {
+        // keep current time if parsing fails
+      }
+      fetchSlots();
+      return true;
+    } catch (err) {
+      alert("Failed to create slot.");
+      return false;
+    } finally {
+      setCreatingSlot(false);
+    }
+  };
+
   // ─── Derived data ──────────────────────────────────────────────────────
 
   const filteredSlots = useMemo(() => {
@@ -1340,6 +1416,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           onClearUpload={() => setNewSlotUploadedVideo(null)}
           onClearUploadError={() => setNewSlotUploadError(null)}
           onCreate={handleCreateSlot}
+          onCreateAnother={handleCreateSlotAndKeepOpen}
           onClose={() => {
             setShowNewSlotModal(false);
             resetNewSlotState();
@@ -1446,9 +1523,25 @@ function WeekView({
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDayDrop(e, day)}
             >
+              {/* Quick + button — always visible at the top of EVERY day cell.
+                  Lets the user add as many slots as they want, on any day
+                  (past days included). Clicking opens the New Slot modal. */}
+              <button
+                onClick={() => onNewSlot(day)}
+                title={isPast ? "Add slot on this past day" : "Add new slot on this day"}
+                className="self-end w-6 h-6 rounded-full flex items-center justify-center text-sm font-bold transition-all hover:scale-110 active:scale-95"
+                style={{
+                  backgroundColor: C.emerald,
+                  color: C.white,
+                  boxShadow: `0 2px 8px ${C.emerald}40`,
+                }}
+              >
+                +
+              </button>
+
               {/* Best-time hint */}
               {dayBestTimes.length > 0 && !isPast && (
-                <div className="flex gap-1 flex-wrap mb-1">
+                <div className="flex gap-1 flex-wrap">
                   {dayBestTimes.slice(0, 3).map((bt, j) => (
                     <span
                       key={j}
@@ -1498,29 +1591,19 @@ function WeekView({
                 );
               })}
 
-              {/* Add new slot button */}
-              {!isPast && (
-                <button
-                  onClick={() => onNewSlot(day)}
-                  className="mt-auto text-[10px] py-1 rounded-lg transition-all hover:scale-[1.02] opacity-50 hover:opacity-100"
-                  style={{
-                    backgroundColor: "transparent",
-                    border: `1px dashed ${C.cardBorder}`,
-                    color: C.emerald,
-                  }}
-                >
-                  + Add slot
-                </button>
-              )}
-
-              {daySlots.length === 0 && !isPast && (
-                <div
-                  className="flex-1 flex items-center justify-center text-[10px]"
-                  style={{ color: C.textMuted, opacity: 0.5 }}
-                >
-                  Drop video here
-                </div>
-              )}
+              {/* Add new slot button — always visible (even on past days).
+                  mt-auto pushes it to the bottom; clicking opens the New Slot modal. */}
+              <button
+                onClick={() => onNewSlot(day)}
+                className="mt-auto text-[10px] py-1 rounded-lg transition-all hover:scale-[1.02] opacity-70 hover:opacity-100"
+                style={{
+                  backgroundColor: "transparent",
+                  border: `1px dashed ${C.cardBorder}`,
+                  color: C.emerald,
+                }}
+              >
+                + Add slot
+              </button>
             </div>
           );
         })}
@@ -1575,7 +1658,7 @@ function MonthView({ currentDate, slotsByDate, timezone, onSlotClick, onDayDrop,
           return (
             <div
               key={i}
-              className="border-r border-b last:border-r-0 min-h-[110px] p-1.5 transition-colors cursor-default"
+              className="border-r border-b last:border-r-0 min-h-[110px] p-1.5 transition-colors cursor-default relative"
               style={{
                 borderColor: C.cardBorder,
                 backgroundColor: isTodayFlag
@@ -1587,7 +1670,7 @@ function MonthView({ currentDate, slotsByDate, timezone, onSlotClick, onDayDrop,
               }}
               onDragOver={(e) => e.preventDefault()}
               onDrop={(e) => onDayDrop(e, day)}
-              onClick={() => inMonth && !isPast && onNewSlot(day)}
+              onClick={() => inMonth && onNewSlot(day)}
             >
               <div className="flex items-center justify-between mb-1">
                 <span
@@ -1599,14 +1682,35 @@ function MonthView({ currentDate, slotsByDate, timezone, onSlotClick, onDayDrop,
                 >
                   {day.getDate()}
                 </span>
-                {daySlots.length > 0 && (
-                  <span
-                    className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
-                    style={{ backgroundColor: C.emeraldLight, color: C.emeraldDark }}
+
+                <div className="flex items-center gap-1">
+                  {daySlots.length > 0 && (
+                    <span
+                      className="text-[9px] px-1.5 py-0.5 rounded-full font-bold"
+                      style={{ backgroundColor: C.emeraldLight, color: C.emeraldDark }}
+                    >
+                      {daySlots.length}
+                    </span>
+                  )}
+                  {/* Quick + button — visible on EVERY day in the month grid.
+                      Lets the user add as many slots as they want, on any day
+                      (past days included, even days outside the current month
+                      if they want to back-plan). Clicking opens the New Slot modal. */}
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onNewSlot(day);
+                    }}
+                    title="Add new slot on this day"
+                    className="w-5 h-5 rounded-full flex items-center justify-center text-xs font-bold transition-all hover:scale-110 active:scale-95"
+                    style={{
+                      backgroundColor: C.emerald,
+                      color: C.white,
+                    }}
                   >
-                    {daySlots.length}
-                  </span>
-                )}
+                    +
+                  </button>
+                </div>
               </div>
 
               <div className="space-y-0.5">
@@ -2420,19 +2524,65 @@ function SlotDetailModal({
                   <>🚀 Publish Now</>
                 )}
               </button>
-              {publishResult && (
-                <div
-                  className="mt-2 rounded-xl p-2.5 text-xs"
-                  style={{
-                    backgroundColor: publishResult.ok ? C.emeraldSoft : "#FEE2E2",
-                    color: publishResult.ok ? C.emeraldDark : C.error,
-                  }}
-                >
-                  {publishResult.ok
-                    ? `✅ Published!${publishResult.tiktokUrl ? " View on TikTok ↗" : ""}`
-                    : `⚠️ ${publishResult.error || "Publish failed"}`}
-                </div>
-              )}
+              {publishResult && (() => {
+                // Detect TikTok's "reached_active_user_cap" quota error and
+                // show a friendly bilingual (English + Arabic) message so the
+                // user understands this is TikTok's daily quota limit, not a
+                // bug in our app. The video itself did NOT make it to TikTok.
+                const err = (publishResult.error || "").toLowerCase();
+                const isQuotaCap =
+                  !publishResult.ok &&
+                  (err.includes("reached_active_user_cap") ||
+                    err.includes("active_user_cap") ||
+                    err.includes("rate_limit") ||
+                    err.includes("quota"));
+
+                if (publishResult.ok) {
+                  return (
+                    <div
+                      className="mt-2 rounded-xl p-2.5 text-xs"
+                      style={{ backgroundColor: C.emeraldSoft, color: C.emeraldDark }}
+                    >
+                      {`✅ Published!${publishResult.tiktokUrl ? " View on TikTok ↗" : ""}`}
+                    </div>
+                  );
+                }
+
+                if (isQuotaCap) {
+                  return (
+                    <div
+                      className="mt-2 rounded-xl p-3 text-xs space-y-1.5"
+                      style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                    >
+                      <div className="font-bold">
+                        ⚠️ TikTok daily publish limit reached
+                      </div>
+                      <div>
+                        TikTok rejected the publish because the connected app
+                        has hit its <code>reached_active_user_cap</code> quota.
+                        This is a TikTok-side limit — no video was posted to
+                        your account. Please wait (usually resets within 24h)
+                        and try again.
+                      </div>
+                      <div dir="rtl" style={{ color: "#92400E" }}>
+                        وصل التطبيق إلى الحد اليومي المسموح به من تيك توك
+                        للنشر (reached_active_user_cap). لم يُنشر أي فيديو على
+                        حسابك. الرجاء المحاولة لاحقًا (عادةً خلال 24 ساعة).
+                      </div>
+                    </div>
+                  );
+                }
+
+                // Generic failure
+                return (
+                  <div
+                    className="mt-2 rounded-xl p-2.5 text-xs"
+                    style={{ backgroundColor: "#FEE2E2", color: C.error }}
+                  >
+                    {`⚠️ ${publishResult.error || "Publish failed"}`}
+                  </div>
+                );
+              })()}
             </div>
           )}
         </div>
@@ -2510,6 +2660,11 @@ interface NewSlotModalProps {
   onClearUpload: () => void;
   onClearUploadError: () => void;
   onCreate: () => void;
+  // New: create current slot, then keep the modal open with per-slot fields
+  // cleared (date + account + time preserved) so the user can immediately
+  // add another slot to the same day. Lets the user chain-create as many
+  // slots as they want without reopening the modal each time.
+  onCreateAnother: () => Promise<boolean>;
   onClose: () => void;
 }
 
@@ -2540,6 +2695,7 @@ function NewSlotModal({
   onClearUpload,
   onClearUploadError,
   onCreate,
+  onCreateAnother,
   onClose,
 }: NewSlotModalProps) {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -2583,6 +2739,14 @@ function NewSlotModal({
     : hasVideo
       ? "📅 Schedule post"
       : "➕ Create open slot";
+
+  // Save & add another: same label logic but suffixed so the user knows the
+  // modal stays open. Disabled while creating/uploading or if no account.
+  const createAnotherBtnLabel = creating
+    ? "Saving…"
+    : hasVideo
+      ? "📅 Save & add another"
+      : "➕ Save & add another";
 
   return (
     <div
@@ -2916,21 +3080,41 @@ function NewSlotModal({
           </div>
         </div>
 
-        <div className="p-5 border-t flex gap-2" style={{ borderColor: C.cardBorder }}>
+        <div className="p-5 border-t flex flex-col gap-2" style={{ borderColor: C.cardBorder }}>
+          <div className="flex gap-2">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+            >
+              Cancel
+            </button>
+            <button
+              onClick={onCreate}
+              disabled={creating || uploading || !accountId}
+              className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
+              style={{ backgroundColor: C.emerald, color: C.white }}
+            >
+              {createBtnLabel}
+            </button>
+          </div>
+          {/* Save & add another — keeps the modal open with per-slot fields
+              cleared (date + account + time preserved) so the user can
+              immediately add another slot. Useful when adding many slots
+              in a row to the same day/account. */}
           <button
-            onClick={onClose}
-            className="flex-1 py-2.5 rounded-xl text-xs font-bold"
-            style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
-          >
-            Cancel
-          </button>
-          <button
-            onClick={onCreate}
+            onClick={async () => {
+              await onCreateAnother();
+            }}
             disabled={creating || uploading || !accountId}
-            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-40 disabled:hover:scale-100"
-            style={{ backgroundColor: C.emerald, color: C.white }}
+            className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.01] disabled:opacity-40 disabled:hover:scale-100 flex items-center justify-center gap-1.5"
+            style={{
+              backgroundColor: "transparent",
+              color: C.emeraldDark,
+              border: `1.5px dashed ${C.emerald}`,
+            }}
           >
-            {createBtnLabel}
+            {createAnotherBtnLabel}
           </button>
         </div>
       </div>
