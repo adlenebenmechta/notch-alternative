@@ -456,6 +456,97 @@ export async function publishSlotToBlotato(slotId: string): Promise<boolean> {
 }
 
 /**
+ * Publish a slot IMMEDIATELY to PostPeer (publishNow: true) — bypassing the
+ * scheduled time. Used by the "Publish Now" button in the Schedule Machine UI.
+ *
+ * Behaviour:
+ *  - If the slot has no video/image content, returns an error.
+ *  - If the slot already has a blotatoPostId, deletes the old PostPeer post first
+ *    (so we don't end up with duplicate posts).
+ *  - Calls PostPeer.publishPost / publishImagePost WITHOUT scheduledAt → PostPeer
+ *    will publish immediately on its side.
+ *  - Updates the slot: blotatoPostId, status='published', blotatoStatus='published',
+ *    tiktokUrl (if returned), errorMessage cleared.
+ */
+export async function publishSlotNow(slotId: string): Promise<{ ok: boolean; tiktokUrl?: string; error?: string }> {
+  const slot = await db.scheduleSlot.findUnique({ where: { id: slotId } });
+  if (!slot) {
+    return { ok: false, error: 'Slot not found' };
+  }
+
+  if (slot.status === 'published') {
+    return { ok: true, tiktokUrl: slot.tiktokUrl || undefined };
+  }
+
+  if (!slot.videoUrl && !slot.imageUrls) {
+    return { ok: false, error: 'Slot has no video or images to publish' };
+  }
+
+  // Cancel any existing PostPeer scheduled post first to avoid duplicates
+  if (slot.blotatoPostId) {
+    await postpeer.deletePost(slot.blotatoPostId).catch((err: any) => {
+      console.warn(`[Schedule] Could not delete old PostPeer post ${slot.blotatoPostId} before publish-now:`, err.message);
+    });
+  }
+
+  await db.scheduleSlot.update({
+    where: { id: slotId },
+    data: { blotatoStatus: 'publishing', errorMessage: null },
+  });
+
+  try {
+    const hashtags = slot.hashtags ? JSON.parse(slot.hashtags) : [];
+    const imageUrls = slot.imageUrls ? JSON.parse(slot.imageUrls) : [];
+
+    // NOTE: no scheduledAt passed → PostPeer sets publishNow: true internally
+    const result =
+      imageUrls.length > 0
+        ? await postpeer.publishImagePost({
+            accountId: slot.accountId,
+            imageUrls,
+            caption: slot.caption || '',
+            hashtags,
+            musicTitle: slot.musicTitle || undefined,
+            platforms: ['tiktok'],
+          })
+        : await postpeer.publishPost({
+            accountId: slot.accountId,
+            videoUrl: slot.videoUrl!,
+            caption: slot.caption || '',
+            hashtags,
+            musicTitle: slot.musicTitle || undefined,
+            platforms: ['tiktok'],
+          });
+
+    await db.scheduleSlot.update({
+      where: { id: slotId },
+      data: {
+        blotatoPostId: result.id,
+        blotatoStatus: result.status || 'published',
+        // Mark as published locally so the UI reflects immediate publish
+        status: 'published',
+        tiktokUrl: result.url || null,
+        errorMessage: result.error || null,
+      },
+    });
+
+    console.log(`[Schedule] Slot ${slotId} published IMMEDIATELY via PostPeer post ${result.id}`);
+    return { ok: true, tiktokUrl: result.url || undefined };
+  } catch (err: any) {
+    console.error(`[Schedule] Publish-now failed for slot ${slotId}:`, err.message);
+    await db.scheduleSlot.update({
+      where: { id: slotId },
+      data: {
+        blotatoStatus: 'failed',
+        status: 'failed',
+        errorMessage: err.message,
+      },
+    });
+    return { ok: false, error: err.message };
+  }
+}
+
+/**
  * Sync the status of scheduled slots from PostPeer.
  * Called periodically (or on-demand) to detect when posts have been published.
  */

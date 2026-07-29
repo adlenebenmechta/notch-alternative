@@ -147,19 +147,85 @@ function toLocalDateStr(d: Date): string {
   return formatDateKey(d);
 }
 
-function formatTime(d: Date): string {
-  return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+// ─── Timezone support ─────────────────────────────────────────────────────
+// Default to US Eastern (America/New_York) so the calendar/slots display in
+// US time regardless of the user's browser timezone. The user can switch TZ
+// in the header.
+
+const US_TIMEZONES = [
+  { value: "America/New_York",    label: "US Eastern (NYC, Miami)", abbr: "ET" },
+  { value: "America/Chicago",     label: "US Central (Chicago, Dallas)", abbr: "CT" },
+  { value: "America/Denver",      label: "US Mountain (Denver, Phoenix)", abbr: "MT" },
+  { value: "America/Los_Angeles", label: "US Pacific (LA, SF)", abbr: "PT" },
+  { value: "Africa/Algiers",      label: "Algeria (local)", abbr: "CET" },
+  { value: "UTC",                 label: "UTC", abbr: "UTC" },
+] as const;
+
+const DEFAULT_TIMEZONE = "America/New_York";
+
+function loadTimezone(): string {
+  if (typeof window === "undefined") return DEFAULT_TIMEZONE;
+  try {
+    const saved = window.localStorage.getItem("schedule_timezone");
+    if (saved && US_TIMEZONES.some((tz) => tz.value === saved)) return saved;
+  } catch {}
+  return DEFAULT_TIMEZONE;
 }
 
-function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString("en-US", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    hour: "numeric",
-    minute: "2-digit",
-    hour12: true,
-  });
+function saveTimezone(tz: string) {
+  if (typeof window === "undefined") return;
+  try { window.localStorage.setItem("schedule_timezone", tz); } catch {}
+}
+
+// Format a Date's TIME in the selected timezone (NOT browser local).
+function formatTimeTZ(d: Date, tz: string): string {
+  try {
+    return d.toLocaleTimeString("en-US", {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    return d.toLocaleTimeString("en-US", { hour: "numeric", minute: "2-digit", hour12: true });
+  }
+}
+
+// Format a Date's full date+time in the selected timezone.
+function formatDateTimeTZ(iso: string, tz: string): string {
+  try {
+    return new Date(iso).toLocaleString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+      timeZone: tz,
+    });
+  } catch {
+    return new Date(iso).toLocaleString("en-US", {
+      weekday: "short", month: "short", day: "numeric",
+      hour: "numeric", minute: "2-digit", hour12: true,
+    });
+  }
+}
+
+// Get the YYYY-MM-DD key for a Date as it appears in the selected timezone.
+// Used to group slots by calendar day correctly when the user has switched TZ.
+function formatDateKeyTZ(d: Date, tz: string): string {
+  try {
+    // Use en-CA which gives YYYY-MM-DD natively
+    const parts = new Intl.DateTimeFormat("en-CA", {
+      year: "numeric", month: "2-digit", day: "2-digit", timeZone: tz,
+    }).formatToParts(d);
+    const y = parts.find((p) => p.type === "year")?.value || "";
+    const m = parts.find((p) => p.type === "month")?.value || "";
+    const day = parts.find((p) => p.type === "day")?.value || "";
+    return `${y}-${m}-${day}`;
+  } catch {
+    return formatDateKey(d);
+  }
 }
 
 function isToday(d: Date): boolean {
@@ -227,7 +293,14 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   const [newSlotVideo, setNewSlotVideo] = useState<LibraryVideo | null>(null);
   const [newSlotCaption, setNewSlotCaption] = useState("");
   const [newSlotHashtags, setNewSlotHashtags] = useState("");
+  const [newSlotMusic, setNewSlotMusic] = useState("");
   const [creatingSlot, setCreatingSlot] = useState(false);
+
+  // Timezone display (defaults to US Eastern; persisted to localStorage)
+  const [timezone, setTimezone] = useState<string>(DEFAULT_TIMEZONE);
+
+  // Publish-now tracking
+  const [publishingNow, setPublishingNow] = useState(false);
 
   // New slot: video upload state (separate from library pick)
   const [newSlotSource, setNewSlotSource] = useState<"upload" | "library">("upload");
@@ -316,6 +389,8 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   }, [fetchAccounts, fetchSlots, fetchLibrary, fetchBestTimes]);
 
   useEffect(() => {
+    // Load saved timezone on mount (defaults to US Eastern)
+    setTimezone(loadTimezone());
     fetchAll();
     // Auto-sync slot statuses every 60 seconds
     const syncInterval = setInterval(async () => {
@@ -328,6 +403,11 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     }, 60000);
     return () => clearInterval(syncInterval);
   }, [fetchAll, fetchSlots]);
+
+  const changeTimezone = (tz: string) => {
+    setTimezone(tz);
+    saveTimezone(tz);
+  };
 
   // ─── Chat ──────────────────────────────────────────────────────────────
 
@@ -482,6 +562,55 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     }
   };
 
+  // Publish a slot IMMEDIATELY to TikTok via PostPeer — bypasses scheduledAt.
+  // Used by the "Publish Now" button in the SlotDetailModal.
+  const handlePublishNow = async (slotId: string): Promise<{ ok: boolean; error?: string; tiktokUrl?: string }> => {
+    setPublishingNow(true);
+    try {
+      const res = await fetch(`/api/schedule/slots/${slotId}/publish`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+      });
+      const data = await res.json();
+      if (!data.ok) {
+        return { ok: false, error: data.error || "Publish failed" };
+      }
+      // Refresh slots + update the selected slot in-place to "published"
+      await fetchSlots();
+      setSelectedSlot((prev) =>
+        prev
+          ? {
+              ...prev,
+              status: "published",
+              blotatoStatus: "published",
+              tiktokUrl: data.tiktokUrl || prev.tiktokUrl,
+              errorMessage: null,
+            }
+          : prev
+      );
+      return { ok: true, tiktokUrl: data.tiktokUrl };
+    } catch (err: any) {
+      return { ok: false, error: err.message || "Network error" };
+    } finally {
+      setPublishingNow(false);
+    }
+  };
+
+  // Update music title for an existing slot (PATCH)
+  const handleUpdateSlotMusic = async (slotId: string, musicTitle: string): Promise<void> => {
+    try {
+      await fetch(`/api/schedule/slots/${slotId}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ musicTitle }),
+      });
+      setSelectedSlot((prev) => (prev ? { ...prev, musicTitle } : prev));
+      fetchSlots();
+    } catch (err) {
+      console.error("Failed to update music title:", err);
+    }
+  };
+
   // Upload a video file from the user's computer and assign it to an existing open slot.
   // Used by SlotDetailModal when the user clicks "Upload Video" on an open slot.
   const handleUploadVideoToSlot = async (slotId: string, file: File): Promise<{ ok: boolean; error?: string }> => {
@@ -597,6 +726,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     setNewSlotUploadedVideo(null);
     setNewSlotCaption("");
     setNewSlotHashtags("");
+    setNewSlotMusic("");
     setNewSlotTime("18:00");
     setNewSlotSource("upload");
     setNewSlotUploading(false);
@@ -633,6 +763,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           hashtags: newSlotHashtags
             ? newSlotHashtags.split(/[,\s]+/).filter(Boolean)
             : undefined,
+          musicTitle: newSlotMusic.trim() || undefined,
           sourceVideoId,
           source,
         }),
@@ -659,7 +790,10 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   const slotsByDate = useMemo(() => {
     const map: { [dateKey: string]: ScheduleSlot[] } = {};
     for (const slot of filteredSlots) {
-      const key = formatDateKey(new Date(slot.scheduledAt));
+      // Group by calendar day in the SELECTED timezone (default US Eastern),
+      // not the browser's local timezone. This makes the calendar show each
+      // slot on the day the user expects when they're working in US time.
+      const key = formatDateKeyTZ(new Date(slot.scheduledAt), timezone);
       if (!map[key]) map[key] = [];
       map[key].push(slot);
     }
@@ -668,7 +802,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
       map[key].sort((a, b) => new Date(a.scheduledAt).getTime() - new Date(b.scheduledAt).getTime());
     }
     return map;
-  }, [filteredSlots]);
+  }, [filteredSlots, timezone]);
 
   // Stats
   const stats = useMemo(() => {
@@ -1008,6 +1142,25 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                   <option key={a.id} value={a.id}>@{(a.username || '').replace(/^@/, '')}</option>
                 ))}
               </select>
+
+              {/* Timezone selector — default US Eastern */}
+              <select
+                value={timezone}
+                onChange={(e) => changeTimezone(e.target.value)}
+                title="Display timezone"
+                className="px-3 py-2 rounded-xl text-xs font-semibold border-0 outline-none cursor-pointer"
+                style={{
+                  backgroundColor: C.cream,
+                  color: C.text,
+                  border: `1.5px solid ${C.cardBorder}`,
+                }}
+              >
+                {US_TIMEZONES.map((tz) => (
+                  <option key={tz.value} value={tz.value}>
+                    🕐 {tz.abbr} — {tz.label}
+                  </option>
+                ))}
+              </select>
             </div>
 
             {/* Loading state */}
@@ -1027,6 +1180,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                     slotsByDate={slotsByDate}
                     accounts={accounts}
                     bestTimes={bestTimes}
+                    timezone={timezone}
                     onSlotClick={setSelectedSlot}
                     onDayDrop={handleDayDrop}
                     onSlotDragOver={handleSlotDragOver}
@@ -1043,6 +1197,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                   <MonthView
                     currentDate={currentDate}
                     slotsByDate={slotsByDate}
+                    timezone={timezone}
                     onSlotClick={setSelectedSlot}
                     onDayDrop={handleDayDrop}
                     onNewSlot={(date) => {
@@ -1053,7 +1208,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
                   />
                 )}
                 {viewMode === "list" && (
-                  <ListView slots={filteredSlots} onSlotClick={setSelectedSlot} />
+                  <ListView slots={filteredSlots} timezone={timezone} onSlotClick={setSelectedSlot} />
                 )}
               </>
             )}
@@ -1138,6 +1293,8 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
       {selectedSlot && (
         <SlotDetailModal
           slot={selectedSlot}
+          timezone={timezone}
+          publishingNow={publishingNow}
           onClose={() => setSelectedSlot(null)}
           onDelete={() => handleDeleteSlot(selectedSlot.id)}
           onReschedule={(newDate) => {
@@ -1145,6 +1302,8 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
             setSelectedSlot(null);
           }}
           onUploadVideo={(file) => handleUploadVideoToSlot(selectedSlot.id, file)}
+          onPublishNow={() => handlePublishNow(selectedSlot.id)}
+          onUpdateMusic={(music) => handleUpdateSlotMusic(selectedSlot.id, music)}
         />
       )}
 
@@ -1158,6 +1317,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           video={newSlotVideo}
           caption={newSlotCaption}
           hashtags={newSlotHashtags}
+          music={newSlotMusic}
           libraryVideos={libraryVideos}
           creating={creatingSlot}
           source={newSlotSource}
@@ -1174,6 +1334,7 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           }}
           onCaptionChange={setNewSlotCaption}
           onHashtagsChange={setNewSlotHashtags}
+          onMusicChange={setNewSlotMusic}
           onSourceChange={setNewSlotSource}
           onUploadFile={handleUploadVideoForNewSlot}
           onClearUpload={() => setNewSlotUploadedVideo(null)}
@@ -1208,6 +1369,7 @@ interface CalendarViewProps {
   slotsByDate: { [dateKey: string]: ScheduleSlot[] };
   accounts: ScheduleAccount[];
   bestTimes: BestTimeSlot[];
+  timezone: string;
   onSlotClick: (slot: ScheduleSlot) => void;
   onDayDrop: (e: React.DragEvent, day: Date, accountId?: string) => void;
   onSlotDragOver: (e: React.DragEvent, slot: ScheduleSlot) => void;
@@ -1221,6 +1383,7 @@ function WeekView({
   slotsByDate,
   accounts,
   bestTimes,
+  timezone,
   onSlotClick,
   onDayDrop,
   onSlotDragOver,
@@ -1318,7 +1481,7 @@ function WeekView({
                     <div className="flex items-center gap-1 mb-0.5">
                       <span className="text-[10px]">{sc.icon}</span>
                       <span className="font-bold" style={{ color: C.text }}>
-                        {formatTime(new Date(slot.scheduledAt))}
+                        {formatTimeTZ(new Date(slot.scheduledAt), timezone)}
                       </span>
                     </div>
                     <div className="text-[10px] truncate" style={{ color: C.textMuted }}>
@@ -1371,12 +1534,13 @@ function WeekView({
 interface MonthViewProps {
   currentDate: Date;
   slotsByDate: { [dateKey: string]: ScheduleSlot[] };
+  timezone: string;
   onSlotClick: (slot: ScheduleSlot) => void;
   onDayDrop: (e: React.DragEvent, day: Date) => void;
   onNewSlot: (date: Date) => void;
 }
 
-function MonthView({ currentDate, slotsByDate, onSlotClick, onDayDrop, onNewSlot }: MonthViewProps) {
+function MonthView({ currentDate, slotsByDate, timezone, onSlotClick, onDayDrop, onNewSlot }: MonthViewProps) {
   const monthStart = startOfMonth(currentDate);
   const calendarStart = startOfWeek(monthStart);
   const days = Array.from({ length: 42 }, (_, i) => addDays(calendarStart, i));
@@ -1462,7 +1626,7 @@ function MonthView({ currentDate, slotsByDate, onSlotClick, onDayDrop, onNewSlot
                         border: `1px solid ${sc.color}30`,
                       }}
                     >
-                      <span className="font-bold">{formatTime(new Date(slot.scheduledAt))}</span>{" "}
+                      <span className="font-bold">{formatTimeTZ(new Date(slot.scheduledAt), timezone)}</span>{" "}
                       <span className="truncate">{slot.caption || sc.label}</span>
                     </div>
                   );
@@ -1483,7 +1647,7 @@ function MonthView({ currentDate, slotsByDate, onSlotClick, onDayDrop, onNewSlot
 
 // ─── List View ─────────────────────────────────────────────────────────────
 
-function ListView({ slots, onSlotClick }: { slots: ScheduleSlot[]; onSlotClick: (s: ScheduleSlot) => void }) {
+function ListView({ slots, timezone, onSlotClick }: { slots: ScheduleSlot[]; timezone: string; onSlotClick: (s: ScheduleSlot) => void }) {
   const now = new Date();
   const upcoming = slots
     .filter((s) => new Date(s.scheduledAt) >= now)
@@ -1518,13 +1682,17 @@ function ListView({ slots, onSlotClick }: { slots: ScheduleSlot[]; onSlotClick: 
                   className="w-12 h-12 rounded-xl flex flex-col items-center justify-center flex-shrink-0"
                   style={{ backgroundColor: sc.bg, color: sc.color }}
                 >
-                  <span className="text-[10px] font-bold uppercase">{WEEKDAYS[new Date(slot.scheduledAt).getDay()]}</span>
-                  <span className="text-base font-bold leading-none">{new Date(slot.scheduledAt).getDate()}</span>
+                  <span className="text-[10px] font-bold uppercase">
+                    {new Intl.DateTimeFormat("en-US", { weekday: "short", timeZone: timezone }).format(new Date(slot.scheduledAt))}
+                  </span>
+                  <span className="text-base font-bold leading-none">
+                    {new Intl.DateTimeFormat("en-CA", { day: "numeric", timeZone: timezone }).format(new Date(slot.scheduledAt))}
+                  </span>
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <span className="text-sm font-bold" style={{ color: C.text }}>
-                      {formatTime(new Date(slot.scheduledAt))}
+                      {formatTimeTZ(new Date(slot.scheduledAt), timezone)}
                     </span>
                     <span
                       className="text-[10px] px-2 py-0.5 rounded-full font-semibold"
@@ -1839,20 +2007,47 @@ function BotPanel({
 
 interface SlotDetailModalProps {
   slot: ScheduleSlot;
+  timezone: string;
+  publishingNow: boolean;
   onClose: () => void;
   onDelete: () => void;
   onReschedule: (newDate: Date) => void;
   onUploadVideo: (file: File) => Promise<{ ok: boolean; error?: string }>;
+  onPublishNow: () => Promise<{ ok: boolean; error?: string; tiktokUrl?: string }>;
+  onUpdateMusic: (music: string) => void;
 }
 
-function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo }: SlotDetailModalProps) {
+function SlotDetailModal({
+  slot,
+  timezone,
+  publishingNow,
+  onClose,
+  onDelete,
+  onReschedule,
+  onUploadVideo,
+  onPublishNow,
+  onUpdateMusic,
+}: SlotDetailModalProps) {
   const sc = statusConfig(slot.status);
   const scheduledDate = new Date(slot.scheduledAt);
   const [showReschedule, setShowReschedule] = useState(false);
-  // IMPORTANT: use LOCAL date so reschedule input shows the correct day.
-  const [newDate, setNewDate] = useState(toLocalDateStr(scheduledDate));
+  // IMPORTANT: use date in the SELECTED timezone so reschedule input shows
+  // the same day the user sees in the calendar (defaults to US Eastern).
+  const [newDate, setNewDate] = useState(formatDateKeyTZ(scheduledDate, timezone));
   const [newTime, setNewTime] = useState(
-    `${String(scheduledDate.getHours()).padStart(2, "0")}:${String(scheduledDate.getMinutes()).padStart(2, "0")}`
+    // Time shown in the selected timezone
+    (() => {
+      try {
+        const parts = new Intl.DateTimeFormat("en-GB", {
+          hour: "2-digit", minute: "2-digit", hour12: false, timeZone: timezone,
+        }).formatToParts(scheduledDate);
+        const h = parts.find((p) => p.type === "hour")?.value || "18";
+        const m = parts.find((p) => p.type === "minute")?.value || "00";
+        return `${h}:${m}`;
+      } catch {
+        return "18:00";
+      }
+    })()
   );
   // Upload state (for open slots)
   const [uploading, setUploading] = useState(false);
@@ -1860,6 +2055,17 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
   const [uploadError, setUploadError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [isDragOver, setIsDragOver] = useState(false);
+
+  // Music title editable state — synced with slot.musicTitle, saved on blur
+  const [musicDraft, setMusicDraft] = useState(slot.musicTitle || "");
+  const [musicDirty, setMusicDirty] = useState(false);
+  // Sync when slot changes (e.g. after publish-now updates parent state)
+  useEffect(() => {
+    setMusicDraft(slot.musicTitle || "");
+    setMusicDirty(false);
+  }, [slot.id, slot.musicTitle]);
+
+  const [publishResult, setPublishResult] = useState<{ ok: boolean; error?: string; tiktokUrl?: string } | null>(null);
 
   const hashtags = slot.hashtags ? safeJsonParse(slot.hashtags, []) : [];
   const imageUrls = slot.imageUrls ? safeJsonParse(slot.imageUrls, []) : [];
@@ -1923,7 +2129,10 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
               {slot.caption || "Untitled slot"}
             </h2>
             <p className="text-xs" style={{ color: C.textMuted }}>
-              {formatDateTime(slot.scheduledAt)}
+              {formatDateTimeTZ(slot.scheduledAt, timezone)}
+              <span className="ml-1 text-[10px] opacity-70">
+                ({US_TIMEZONES.find((tz) => tz.value === timezone)?.abbr || timezone})
+              </span>
             </p>
           </div>
           <button
@@ -2064,6 +2273,45 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
             </div>
           )}
 
+          {/* Music title — editable */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>
+              🎵 Music title (TikTok sound)
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={musicDraft}
+                onChange={(e) => { setMusicDraft(e.target.value); setMusicDirty(true); }}
+                onBlur={() => {
+                  if (musicDirty) {
+                    onUpdateMusic(musicDraft.trim());
+                    setMusicDirty(false);
+                  }
+                }}
+                placeholder="Leave empty to let TikTok pick a sound"
+                className="flex-1 px-3 py-2 rounded-xl text-sm border-0 outline-none"
+                style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+              />
+              {musicDirty && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onUpdateMusic(musicDraft.trim());
+                    setMusicDirty(false);
+                  }}
+                  className="px-3 py-2 rounded-xl text-xs font-bold"
+                  style={{ backgroundColor: C.emerald, color: C.white }}
+                >
+                  Save
+                </button>
+              )}
+            </div>
+            <p className="text-[10px] mt-1 italic" style={{ color: C.textMuted }}>
+              Added as a 🎵 line at the end of the caption when published to TikTok.
+            </p>
+          </div>
+
           {/* Analytics (if published) */}
           {slot.status === "published" && (slot.views > 0 || slot.likes > 0) && (
             <div>
@@ -2139,6 +2387,54 @@ function SlotDetailModal({ slot, onClose, onDelete, onReschedule, onUploadVideo 
               View on TikTok ↗
             </a>
           )}
+
+          {/* Publish Now — bypass scheduledAt and publish immediately */}
+          {slot.videoUrl && slot.status !== "published" && slot.status !== "cancelled" && (
+            <div>
+              <button
+                onClick={async () => {
+                  if (!confirm("Publish this slot to TikTok RIGHT NOW? This bypasses the scheduled time.")) return;
+                  setPublishResult(null);
+                  const res = await onPublishNow();
+                  setPublishResult(res);
+                }}
+                disabled={publishingNow}
+                className="w-full py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+                style={{
+                  background: publishingNow
+                    ? `linear-gradient(90deg, ${C.emeraldDark}, ${C.emerald})`
+                    : `linear-gradient(90deg, ${C.emerald}, ${C.emeraldDark})`,
+                  color: C.white,
+                  boxShadow: `0 4px 14px ${C.emerald}40`,
+                }}
+              >
+                {publishingNow ? (
+                  <>
+                    <div
+                      className="w-3.5 h-3.5 rounded-full animate-spin"
+                      style={{ border: `2px solid ${C.emeraldLight}`, borderTopColor: C.white }}
+                    />
+                    Publishing to TikTok…
+                  </>
+                ) : (
+                  <>🚀 Publish Now</>
+                )}
+              </button>
+              {publishResult && (
+                <div
+                  className="mt-2 rounded-xl p-2.5 text-xs"
+                  style={{
+                    backgroundColor: publishResult.ok ? C.emeraldSoft : "#FEE2E2",
+                    color: publishResult.ok ? C.emeraldDark : C.error,
+                  }}
+                >
+                  {publishResult.ok
+                    ? `✅ Published!${publishResult.tiktokUrl ? " View on TikTok ↗" : ""}`
+                    : `⚠️ ${publishResult.error || "Publish failed"}`}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Actions */}
@@ -2194,6 +2490,7 @@ interface NewSlotModalProps {
   video: LibraryVideo | null;
   caption: string;
   hashtags: string;
+  music: string;
   libraryVideos: LibraryVideo[];
   creating: boolean;
   // New: upload-related props
@@ -2207,6 +2504,7 @@ interface NewSlotModalProps {
   onVideoChange: (v: LibraryVideo | null) => void;
   onCaptionChange: (s: string) => void;
   onHashtagsChange: (s: string) => void;
+  onMusicChange: (s: string) => void;
   onSourceChange: (s: "upload" | "library") => void;
   onUploadFile: (file: File) => Promise<{ ok: boolean; error?: string }>;
   onClearUpload: () => void;
@@ -2223,6 +2521,7 @@ function NewSlotModal({
   video,
   caption,
   hashtags,
+  music,
   libraryVideos,
   creating,
   source,
@@ -2235,6 +2534,7 @@ function NewSlotModal({
   onVideoChange,
   onCaptionChange,
   onHashtagsChange,
+  onMusicChange,
   onSourceChange,
   onUploadFile,
   onClearUpload,
@@ -2595,6 +2895,24 @@ function NewSlotModal({
               className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none"
               style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
             />
+          </div>
+
+          {/* Music title (optional) */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>
+              🎵 Music title (optional)
+            </label>
+            <input
+              type="text"
+              value={music}
+              onChange={(e) => onMusicChange(e.target.value)}
+              placeholder="e.g. Original Sound - Artist"
+              className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+            />
+            <p className="text-[10px] mt-1 italic" style={{ color: C.textMuted }}>
+              Added as a 🎵 line at the end of the caption.
+            </p>
           </div>
         </div>
 
