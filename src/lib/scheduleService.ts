@@ -547,6 +547,129 @@ export async function publishSlotNow(slotId: string): Promise<{ ok: boolean; tik
 }
 
 /**
+ * Create a slot AND immediately publish it to TikTok via PostPeer
+ * (bypassing the scheduled time entirely). Used by the "Post Immediately"
+ * button in the Schedule Machine header — the user picks a video, writes
+ * caption + hashtags + music, clicks one button, and the video goes to
+ * TikTok right now (no slot pre-creation, no scheduling).
+ *
+ * Behaviour:
+ *  - Creates the slot row in the DB with status='scheduled',
+ *    blotatoStatus='publishing' so the UI shows progress.
+ *  - Calls PostPeer.publishPost / publishImagePost WITHOUT scheduledAt →
+ *    PostPeer will publish to TikTok right away.
+ *  - On success: updates slot → status='published', blotatoStatus='published',
+ *    blotatoPostId, tiktokUrl.
+ *  - On failure: updates slot → status='failed', errorMessage. The user can
+ *    retry via the existing "Publish Now" button in SlotDetailModal once
+ *    TikTok's quota resets (e.g. reached_active_user_cap).
+ */
+export async function createAndPublishSlotNow(input: {
+  accountId: string;
+  accountLabel?: string;
+  videoUrl?: string;
+  thumbnailUrl?: string;
+  imageUrls?: string[];
+  caption?: string;
+  hashtags?: string[];
+  musicTitle?: string;
+  sourceVideoId?: string;
+  source?: string;
+  planId?: string;
+}): Promise<{
+  ok: boolean;
+  slotId?: string;
+  tiktokUrl?: string;
+  error?: string;
+}> {
+  const {
+    accountId,
+    accountLabel,
+    videoUrl,
+    thumbnailUrl,
+    imageUrls = [],
+    caption = '',
+    hashtags = [],
+    musicTitle,
+    sourceVideoId,
+    source = 'manual',
+    planId,
+  } = input;
+
+  if (!videoUrl && imageUrls.length === 0) {
+    return { ok: false, error: 'Video or images required to publish immediately' };
+  }
+
+  // 1. Create the slot row marked as "publishing"
+  const slot = await db.scheduleSlot.create({
+    data: {
+      planId: planId || null,
+      accountId,
+      accountLabel: accountLabel || null,
+      // Use now as the scheduled time (actual publish time)
+      scheduledAt: new Date(),
+      videoUrl: videoUrl || null,
+      thumbnailUrl: thumbnailUrl || null,
+      imageUrls: imageUrls.length ? JSON.stringify(imageUrls) : null,
+      caption: caption || null,
+      hashtags: hashtags.length ? JSON.stringify(hashtags) : null,
+      musicTitle: musicTitle || null,
+      sourceVideoId: sourceVideoId || null,
+      source,
+      status: 'scheduled',
+      blotatoStatus: 'publishing',
+    },
+  });
+
+  // 2. Push to PostPeer immediately (no scheduledAt → publishNow: true)
+  try {
+    const result =
+      imageUrls.length > 0
+        ? await postpeer.publishImagePost({
+            accountId,
+            imageUrls,
+            caption,
+            hashtags,
+            musicTitle: musicTitle || undefined,
+            platforms: ['tiktok'],
+          })
+        : await postpeer.publishPost({
+            accountId,
+            videoUrl: videoUrl!,
+            caption,
+            hashtags,
+            musicTitle: musicTitle || undefined,
+            platforms: ['tiktok'],
+          });
+
+    await db.scheduleSlot.update({
+      where: { id: slot.id },
+      data: {
+        blotatoPostId: result.id,
+        blotatoStatus: result.status || 'published',
+        status: 'published',
+        tiktokUrl: result.url || null,
+        errorMessage: result.error || null,
+      },
+    });
+
+    console.log(`[Schedule] Slot ${slot.id} created AND published immediately via PostPeer post ${result.id}`);
+    return { ok: true, slotId: slot.id, tiktokUrl: result.url || undefined };
+  } catch (err: any) {
+    console.error(`[Schedule] createAndPublishSlotNow failed for slot ${slot.id}:`, err.message);
+    await db.scheduleSlot.update({
+      where: { id: slot.id },
+      data: {
+        blotatoStatus: 'failed',
+        status: 'failed',
+        errorMessage: err.message,
+      },
+    });
+    return { ok: false, slotId: slot.id, error: err.message };
+  }
+}
+
+/**
  * Sync the status of scheduled slots from PostPeer.
  * Called periodically (or on-demand) to detect when posts have been published.
  */

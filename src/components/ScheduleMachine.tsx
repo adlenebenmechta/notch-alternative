@@ -317,6 +317,33 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
   // Google Drive Import modal state
   const [showGDriveModal, setShowGDriveModal] = useState(false);
 
+  // ─── Post Immediately modal state ────────────────────────────────────────
+  // "Post Immediately" = create a slot AND publish to TikTok in one shot,
+  // bypassing the calendar entirely. Distinct from "Publish Now" (which
+  // retries an existing slot from inside SlotDetailModal).
+  const [showPostNowModal, setShowPostNowModal] = useState(false);
+  const [postNowAccountId, setPostNowAccountId] = useState<string>("");
+  const [postNowVideo, setPostNowVideo] = useState<LibraryVideo | null>(null);
+  const [postNowCaption, setPostNowCaption] = useState("");
+  const [postNowHashtags, setPostNowHashtags] = useState("");
+  const [postNowMusic, setPostNowMusic] = useState("");
+  const [postNowSource, setPostNowSource] = useState<"upload" | "library">("upload");
+  const [postNowUploadedVideo, setPostNowUploadedVideo] = useState<{
+    videoUrl: string;
+    title: string;
+    fileName: string;
+    sizeMB: number;
+    mimeType: string;
+  } | null>(null);
+  const [postNowUploading, setPostNowUploading] = useState(false);
+  const [postNowUploadError, setPostNowUploadError] = useState<string | null>(null);
+  const [postNowPublishing, setPostNowPublishing] = useState(false);
+  const [postNowResult, setPostNowResult] = useState<{
+    ok: boolean;
+    error?: string;
+    tiktokUrl?: string;
+  } | null>(null);
+
   // Chat state
   const [conversationId, setConversationId] = useState<string | null>(null);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>([]);
@@ -733,6 +760,127 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
     setNewSlotUploadError(null);
   };
 
+  // ─── Post Immediately handlers ────────────────────────────────────────────
+
+  // Upload a video file from the user's computer for the Post Immediately modal.
+  // Mirrors handleUploadVideoForNewSlot but uses postNow* state instead of newSlot*.
+  const handleUploadVideoForPostNow = async (file: File): Promise<{ ok: boolean; error?: string }> => {
+    setPostNowUploadError(null);
+    setPostNowUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append("video", file);
+      const uploadRes = await fetch("/api/schedule/upload-video", {
+        method: "POST",
+        body: formData,
+      });
+      const uploadData = await uploadRes.json();
+      if (!uploadData.success) {
+        const msg = uploadData.error || "Upload failed";
+        setPostNowUploadError(msg);
+        return { ok: false, error: msg };
+      }
+      setPostNowUploadedVideo({
+        videoUrl: uploadData.videoUrl,
+        title: uploadData.title || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim(),
+        fileName: uploadData.fileName || file.name,
+        sizeMB: uploadData.sizeMB ?? Math.round(file.size / 1024 / 1024 * 10) / 10,
+        mimeType: uploadData.mimeType || file.type || "video/mp4",
+      });
+      // Pre-fill caption with the friendly filename if user hasn't typed one yet
+      if (!postNowCaption) {
+        setPostNowCaption(uploadData.title || file.name.replace(/\.[^/.]+$/, "").replace(/[_-]+/g, " ").trim());
+      }
+      // Selecting an upload should clear any library pick
+      setPostNowVideo(null);
+      return { ok: true };
+    } catch (err: any) {
+      const msg = err.message || "Network error during upload";
+      setPostNowUploadError(msg);
+      return { ok: false, error: msg };
+    } finally {
+      setPostNowUploading(false);
+    }
+  };
+
+  // Reset all Post-Immediately state when the modal closes
+  const resetPostNowState = () => {
+    setPostNowVideo(null);
+    setPostNowUploadedVideo(null);
+    setPostNowCaption("");
+    setPostNowHashtags("");
+    setPostNowMusic("");
+    setPostNowSource("upload");
+    setPostNowUploading(false);
+    setPostNowUploadError(null);
+    setPostNowPublishing(false);
+    setPostNowResult(null);
+  };
+
+  // Create a slot AND publish it to TikTok right now (no scheduling).
+  // Calls POST /api/schedule/slots with publishNow: true → the server
+  // creates the slot row and immediately pushes it to PostPeer.
+  const handlePostNow = async (): Promise<void> => {
+    if (!postNowAccountId) {
+      alert("Please pick a TikTok account first.");
+      return;
+    }
+    const hasUpload = !!postNowUploadedVideo;
+    const hasLibrary = !!postNowVideo;
+    if (!hasUpload && !hasLibrary) {
+      alert("Please upload or pick a video first.");
+      return;
+    }
+
+    setPostNowPublishing(true);
+    setPostNowResult(null);
+    try {
+      const videoUrl = hasUpload ? postNowUploadedVideo!.videoUrl : postNowVideo!.videoUrl;
+      const thumbnailUrl = hasUpload ? undefined : postNowVideo?.thumbnailUrl;
+      const caption =
+        postNowCaption ||
+        (hasUpload ? postNowUploadedVideo!.title : postNowVideo?.title) ||
+        "";
+      const sourceVideoId = hasLibrary ? postNowVideo?.id : undefined;
+      const source = hasUpload ? "manual_upload" : "manual";
+
+      const res = await fetch("/api/schedule/slots", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          accountId: postNowAccountId,
+          accountLabel: accounts.find((a) => a.id === postNowAccountId)?.username,
+          videoUrl,
+          thumbnailUrl,
+          caption,
+          hashtags: postNowHashtags
+            ? postNowHashtags.split(/[,\s]+/).filter(Boolean)
+            : undefined,
+          musicTitle: postNowMusic.trim() || undefined,
+          sourceVideoId,
+          source,
+          publishNow: true, // ← key flag: tells the API to publish immediately
+        }),
+      });
+      const data = await res.json();
+      if (!data.ok && res.status !== 200) {
+        setPostNowResult({ ok: false, error: data.error || "Publish failed" });
+        return;
+      }
+      // Server returns { ok, slotId, tiktokUrl } for publishNow branch
+      if (data.ok === false) {
+        setPostNowResult({ ok: false, error: data.error || "Publish failed" });
+        return;
+      }
+      setPostNowResult({ ok: true, tiktokUrl: data.tiktokUrl });
+      fetchSlots(); // refresh calendar so the new published slot appears
+    } catch (err: any) {
+      setPostNowResult({ ok: false, error: err.message || "Network error" });
+    } finally {
+      setPostNowPublishing(false);
+    }
+  };
+
   const handleCreateSlot = async () => {
     if (!newSlotDate || !newSlotAccountId) return;
     setCreatingSlot(true);
@@ -942,6 +1090,25 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
               </div>
             </div>
             <div className="flex items-center gap-2">
+              {/* ⚡ Post Immediately — opens a modal that creates a slot AND
+                  publishes to TikTok in one shot. No date/time picker, no
+                  scheduling — for spontaneous same-instant publishing. */}
+              <button
+                onClick={() => {
+                  setPostNowAccountId(accounts[0]?.id || "");
+                  setPostNowResult(null);
+                  setShowPostNowModal(true);
+                }}
+                className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold transition-all hover:scale-105"
+                style={{
+                  background: `linear-gradient(90deg, ${C.emerald}, ${C.emeraldDark})`,
+                  color: C.white,
+                  boxShadow: `0 4px 14px ${C.emerald}40`,
+                }}
+                title="Pick a video and publish to TikTok right now — no scheduling"
+              >
+                ⚡ Post Immediately
+              </button>
               <button
                 onClick={() => setShowGDriveModal(true)}
                 className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-semibold transition-all hover:scale-105"
@@ -1420,6 +1587,42 @@ export default function ScheduleMachine({ onBack }: ScheduleMachineProps) {
           onClose={() => {
             setShowNewSlotModal(false);
             resetNewSlotState();
+          }}
+        />
+      )}
+
+      {/* Post Immediately modal — create a slot AND publish to TikTok in one shot */}
+      {showPostNowModal && (
+        <PostNowModal
+          accountId={postNowAccountId}
+          accounts={accounts}
+          video={postNowVideo}
+          caption={postNowCaption}
+          hashtags={postNowHashtags}
+          music={postNowMusic}
+          libraryVideos={libraryVideos}
+          publishing={postNowPublishing}
+          source={postNowSource}
+          uploadedVideo={postNowUploadedVideo}
+          uploading={postNowUploading}
+          uploadError={postNowUploadError}
+          result={postNowResult}
+          onAccountChange={setPostNowAccountId}
+          onVideoChange={(v) => {
+            setPostNowVideo(v);
+            if (v) setPostNowUploadedVideo(null);
+          }}
+          onCaptionChange={setPostNowCaption}
+          onHashtagsChange={setPostNowHashtags}
+          onMusicChange={setPostNowMusic}
+          onSourceChange={setPostNowSource}
+          onUploadFile={handleUploadVideoForPostNow}
+          onClearUpload={() => setPostNowUploadedVideo(null)}
+          onClearUploadError={() => setPostNowUploadError(null)}
+          onPublish={handlePostNow}
+          onClose={() => {
+            setShowPostNowModal(false);
+            resetPostNowState();
           }}
         />
       )}
@@ -3122,6 +3325,512 @@ function NewSlotModal({
   );
 }
 
+// ─── Post Immediately Modal ────────────────────────────────────────────────
+// Distinct from NewSlotModal: no date/time picker, no "schedule" — just pick
+// a video, write caption + hashtags + music, and click one button to publish
+// to TikTok right now. The slot is created AND published in a single API call.
+
+interface PostNowModalProps {
+  accountId: string;
+  accounts: ScheduleAccount[];
+  video: LibraryVideo | null;
+  caption: string;
+  hashtags: string;
+  music: string;
+  libraryVideos: LibraryVideo[];
+  publishing: boolean;
+  source: "upload" | "library";
+  uploadedVideo: NewSlotUploadedVideo | null;
+  uploading: boolean;
+  uploadError: string | null;
+  result: { ok: boolean; error?: string; tiktokUrl?: string } | null;
+  onAccountChange: (id: string) => void;
+  onVideoChange: (v: LibraryVideo | null) => void;
+  onCaptionChange: (s: string) => void;
+  onHashtagsChange: (s: string) => void;
+  onMusicChange: (s: string) => void;
+  onSourceChange: (s: "upload" | "library") => void;
+  onUploadFile: (file: File) => Promise<{ ok: boolean; error?: string }>;
+  onClearUpload: () => void;
+  onClearUploadError: () => void;
+  onPublish: () => void;
+  onClose: () => void;
+}
+
+function PostNowModal({
+  accountId,
+  accounts,
+  video,
+  caption,
+  hashtags,
+  music,
+  libraryVideos,
+  publishing,
+  source,
+  uploadedVideo,
+  uploading,
+  uploadError,
+  result,
+  onAccountChange,
+  onVideoChange,
+  onCaptionChange,
+  onHashtagsChange,
+  onMusicChange,
+  onSourceChange,
+  onUploadFile,
+  onClearUpload,
+  onClearUploadError,
+  onPublish,
+  onClose,
+}: PostNowModalProps) {
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [dragOver, setDragOver] = useState(false);
+
+  const pickFile = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    onClearUploadError();
+    await onUploadFile(file);
+    e.target.value = "";
+  };
+
+  const handleDrop = async (e: React.DragEvent) => {
+    e.preventDefault();
+    setDragOver(false);
+    const file = e.dataTransfer.files?.[0];
+    if (!file) return;
+    if (!file.type.startsWith("video/")) {
+      onClearUploadError();
+      await onUploadFile(file); // server will reject with "File must be a video"
+      return;
+    }
+    onClearUploadError();
+    await onUploadFile(file);
+  };
+
+  const hasVideo = !!uploadedVideo || !!video;
+
+  // Detect TikTok quota errors so we can show a friendly bilingual message.
+  const err = result?.error ? result.error.toLowerCase() : "";
+  const isQuotaCap =
+    !result?.ok &&
+    !!result?.error &&
+    (err.includes("reached_active_user_cap") ||
+      err.includes("active_user_cap") ||
+      err.includes("rate_limit") ||
+      err.includes("quota"));
+
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center p-4"
+      style={{ backgroundColor: "rgba(10,10,10,0.6)" }}
+      onClick={onClose}
+    >
+      <div
+        className="w-full max-w-lg rounded-3xl shadow-2xl max-h-[90vh] overflow-y-auto"
+        style={{ backgroundColor: C.white }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="p-5 border-b flex items-center justify-between" style={{ borderColor: C.cardBorder }}>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: C.text }}>⚡ Post Immediately to TikTok</h2>
+            <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
+              No scheduling — the video is published the moment you click the button.
+            </p>
+          </div>
+          <button
+            onClick={onClose}
+            disabled={publishing}
+            className="w-8 h-8 rounded-lg flex items-center justify-center disabled:opacity-40"
+            style={{ backgroundColor: C.cream }}
+          >✕</button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          {/* Account */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>TikTok account</label>
+            <select
+              value={accountId}
+              onChange={(e) => onAccountChange(e.target.value)}
+              disabled={publishing}
+              className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none cursor-pointer disabled:opacity-60"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+            >
+              {accounts.map((a) => (
+                <option key={a.id} value={a.id}>@{(a.username || '').replace(/^@/, '')}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Video picker — tabbed: Upload from device / Pick from library */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1.5 block" style={{ color: C.textMuted }}>
+              Video source
+            </label>
+
+            <div
+              className="grid grid-cols-2 p-1 rounded-xl mb-2.5"
+              style={{ backgroundColor: C.cream, border: `1px solid ${C.cardBorder}` }}
+            >
+              <button
+                type="button"
+                onClick={() => onSourceChange("upload")}
+                disabled={publishing}
+                className="py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                style={{
+                  backgroundColor: source === "upload" ? C.emerald : "transparent",
+                  color: source === "upload" ? C.white : C.textMuted,
+                }}
+              >
+                ⬆️ Upload from device
+              </button>
+              <button
+                type="button"
+                onClick={() => onSourceChange("library")}
+                disabled={publishing}
+                className="py-1.5 rounded-lg text-xs font-bold transition-all disabled:opacity-50"
+                style={{
+                  backgroundColor: source === "library" ? C.emerald : "transparent",
+                  color: source === "library" ? C.white : C.textMuted,
+                }}
+              >
+                🎬 Pick from library
+              </button>
+            </div>
+
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="video/mp4,video/quicktime,video/webm,video/x-msvideo,video/x-matroska,.mp4,.mov,.webm,.avi,.mkv"
+              onChange={handleFileSelected}
+              className="hidden"
+            />
+
+            {/* UPLOAD TAB */}
+            {source === "upload" && (
+              <div>
+                {uploadedVideo ? (
+                  <div
+                    className="rounded-xl p-3"
+                    style={{ backgroundColor: C.emeraldSoft, border: `1.5px solid ${C.emerald}` }}
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-12 h-12 rounded-lg flex-shrink-0 flex items-center justify-center text-xl"
+                        style={{ backgroundColor: C.emerald, color: C.white }}
+                      >
+                        ▶
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-xs font-bold truncate" style={{ color: C.text }}>
+                          {uploadedVideo.title}
+                        </p>
+                        <p className="text-[10px] mt-0.5" style={{ color: C.textMuted }}>
+                          {uploadedVideo.fileName} · {uploadedVideo.sizeMB} MB · {(uploadedVideo.mimeType || "video/mp4").replace("video/", "").toUpperCase()}
+                        </p>
+                        <p className="text-[10px] mt-0.5 font-semibold flex items-center gap-1" style={{ color: C.emeraldDark }}>
+                          ✓ Uploaded & ready to publish
+                        </p>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={onClearUpload}
+                        disabled={uploading || publishing}
+                        className="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold"
+                        style={{ backgroundColor: C.white, color: C.textMuted, border: `1px solid ${C.cardBorder}` }}
+                        title="Remove uploaded video"
+                      >
+                        ✕
+                      </button>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={pickFile}
+                      disabled={uploading || publishing}
+                      className="mt-2 w-full py-1.5 rounded-lg text-[11px] font-semibold transition-all hover:scale-[1.01] disabled:opacity-50"
+                      style={{ backgroundColor: C.white, color: C.emeraldDark, border: `1px solid ${C.cardBorder}` }}
+                    >
+                      Replace with a different file
+                    </button>
+                  </div>
+                ) : uploading ? (
+                  <div
+                    className="rounded-xl p-6 text-center"
+                    style={{ backgroundColor: C.cream, border: `2px dashed ${C.emerald}` }}
+                  >
+                    <div className="inline-flex items-center gap-2 mb-2">
+                      <div
+                        className="w-4 h-4 rounded-full animate-spin"
+                        style={{ border: `2px solid ${C.emeraldLight}`, borderTopColor: C.emerald }}
+                      />
+                      <p className="text-xs font-bold" style={{ color: C.text }}>Uploading…</p>
+                    </div>
+                    <p className="text-[10px]" style={{ color: C.textMuted }}>
+                      Large videos may take 30–60 seconds. Please keep this window open.
+                    </p>
+                  </div>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={pickFile}
+                    onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className="w-full rounded-xl p-6 text-center transition-all hover:scale-[1.01]"
+                    style={{
+                      backgroundColor: dragOver ? C.emeraldSoft : C.cream,
+                      border: `2px dashed ${dragOver ? C.emerald : C.cardBorder}`,
+                      cursor: "pointer",
+                    }}
+                  >
+                    <div
+                      className="w-12 h-12 mx-auto rounded-xl flex items-center justify-center mb-2 text-xl"
+                      style={{ backgroundColor: C.emeraldLight, color: C.emeraldDark }}
+                    >
+                      ⬆️
+                    </div>
+                    <p className="text-xs font-bold mb-0.5" style={{ color: C.text }}>
+                      Click to browse or drop a video here
+                    </p>
+                    <p className="text-[10px]" style={{ color: C.textMuted }}>
+                      MP4, MOV, WebM, AVI, MKV · up to 200 MB
+                    </p>
+                  </button>
+                )}
+
+                {uploadError && (
+                  <div
+                    className="mt-2 rounded-lg p-2 flex items-start gap-2"
+                    style={{ backgroundColor: "rgba(239, 68, 68, 0.08)", border: `1px solid ${C.error}` }}
+                  >
+                    <span className="text-xs" style={{ color: C.error }}>⚠️</span>
+                    <p className="text-[11px] flex-1" style={{ color: C.error }}>{uploadError}</p>
+                    <button
+                      type="button"
+                      onClick={onClearUploadError}
+                      className="text-[11px] font-bold"
+                      style={{ color: C.error }}
+                    >✕</button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* LIBRARY TAB */}
+            {source === "library" && (
+              <div>
+                {video ? (
+                  <div
+                    className="flex items-center gap-2 p-2 rounded-xl"
+                    style={{ backgroundColor: C.emeraldSoft, border: `1px solid ${C.cardBorder}` }}
+                  >
+                    <div
+                      className="w-12 h-12 rounded-lg flex-shrink-0 overflow-hidden"
+                      style={{ backgroundColor: C.dark }}
+                    >
+                      {video.thumbnailUrl && <img src={video.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs font-bold truncate" style={{ color: C.text }}>{video.title}</p>
+                      <p className="text-[10px]" style={{ color: C.textMuted }}>{video.provider} · {video.scenesCount} scenes</p>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => onVideoChange(null)}
+                      disabled={publishing}
+                      className="w-6 h-6 rounded-lg flex items-center justify-center text-xs disabled:opacity-40"
+                      style={{ backgroundColor: C.white, color: C.textMuted }}
+                    >✕</button>
+                  </div>
+                ) : (
+                  <div className="max-h-40 overflow-y-auto rounded-xl" style={{ border: `1px solid ${C.cardBorder}`, backgroundColor: C.white }}>
+                    {libraryVideos.length === 0 ? (
+                      <p className="text-xs italic p-3 text-center" style={{ color: C.textMuted }}>
+                        Your library is empty. Switch to “Upload from device” to add a video directly.
+                      </p>
+                    ) : (
+                      libraryVideos.slice(0, 20).map((v) => (
+                        <button
+                          key={v.id}
+                          type="button"
+                          onClick={() => {
+                            onVideoChange(v);
+                            if (!caption) onCaptionChange(v.title);
+                          }}
+                          disabled={publishing}
+                          className="w-full flex items-center gap-2 p-2 text-left hover:bg-emerald-50 transition-colors disabled:opacity-50"
+                          style={{ borderBottom: `1px solid ${C.cardBorder}` }}
+                        >
+                          <div className="w-10 h-10 rounded-lg flex-shrink-0 overflow-hidden" style={{ backgroundColor: C.dark }}>
+                            {v.thumbnailUrl && <img src={v.thumbnailUrl} alt="" className="w-full h-full object-cover" />}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-xs font-semibold truncate" style={{ color: C.text }}>{v.title}</p>
+                            <p className="text-[10px]" style={{ color: C.textMuted }}>{v.provider}</p>
+                          </div>
+                        </button>
+                      ))
+                    )}
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!uploadedVideo && !video && !uploading && (
+              <p className="text-[10px] mt-1.5 italic" style={{ color: C.textMuted }}>
+                💡 A video is required to publish immediately.
+              </p>
+            )}
+          </div>
+
+          {/* Caption */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>Caption</label>
+            <input
+              type="text"
+              value={caption}
+              onChange={(e) => onCaptionChange(e.target.value)}
+              disabled={publishing}
+              placeholder="Write a catchy caption…"
+              className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none disabled:opacity-60"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+            />
+          </div>
+
+          {/* Hashtags */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>
+              Hashtags (comma-separated)
+            </label>
+            <input
+              type="text"
+              value={hashtags}
+              onChange={(e) => onHashtagsChange(e.target.value)}
+              disabled={publishing}
+              placeholder="fyp, viral, ai"
+              className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none disabled:opacity-60"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+            />
+          </div>
+
+          {/* Music title */}
+          <div>
+            <label className="text-[10px] uppercase tracking-wide font-bold mb-1 block" style={{ color: C.textMuted }}>
+              🎵 Music title (optional)
+            </label>
+            <input
+              type="text"
+              value={music}
+              onChange={(e) => onMusicChange(e.target.value)}
+              disabled={publishing}
+              placeholder="e.g. Original Sound - Artist"
+              className="w-full px-3 py-2 rounded-xl text-sm border-0 outline-none disabled:opacity-60"
+              style={{ backgroundColor: C.cream, color: C.text, border: `1px solid ${C.cardBorder}` }}
+            />
+            <p className="text-[10px] mt-1 italic" style={{ color: C.textMuted }}>
+              Added as a 🎵 line at the end of the caption.
+            </p>
+          </div>
+
+          {/* Result feedback */}
+          {result && (
+            <>
+              {result.ok ? (
+                <div
+                  className="rounded-xl p-3 text-xs space-y-1.5"
+                  style={{ backgroundColor: C.emeraldSoft, color: C.emeraldDark }}
+                >
+                  <div className="font-bold">✅ Posted to TikTok!</div>
+                  {result.tiktokUrl && (
+                    <a
+                      href={result.tiktokUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="underline font-semibold"
+                    >
+                      View on TikTok ↗
+                    </a>
+                  )}
+                  <div dir="rtl" style={{ color: C.emeraldDark }}>
+                    تم النشر بنجاح على تيك توك.
+                  </div>
+                </div>
+              ) : isQuotaCap ? (
+                <div
+                  className="rounded-xl p-3 text-xs space-y-1.5"
+                  style={{ backgroundColor: "#FEF3C7", color: "#92400E" }}
+                >
+                  <div className="font-bold">
+                    ⚠️ TikTok daily publish limit reached
+                  </div>
+                  <div>
+                    TikTok rejected the publish because the connected app has
+                    hit its <code>reached_active_user_cap</code> quota. This is
+                    a TikTok-side limit — no video was posted to your account.
+                    Please wait (usually resets within 24h) and try again.
+                  </div>
+                  <div dir="rtl" style={{ color: "#92400E" }}>
+                    وصل التطبيق إلى الحد اليومي المسموح به من تيك توك للنشر
+                    (reached_active_user_cap). لم يُنشر أي فيديو على حسابك.
+                    الرجاء المحاولة لاحقًا (عادةً خلال 24 ساعة).
+                  </div>
+                </div>
+              ) : (
+                <div
+                  className="rounded-xl p-3 text-xs"
+                  style={{ backgroundColor: "#FEE2E2", color: C.error }}
+                >
+                  ⚠️ {result.error || "Publish failed"}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+
+        <div className="p-5 border-t flex gap-2" style={{ borderColor: C.cardBorder }}>
+          <button
+            onClick={onClose}
+            disabled={publishing}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold disabled:opacity-50"
+            style={{ backgroundColor: C.cream, color: C.text, border: `1.5px solid ${C.cardBorder}` }}
+          >
+            {result?.ok ? "Done" : "Cancel"}
+          </button>
+          <button
+            onClick={onPublish}
+            disabled={publishing || uploading || !accountId || !hasVideo}
+            className="flex-1 py-2.5 rounded-xl text-xs font-bold transition-all hover:scale-[1.02] disabled:opacity-50 disabled:hover:scale-100 flex items-center justify-center gap-2"
+            style={{
+              background: publishing
+                ? `linear-gradient(90deg, ${C.emeraldDark}, ${C.emerald})`
+                : `linear-gradient(90deg, ${C.emerald}, ${C.emeraldDark})`,
+              color: C.white,
+              boxShadow: `0 4px 14px ${C.emerald}40`,
+            }}
+          >
+            {publishing ? (
+              <>
+                <div
+                  className="w-3.5 h-3.5 rounded-full animate-spin"
+                  style={{ border: `2px solid ${C.emeraldLight}`, borderTopColor: C.white }}
+                />
+                Posting to TikTok…
+              </>
+            ) : (
+              <>⚡ Post to TikTok now</>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // ─── Helpers ───────────────────────────────────────────────────────────────
 
 function safeJsonParse<T>(s: string, fallback: T): T {
@@ -3360,7 +4069,10 @@ function GoogleDriveImportModal({
               </button>
             </div>
             <p className="text-[10px] mt-1.5" style={{ color: C.textMuted }}>
-              ⚠️ The folder must be shared as <strong>“Anyone with the link can view”</strong>. Only video files (MP4, MOV, etc.) will be imported.
+              ⚠️ The folder must be shared as <strong>“Anyone with the link can view”</strong>. Right-click the folder in Google Drive → <em>Share</em> → change to “Anyone with the link”. Only video files (MP4, MOV, etc.) will be imported.
+            </p>
+            <p className="text-[10px] mt-1" style={{ color: C.textMuted }}>
+              💡 Tip: open the folder URL in an <strong>incognito window</strong> first. If Google asks you to sign in, sharing is not public yet.
             </p>
           </div>
 
@@ -3477,7 +4189,10 @@ function GoogleDriveImportModal({
 
           {/* Error */}
           {previewError && (
-            <div className="rounded-xl p-3 text-xs" style={{ backgroundColor: "#FEE2E2", color: C.error }}>
+            <div
+              className="rounded-xl p-3 text-xs whitespace-pre-line"
+              style={{ backgroundColor: "#FEE2E2", color: C.error }}
+            >
               ⚠️ {previewError}
             </div>
           )}

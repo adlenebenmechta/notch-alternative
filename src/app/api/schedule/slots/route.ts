@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getSlots, createSlot } from '@/lib/scheduleService';
+import { getSlots, createSlot, createAndPublishSlotNow } from '@/lib/scheduleService';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -25,9 +25,51 @@ export async function GET(req: NextRequest) {
 }
 
 // POST /api/schedule/slots — create a new slot
+//
+// Body params:
+//   - standard CreateSlotInput fields (accountId, scheduledAt, videoUrl, etc.)
+//   - publishNow?: boolean  ← when true, the slot is created AND immediately
+//     published to TikTok via PostPeer (bypassing scheduledAt). Used by the
+//     "Post Immediately" button in the Schedule Machine header.
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
+
+    // ── "Post Immediately" branch ─────────────────────────────────────────
+    // If the caller sets publishNow: true, route to createAndPublishSlotNow
+    // which creates the slot AND pushes it to PostPeer immediately (no
+    // scheduledAt → PostPeer sets publishNow: true internally). The slot is
+    // marked 'published' on success, 'failed' on error.
+    if (body?.publishNow === true) {
+      const result = await createAndPublishSlotNow({
+        accountId: body.accountId,
+        accountLabel: body.accountLabel,
+        videoUrl: body.videoUrl,
+        thumbnailUrl: body.thumbnailUrl,
+        imageUrls: body.imageUrls,
+        caption: body.caption,
+        hashtags: body.hashtags,
+        musicTitle: body.musicTitle,
+        sourceVideoId: body.sourceVideoId,
+        source: body.source,
+        planId: body.planId,
+      });
+
+      if (!result.ok) {
+        return NextResponse.json(
+          { ok: false, error: result.error || 'Publish failed', slotId: result.slotId },
+          { status: 500 }
+        );
+      }
+
+      return NextResponse.json({
+        ok: true,
+        slotId: result.slotId,
+        tiktokUrl: result.tiktokUrl || null,
+      });
+    }
+
+    // ── Standard scheduled-slot branch ────────────────────────────────────
     const slot = await createSlot(body);
     return NextResponse.json({ slot });
   } catch (err: any) {
