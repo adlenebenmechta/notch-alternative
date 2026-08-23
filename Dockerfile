@@ -67,4 +67,4 @@ ENV HOSTNAME "0.0.0.0"
 
 # Run prisma db push then start the server.
 # Railway Variables are already in the process environment — no .env sourcing needed.
-CMD ["sh", "-c", "npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || echo 'DB push failed, continuing anyway'; HOSTNAME=0.0.0.0 PORT=3000 node server.js 2>&1; echo SERVER_EXITED_WITH_$?; sleep 30"]
+CMD ["sh", "-c", "echo ===CMD-START===; ls /app/server.js && echo FILE-OK || echo FILE-MISSING; export HOSTNAME=0.0.0.0 PORT=3000; npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || true; echo ===STARTING-NODE===; node /app/server.js 2>&1; echo ===NODE-EXITED:$?===; sleep 120"]
