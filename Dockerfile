@@ -56,8 +56,6 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 # injected by Railway Variables at container start. Next.js standalone mode in
 # production reads process.env directly, so no .env file is needed.
 
-COPY --from=builder /app/raw-test.js ./raw-test.js
-
 # Ensure nextjs user owns the prisma files for db push
 RUN chown -R nextjs:nodejs /app/prisma /app/node_modules
 
@@ -71,4 +69,4 @@ ENV NODE_OPTIONS "--max-old-space-size=700 --optimize-for-size"
 
 # Run prisma db push then start the server.
 # Railway Variables are already in the process environment — no .env sourcing needed.
-CMD ["sh", "-c", "node /app/raw-test.js 2>&1; sleep 500"]
+CMD ["sh", "-c", "export HOSTNAME=0.0.0.0 PORT=3000; npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || true; node server.js"]
