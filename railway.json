@@ -5,7 +5,7 @@
     "buildCommand": "npx prisma generate && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
   },
   "deploy": {
-    "startCommand": "mkdir -p /app/db && npx prisma db push --accept-data-loss && node .next/standalone/server.js",
+    "startCommand": "npx prisma db push --accept-data-loss && node server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
