@@ -8,10 +8,14 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  turbopack: {
-    // Use current working directory (works in both local dev and Docker/Railway)
-    root: process.cwd(),
-  },
+  ...(process.env.NODE_ENV === "production"
+    ? {}
+    : {
+        turbopack: {
+          // Dev-only: current working directory (breaks standalone Docker runtime)
+          root: process.cwd(),
+        },
+      }),
   // Increase body size limit for API routes that receive base64 images
   experimental: {
     serverActions: {
