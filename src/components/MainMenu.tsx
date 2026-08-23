@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { useAuth } from "@/providers/auth-provider";
 import UserProfilePanel from "@/components/UserProfilePanel";
+import { useAppLang, APP_LOCALES } from "@/lib/i18n";
 
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
@@ -304,7 +305,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
               </svg>
             </div>
             <h2 className="text-xl font-bold uppercase tracking-wide" style={{ color: C.dark }}>
-              {isLogin ? "Welcome Back" : "Create Account"}
+              {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
             </h2>
           </div>
 
@@ -390,7 +391,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                   type="text"
                   value={name}
                   onChange={(e) => setName(e.target.value)}
-                  placeholder="John Doe"
+                  placeholder={t("auth.namePlaceholder")}
                   required={!isLogin}
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
                   style={{
@@ -428,7 +429,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                   type={showPassword ? "text" : "password"}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  placeholder="Min. 6 characters"
+                  placeholder={t("auth.passwordPlaceholder")}
                   required
                   minLength={6}
                   className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none transition-all"
@@ -470,7 +471,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                   {isLogin ? "Signing in..." : "Creating..."}
                 </span>
               ) : (
-                isLogin ? "Sign In" : "Create Account"
+                isLogin ? t("auth.signIn") : t("auth.signUp")
               )}
             </button>
           </form>
@@ -516,7 +517,7 @@ function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
 
   const plans = [
     {
-      name: "Free",
+      name: t("plan.free"),
       price: "$0",
       period: "",
       credits: "3",
@@ -536,7 +537,7 @@ function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
       ),
     },
     {
-      name: "Pro",
+      name: t("plan.pro"),
       price: "$19",
       period: ".99/mo",
       credits: "50",
@@ -557,7 +558,7 @@ function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
       ),
     },
     {
-      name: "Enterprise",
+      name: t("plan.enterprise"),
       price: "$49",
       period: ".99/mo",
       credits: "\u221E",
@@ -782,7 +783,7 @@ function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
                   transform: hoveredPlan === index ? "scale(1.02)" : "scale(1)",
                 }}
               >
-                {plan.name === "Free" ? "Get Started" : `Upgrade to ${plan.name}`}
+                {plan.name === t("plan.free") ? t("plan.getStarted") : t("plan.upgradeTo", { name: plan.name })}
               </button>
             </div>
           </div>
@@ -1276,9 +1277,9 @@ export default function MainMenu({
   const menuItems = [
     {
       id: "ai-avatar-machine",
-      title: "AI Avatar Machine",
-      subtitle: "Create AI-Powered Talking Videos",
-      description: "Transform your scripts into stunning talking avatar videos with consistent characters across multiple scenes.",
+      title: t("menu.ai-avatar-machine.title"),
+      subtitle: t("menu.ai-avatar-machine.subtitle"),
+      description: t("menu.ai-avatar-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="4" y="8" width="40" height="32" rx="6" stroke={C.pink} strokeWidth="2.5" fill="none" />
@@ -1293,9 +1294,9 @@ export default function MainMenu({
     },
     {
       id: "ai-viral-carousel",
-      title: "AI Viral Carousel Machine",
-      subtitle: "Create Viral Content",
-      description: "Generate stunning viral carousels for Instagram, LinkedIn & more with AI-powered design and copy.",
+      title: t("menu.ai-viral-carousel.title"),
+      subtitle: t("menu.ai-viral-carousel.subtitle"),
+      description: t("menu.ai-viral-carousel.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="6" y="4" width="36" height="40" rx="6" stroke={C.gold} strokeWidth="2" fill="none" />
@@ -1308,9 +1309,9 @@ export default function MainMenu({
     },
     {
       id: "ai-podcast-machine",
-      title: "AI Podcast Machine",
-      subtitle: "Create Podcast Videos",
-      description: "Generate AI-powered podcast videos with two characters, dialogue automation, and seamless video merging.",
+      title: t("menu.ai-podcast-machine.title"),
+      subtitle: t("menu.ai-podcast-machine.subtitle"),
+      description: t("menu.ai-podcast-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <circle cx="14" cy="18" r="6" stroke={C.cyan} strokeWidth="2" fill="none" />
@@ -1326,9 +1327,9 @@ export default function MainMenu({
     },
     {
       id: "bof-videos-machine",
-      title: "BOF Videos Machine",
-      subtitle: "Bulk Product Video Generator",
-      description: "Generate AI-powered TikTok Shop & product videos in bulk with overlays, voices, and batch processing.",
+      title: t("menu.bof-videos-machine.title"),
+      subtitle: t("menu.bof-videos-machine.subtitle"),
+      description: t("menu.bof-videos-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="4" y="8" width="40" height="28" rx="4" stroke="#9AFF01" strokeWidth="2.5" fill="none" />
@@ -1344,9 +1345,9 @@ export default function MainMenu({
     },
     {
       id: "claymotion-videos-machine",
-      title: "Claymotion Videos Machine",
-      subtitle: "Linked Scene Video Creator",
-      description: "Create smooth claymation-style videos with linked scenes. Each scene flows into the next with AI-powered transitions.",
+      title: t("menu.claymotion-videos-machine.title"),
+      subtitle: t("menu.claymotion-videos-machine.subtitle"),
+      description: t("menu.claymotion-videos-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="4" y="8" width="16" height="24" rx="3" stroke="#FFFFFF" strokeWidth="2" fill="none" />
@@ -1360,9 +1361,9 @@ export default function MainMenu({
     },
     {
       id: "allinone-machine",
-      title: "All in One Machine",
-      subtitle: "Complete AI Video Suite",
-      description: "All AI tools in one place — generate videos, images, scripts, voiceovers, and more with a powerful suite of AI-powered tools.",
+      title: t("menu.allinone-machine.title"),
+      subtitle: t("menu.allinone-machine.subtitle"),
+      description: t("menu.allinone-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="4" y="4" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
@@ -1379,9 +1380,9 @@ export default function MainMenu({
     },
     {
       id: "autopublish-machine",
-      title: "Auto-Publish Machine",
-      subtitle: "Schedule & Publish to TikTok",
-      description: "Auto-publish your AI videos to TikTok at the best times. Connect multiple accounts, schedule posts, and track analytics.",
+      title: t("menu.autopublish-machine.title"),
+      subtitle: t("menu.autopublish-machine.subtitle"),
+      description: t("menu.autopublish-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="4" y="8" width="40" height="28" rx="4" stroke="#FF0050" strokeWidth="2.5" fill="none" />
@@ -1396,9 +1397,9 @@ export default function MainMenu({
     },
     {
       id: "schedule-machine",
-      title: "Schedule Machine",
-      subtitle: "AI Calendar & Smart Scheduling",
-      description: "Plan your whole TikTok calendar with drag-and-drop, best-time recommendations, and an AI bot that fills your schedule automatically.",
+      title: t("menu.schedule-machine.title"),
+      subtitle: t("menu.schedule-machine.subtitle"),
+      description: t("menu.schedule-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
           <rect x="6" y="8" width="36" height="34" rx="5" stroke="#10B981" strokeWidth="2.5" fill="none" />
@@ -1417,7 +1418,29 @@ export default function MainMenu({
     }];
 
   return (
-    <div className="min-h-screen relative overflow-hidden" style={{ fontFamily: "var(--font-etna), 'Etna', sans-serif" }}>
+    <div className="min-h-screen relative overflow-hidden" dir={rtl ? "rtl" : "ltr"} style={{ fontFamily: "var(--font-etna), 'Etna', sans-serif" }}>
+      {/* ─── Language Switcher (floating, top corner) ─── */}
+      <div
+        className="fixed z-[100] flex items-center gap-1 rounded-full border border-white/40 bg-white/80 backdrop-blur-md shadow-lg"
+        style={{ top: 16, [rtl ? "left" : "right"]: 16, padding: "4px 6px" } as React.CSSProperties}
+      >
+        {APP_LOCALES.map((l) => (
+          <button
+            key={l.code}
+            onClick={() => setLocale(l.code)}
+            className="rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
+            style={{
+              backgroundColor: locale === l.code ? "#E461AD" : "transparent",
+              color: locale === l.code ? "#fff" : "#1A1A2E",
+              cursor: "pointer",
+            }}
+            aria-pressed={locale === l.code}
+          >
+            {l.short}
+          </button>
+        ))}
+      </div>
+
       {/* ─── Video Background ─────────────────────────────────── */}
       <div className="absolute inset-0 z-0">
         {!videoLoaded && (
@@ -1600,7 +1623,7 @@ export default function MainMenu({
                 className="text-sm sm:text-base font-medium uppercase tracking-[0.3em] mb-3"
                 style={{ color: C.gold, textShadow: "0 1px 6px rgba(0,0,0,0.3)" }}
               >
-                {isAuthenticated ? `Welcome back, ${userName.split(" ")[0]}` : "Create stunning AI videos"}
+                {isAuthenticated ? t("header.welcomeBackName", { name: userName.split(" ")[0] }) : t("header.createVideos")}
               </p>
               <h2
                 className="text-3xl sm:text-5xl lg:text-6xl font-bold uppercase leading-tight mb-4"
@@ -1618,8 +1641,8 @@ export default function MainMenu({
                 style={{ color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.2)" }}
               >
                 {isAuthenticated
-                  ? "Choose a tool below to start bringing your ideas to life"
-                  : "Sign up to start creating AI-powered content with our suite of tools"}
+                  ? t("header.subAuth")
+                  : t("header.subGuest")}
               </p>
             </div>
 
@@ -1774,7 +1797,7 @@ export default function MainMenu({
                             transition: "opacity 0.3s",
                           }}
                         >
-                          {isAuthenticated ? "Get Started" : "Sign Up to Start"}
+                          {isAuthenticated ? t("header.getStarted") : t("header.signUpToStart")}
                         </span>
                         <svg
                           width="16" height="16" viewBox="0 0 16 16" fill="none"
@@ -1816,8 +1839,8 @@ export default function MainMenu({
             </p>
             <div className="flex items-center gap-4">
               {[
-                { label: "Privacy Policy", href: "/privacy" },
-                { label: "Terms of Service", href: "/terms" },
+                { label: t("footer.privacy"), href: "/privacy" },
+                { label: t("footer.terms"), href: "/terms" },
                 { label: "Support", href: "/support" },
               ].map((link) => (
                 <a
@@ -1860,7 +1883,7 @@ export default function MainMenu({
             backgroundColor: "#DC2626",
             color: "#FFFFFF",
           }}
-          title="Sign Out"
+          title={t("auth.signOut")}
         >
           <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
             <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clipRule="evenodd" />
