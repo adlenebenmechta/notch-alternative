@@ -196,6 +196,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
   onClose: () => void;
   defaultMode?: "login" | "signup";
 }) {
+  const { t } = useAppLang();
   const { signIn, signUp, signInGoogle } = useAuth();
   const [isLogin, setIsLogin] = useState(defaultMode !== "signup");
   const [name, setName] = useState("");
@@ -497,6 +498,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
 // ─── Plans Section ──────────────────────────────────────────────────────────
 
 function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
+  const { t } = useAppLang();
   const [hoveredPlan, setHoveredPlan] = useState<number | null>(null);
   const sectionRef = useRef<HTMLDivElement>(null);
   const [isVisible, setIsVisible] = useState(false);
@@ -1204,6 +1206,7 @@ export default function MainMenu({
   onOpenLibrary,
 }: MainMenuProps) {
   const { user, loading, signOut } = useAuth();
+  const { locale, setLocale, t, rtl } = useAppLang();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
   const [activeCard, setActiveCard] = useState<number | null>(null);
