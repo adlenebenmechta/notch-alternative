@@ -64,6 +64,8 @@ USER nextjs
 EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
+# Cap V8 heap so the app boots inside the 1GB trial limit
+ENV NODE_OPTIONS "--max-old-space-size=700 --optimize-for-size"
 
 # Run prisma db push then start the server.
 # Railway Variables are already in the process environment — no .env sourcing needed.
