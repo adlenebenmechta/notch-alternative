@@ -5,7 +5,7 @@
     "buildCommand": "npx prisma generate && next build && cp -r .next/static .next/standalone/.next/ && cp -r public .next/standalone/"
   },
   "deploy": {
-    "startCommand": "npx prisma db push --accept-data-loss && node server.js",
+    "startCommand": "npx prisma db push --accept-data-loss; echo '=== DIAG ==='; ls -la /app | head -20; echo \"PORT=$PORT HOSTNAME=$HOSTNAME\"; echo '=== START ==='; exec node server.js",
     "restartPolicyType": "ON_FAILURE",
     "restartPolicyMaxRetries": 10
   }
