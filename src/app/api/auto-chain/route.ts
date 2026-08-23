@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthUser } from "@/lib/auth-server";
 
-export const maxDuration = 600; // 10 minutes for long pipelines
+export const maxDuration = 300  // hobby plan max; // 10 minutes for long pipelines
 export const dynamic = "force-dynamic";
 
 const DEFAULT_KIE_KEY = process.env.KIE_KEY || "aaf0ea1db84a074fb1ed0ba386bbf615";
