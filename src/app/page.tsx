@@ -16,6 +16,7 @@ import ClaymotionVideosMachine from "@/components/ClaymotionVideosMachine";
 import AllInOneMachine from "@/components/AllInOneMachine";
 import AutoPublishMachine from "@/components/AutoPublishMachine";
 import ScheduleMachine from "@/components/ScheduleMachine";
+import NotchAltView from "@/components/NotchAltView";
 
 // ─── Colors (matching the existing design) ────────────────────────────────────
 
@@ -305,7 +306,7 @@ function SubscriptionScreen({ userData, onComplete }: {
 export default function Home() {
   const { user, loading, signOut } = useAuth();
   const [showSubscription, setShowSubscription] = useState(false);
-  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion" | "allinone" | "autopublish" | "schedule">("menu");
+  const [currentView, setCurrentView] = useState<"menu" | "avatar" | "carousel" | "podcast" | "library" | "bof" | "claymotion" | "allinone" | "autopublish" | "schedule" | "notchalt">("menu");
   const [initialView, setInitialView] = useState<string>("create");
   const [libraryEditorUrl, setLibraryEditorUrl] = useState("");
   const [libraryCaptionUrl, setLibraryCaptionUrl] = useState("");
@@ -366,6 +367,8 @@ export default function Home() {
             setCurrentView("autopublish");
           } else if (dest === "schedule-machine") {
             setCurrentView("schedule");
+          } else if (dest === "notch-alternative") {
+            setCurrentView("notchalt");
           }
         }}
         onOpenLibrary={() => {
@@ -373,6 +376,11 @@ export default function Home() {
         }}
       />
     );
+  }
+
+  // Notch Alternative — embedded AI Ad Cloning Machine
+  if (currentView === "notchalt") {
+    return <NotchAltView onBack={() => setCurrentView("menu")} />;
   }
 
   // AI Carousel view

@@ -70,6 +70,13 @@ const DICT: Record<AppLocale, Record<string, string>> = {
     "footer.terms": "Terms of Service",
     "footer.allRights": "All rights reserved.",
     "lang.switch": "Language",
+    "menu.notch-alternative.title": "Notch Alternative",
+    "menu.notch-alternative.subtitle": "AI Ad Cloning Machine",
+    "menu.notch-alternative.description": "Clone any winning video ad for your product: Reference X-Ray analysis, Brand Brain, script rewriting and AI scene generation — the complete Notch experience in Arabic, English & French.",
+    "notchWindow.title": "Notch Alternative — AI Ad Cloning Machine",
+    "notchWindow.openTab": "Open in new tab",
+    "notchWindow.back": "Back to machines",
+    "notchWindow.loading": "Loading the Notch Alternative platform…",
   },
 
   ar: {
@@ -128,6 +135,13 @@ const DICT: Record<AppLocale, Record<string, string>> = {
     "footer.terms": "شروط الخدمة",
     "footer.allRights": "جميع الحقوق محفوظة.",
     "lang.switch": "اللغة",
+    "menu.notch-alternative.title": "بديل Notch",
+    "menu.notch-alternative.subtitle": "آلة استنساخ الإعلانات",
+    "menu.notch-alternative.description": "استنسخ أي فيديو إعلاني ناجح لمنتجك: تحليل أشعة الفيديو، العقل العلامي، إعادة كتابة السكريبت وتوليد المشاهد بالذكاء الاصطناعي — تجربة Notch كاملة بالعربية والإنجليزية والفرنسية.",
+    "notchWindow.title": "بديل Notch — آلة استنساخ الإعلانات",
+    "notchWindow.openTab": "فتح في تبويب جديد",
+    "notchWindow.back": "العودة للآلات",
+    "notchWindow.loading": "جارٍ تحميل منصة بديل Notch…",
   },
 
   fr: {
@@ -186,6 +200,13 @@ const DICT: Record<AppLocale, Record<string, string>> = {
     "footer.terms": "Conditions d'utilisation",
     "footer.allRights": "Tous droits réservés.",
     "lang.switch": "Langue",
+    "menu.notch-alternative.title": "Alternative Notch",
+    "menu.notch-alternative.subtitle": "Machine de clonage publicitaire",
+    "menu.notch-alternative.description": "Clonez n'importe quelle pub gagnante pour votre produit : analyse X-Ray, Cerveau de Marque, réécriture de script et génération de scènes IA — l'expérience Notch complète en arabe, anglais et français.",
+    "notchWindow.title": "Alternative Notch — Machine de clonage publicitaire",
+    "notchWindow.openTab": "Ouvrir dans un onglet",
+    "notchWindow.back": "Retour aux machines",
+    "notchWindow.loading": "Chargement de la plateforme Alternative Notch…",
   },
 };
 

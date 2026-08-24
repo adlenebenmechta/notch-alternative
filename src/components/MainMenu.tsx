@@ -1418,6 +1418,23 @@ export default function MainMenu({
         </svg>
       ),
       accentColor: "#10B981",
+    },
+    {
+      id: "notch-alternative",
+      title: t("menu.notch-alternative.title"),
+      subtitle: t("menu.notch-alternative.subtitle"),
+      description: t("menu.notch-alternative.description"),
+      icon: (
+        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
+          <path d="M13 2L4.5 13.5H11L10 22L19.5 10H13L13 2Z" fill="#593dfa" />
+          <rect x="4" y="26" width="17" height="17" rx="4" stroke="#593dfa" strokeWidth="2.5" fill="none" />
+          <rect x="27" y="26" width="17" height="17" rx="4" stroke="#c026d3" strokeWidth="2.5" fill="none" />
+          <circle cx="12.5" cy="34.5" r="3" fill="#593dfa" opacity="0.7" />
+          <circle cx="35.5" cy="34.5" r="3" fill="#c026d3" opacity="0.7" />
+          <path d="M24 20l3 3m0-3l-3 3" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      ),
+      accentColor: "#593dfa",
     }];
 
   return (

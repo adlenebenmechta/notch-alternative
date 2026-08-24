@@ -8,14 +8,11 @@ const nextConfig: NextConfig = {
     ignoreBuildErrors: true,
   },
   reactStrictMode: false,
-  ...(process.env.NODE_ENV === "production"
-    ? {}
-    : {
-        turbopack: {
-          // Dev-only: current working directory (breaks standalone Docker runtime)
-          root: process.cwd(),
-        },
-      }),
+  turbopack: {
+    // Explicit project root — required for dev in nested dirs and safe for
+    // standalone Docker builds (root points at the app, not the host cwd)
+    root: import.meta.dirname,
+  },
   // Increase body size limit for API routes that receive base64 images
   experimental: {
     serverActions: {
