@@ -62,6 +62,9 @@ RUN chown -R nextjs:nodejs /app/prisma /app/node_modules
 USER nextjs
 
 EXPOSE 3000
+# PORT: intentionally NOT set here — Railway injects PORT dynamically and routes
+# traffic to it. The app must listen on process.env.PORT (Next standalone does).
+# The value below is only a fallback for local docker runs.
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 # Cap V8 heap so the app boots inside the 1GB trial limit
@@ -71,4 +74,6 @@ ENV NODE_OPTIONS "--max-old-space-size=700"
 
 # Run prisma db push then start the server.
 # Railway Variables are already in the process environment — no .env sourcing needed.
-CMD ["sh", "-c", "export HOSTNAME=0.0.0.0 PORT=3000; npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || true; node server.js"]
+# IMPORTANT: never export/override PORT — Railway injects the port it routes to.
+# HOSTNAME=0.0.0.0 is forced so Next standalone binds all interfaces.
+CMD ["sh", "-c", "export HOSTNAME=0.0.0.0; echo \"[start] using PORT=${PORT:-unset}\"; npx --yes prisma db push --skip-generate --accept-data-loss 2>&1 || true; exec node server.js"]
