@@ -65,7 +65,9 @@ EXPOSE 3000
 ENV PORT 3000
 ENV HOSTNAME "0.0.0.0"
 # Cap V8 heap so the app boots inside the 1GB trial limit
-ENV NODE_OPTIONS "--max-old-space-size=700 --optimize-for-size"
+# NOTE: --optimize-for-size was removed in Node 20 and makes node exit instantly
+# with "not allowed in NODE_OPTIONS" — do NOT re-add it.
+ENV NODE_OPTIONS "--max-old-space-size=700"
 
 # Run prisma db push then start the server.
 # Railway Variables are already in the process environment — no .env sourcing needed.
