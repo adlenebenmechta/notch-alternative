@@ -386,3 +386,19 @@ model ScheduleMessage {
 
   @@index([conversationId])
 }
+
+// ─── WENOV8 marketing site — contact form submissions ──────────────────────
+
+model ContactMessage {
+  id          String   @id @default(cuid())
+  name        String
+  email       String
+  company     String?
+  website     String?
+  projectType String
+  budgetRange String?
+  details     String
+  createdAt   DateTime @default(now())
+
+  @@index([createdAt])
+}

@@ -400,7 +400,7 @@ export default function AdminPage() {
   // Firebase handles auth state - redirect if not admin
   useEffect(() => {
     if (status === "unauthenticated") {
-      window.location.href = "/";
+      window.location.href = "/studio";
     }
   }, [status]);
 

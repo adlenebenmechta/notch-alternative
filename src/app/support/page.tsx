@@ -68,7 +68,7 @@ export default function SupportPage() {
       {/* Back button */}
       <div className="max-w-3xl mx-auto px-5 pt-6">
         <button
-          onClick={() => window.location.href = user ? "/" : "/"}
+          onClick={() => window.location.href = "/studio"}
           className="flex items-center gap-2 text-sm font-medium transition-all hover:opacity-80"
           style={{ color: COLORS.textMuted }}
         >

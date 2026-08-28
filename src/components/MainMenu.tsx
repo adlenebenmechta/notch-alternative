@@ -1517,13 +1517,13 @@ export default function MainMenu({
                   className="text-lg sm:text-xl font-bold uppercase tracking-wider leading-none"
                   style={{ color: C.white, textShadow: "0 2px 10px rgba(0,0,0,0.3)" }}
                 >
-                  Your AI
+                  WENOV8
                 </h1>
                 <p
                   className="text-xs sm:text-sm uppercase tracking-widest leading-none"
                   style={{ color: C.pink, textShadow: "0 1px 8px rgba(228,97,173,0.4)" }}
                 >
-                  Avatar Machine
+                  AI Studio
                 </p>
               </div>
             </div>
@@ -1855,12 +1855,13 @@ export default function MainMenu({
         >
           <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
             <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
-              Your AI Avatar Machine &middot; Powered by Advanced AI
+              WENOV8 AI Studio &middot; Powered by WENOV8
             </p>
             <div className="flex items-center gap-4">
               {[
-                { label: t("footer.privacy"), href: "/privacy" },
-                { label: t("footer.terms"), href: "/terms" },
+                { label: "WENOV8", href: "/" },
+                { label: t("footer.privacy"), href: "/privacy-policy" },
+                { label: t("footer.terms"), href: "/terms-of-service" },
                 { label: "Support", href: "/support" },
               ].map((link) => (
                 <a
@@ -1896,7 +1897,7 @@ export default function MainMenu({
               });
             } catch(e) {}
             // Sign out is handled by the auth provider via UserProfilePanel
-            window.location.href = "/";
+            window.location.href = "/studio";
           }}
           className="fixed bottom-6 right-6 z-[70] flex items-center gap-2 px-5 py-3 rounded-2xl shadow-lg text-sm font-bold transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95"
           style={{

@@ -111,7 +111,7 @@ export default function UserProfilePanel({
     if (onSignOut) {
       onSignOut();
     } else {
-      window.location.href = "/";
+      window.location.href = "/studio";
     }
   };
 

@@ -54,7 +54,7 @@ export default function AdminGrantPage() {
   // ── Auth gate: redirect non-admins ──
   useEffect(() => {
     if (!authLoading && !user) {
-      router.push("/");
+      router.push("/studio");
     }
   }, [user, authLoading, router]);
 
@@ -170,7 +170,7 @@ export default function AdminGrantPage() {
             This section is restricted to authorized administrators only. All access attempts are logged and monitored.
           </p>
           <button
-            onClick={() => router.push("/")}
+            onClick={() => router.push("/studio")}
             className="px-6 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:scale-105"
             style={{ backgroundColor: "#E461AD" }}
           >
@@ -192,7 +192,7 @@ export default function AdminGrantPage() {
         <div className="max-w-4xl mx-auto px-6 py-5 flex items-center justify-between">
           <div className="flex items-center gap-4">
             <button
-              onClick={() => router.push("/")}
+              onClick={() => router.push("/studio")}
               className="w-10 h-10 rounded-xl flex items-center justify-center transition-all hover:scale-105"
               style={{ backgroundColor: "#1E1E1E" }}
             >
