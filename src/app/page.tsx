@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { SITE } from "@/lib/site/config";
 import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
+import { ScrollStage } from "@/components/site/scroll-stage";
 import { Hero } from "@/components/site/sections/hero";
 import { SelectedWork } from "@/components/site/sections/work";
 import { ServicesSection } from "@/components/site/sections/services";
@@ -10,6 +11,7 @@ import { ProcessSection } from "@/components/site/sections/process";
 import { AudienceSection } from "@/components/site/sections/audience";
 import { StudioSection } from "@/components/site/sections/studio";
 import { AboutPreview } from "@/components/site/sections/about-preview";
+import { FinalCta } from "@/components/site/sections/final-cta";
 
 export const metadata: Metadata = {
   title: "WENOV8 | AI Video Production & Creative Marketing",
@@ -56,22 +58,32 @@ function JsonLd() {
   );
 }
 
+/**
+ * The WENOV8 homepage — one continuous cinematic journey through the
+ * creative machine. Seven chapters over a persistent WebGL scene:
+ * intro → work → services → process → studio → about → contact.
+ * All content is real DOM (crawlable, accessible); the 3D canvas is a
+ * progressive enhancement behind it.
+ */
 export default function HomePage() {
   return (
     <>
       <JsonLd />
       <SiteHeader />
-      <main>
-        <Hero />
-        <SelectedWork />
-        <ServicesSection />
-        <WhySection />
-        <ProcessSection />
-        <AudienceSection />
-        <StudioSection />
-        <AboutPreview />
-      </main>
-      <SiteFooter />
+      <ScrollStage>
+        <main>
+          <Hero />
+          <SelectedWork />
+          <ServicesSection />
+          <WhySection />
+          <ProcessSection />
+          <AudienceSection />
+          <StudioSection />
+          <AboutPreview />
+          <FinalCta />
+        </main>
+        <SiteFooter />
+      </ScrollStage>
     </>
   );
 }

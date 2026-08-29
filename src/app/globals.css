@@ -162,6 +162,28 @@
 @media (min-width: 768px) {
   .w8-section { padding-block: 7.5rem; }
 }
+/* cinematic chapters: taller so the camera has room to travel */
+.w8-section-pad { padding-block: 6.5rem; }
+@media (min-width: 768px) {
+  .w8-section-pad { padding-block: 9rem; }
+}
+
+/* ── scrim: keeps text readable over the 3D scene ──────────────────────── */
+.w8-scrim { position: relative; background: rgba(10, 10, 11, 0.72); }
+.w8-scrim::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    var(--w8-ink),
+    rgba(10, 10, 11, 0.66) 14%,
+    rgba(10, 10, 11, 0.66) 86%,
+    var(--w8-ink)
+  );
+}
+.w8-scrim > * { position: relative; }
 
 .w8-dark { background: var(--w8-ink); color: var(--w8-text-hi); }
 .w8-darker { background: #060607; color: var(--w8-text-hi); }
@@ -347,4 +369,84 @@
 .w8-link:focus-visible {
   outline: 2px solid var(--w8-lime);
   outline-offset: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WENOV8 — cinematic pixel layer (homepage experience)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* pixel cursor: hide native cursor on the marketing homepage (desktop) */
+body.w8-pixel-cursor,
+body.w8-pixel-cursor a,
+body.w8-pixel-cursor button,
+body.w8-pixel-cursor [data-cursor] {
+  cursor: none !important;
+}
+
+/* active pixel elements blink like a machine heartbeat */
+@keyframes w8-blink {
+  0%, 55% { opacity: 1; }
+  56%, 100% { opacity: 0.45; }
+}
+.w8-blink {
+  animation: w8-blink 1.6s steps(1, end) infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-blink { animation: none; }
+}
+
+/* intro overlay fade-out */
+@keyframes w8-intro-out {
+  to { opacity: 0; visibility: hidden; }
+}
+.w8-intro-fade {
+  animation: w8-intro-out 0.45s ease 2.15s forwards;
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-intro-fade { animation: none; }
+}
+
+/* hero fallback dims once the live WebGL scene takes over */
+.w8-hero-fallback {
+  transition: opacity 1.2s ease 0.2s;
+}
+body.w8-scene-on .w8-hero-fallback {
+  opacity: 0.34;
+}
+
+/* ── atmosphere: scanlines + animated grain ─────────────────────────────── */
+.w8-scanlines {
+  background: repeating-linear-gradient(
+    0deg,
+    rgba(255, 255, 255, 0.026) 0px,
+    rgba(255, 255, 255, 0.026) 1px,
+    transparent 1px,
+    transparent 3px
+  );
+  opacity: 0.7;
+}
+
+.w8-grain-anim {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  animation: w8-grain 0.9s steps(4, end) infinite;
+}
+@keyframes w8-grain {
+  0% { background-position: 0 0; }
+  25% { background-position: -40px 60px; }
+  50% { background-position: 60px -40px; }
+  75% { background-position: -60px -60px; }
+  100% { background-position: 40px 40px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-grain-anim { animation: none; }
+}
+
+/* crisp pixel rendering for canvas labels */
+canvas { image-rendering: auto; }
+.w8-shell canvas { image-rendering: pixelated; }
+
+/* selection */
+::selection {
+  background: var(--w8-lime);
+  color: var(--w8-ink);
 }

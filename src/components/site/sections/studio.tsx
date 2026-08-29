@@ -1,7 +1,10 @@
+"use client";
+
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { Reveal, RevealGroup, RevealItem } from "../reveal";
-import { SectionHeading } from "./work";
+import { ConvergeCanvas } from "../pixel/converge-canvas";
+import { PixelText } from "../pixel/pixel-text";
 
 /**
  * Real capabilities of the in-house WENOV8 AI Studio (all of these tools
@@ -16,28 +19,42 @@ const STUDIO_TOOLS = [
   "Auto-publish scheduling",
 ];
 
-/** Your AI Creative Studio — dark feature section. */
+/**
+ * Chapter 05 — THE AI ENGINE / YOUR AI CREATIVE STUDIO.
+ * The signature transition: pixel particles converge and assemble the
+ * "AI STUDIO" wordmark (scroll-linked), echoing the 3D core behind.
+ * Links straight into the real application at /studio.
+ */
 export function StudioSection() {
   return (
-    <section className="relative w8-darker w8-section overflow-hidden">
-      {/* ambient shape */}
+    <section
+      id="studio"
+      data-chapter="studio"
+      className="relative w8-scrim w8-section-pad overflow-hidden"
+    >
+      {/* ghost chapter number */}
       <div
         aria-hidden
-        className="absolute -top-40 -right-40 w-[520px] h-[520px] rounded-full"
-        style={{
-          background:
-            "radial-gradient(closest-side, rgba(198,241,53,0.07), transparent)",
-        }}
-      />
+        className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
+      >
+        <PixelText text="05" cell={14} color="#f4f3ee" />
+      </div>
 
       <div className="w8-shell relative">
+        {/* the convergence wordmark */}
+        <ConvergeCanvas text="AI STUDIO" cell={7} className="mb-12 md:mb-16" />
+
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
-            <SectionHeading
-              eyebrow="AI Studio"
-              title="Your AI Creative Studio"
-              intro="Create, experiment, and produce AI-powered video content with the WENOV8 creative platform."
-            />
+            <Reveal>
+              <p className="w8-eyebrow w8-accent mb-4">The AI Engine</p>
+              <h2 className="w8-h2 text-balance">Your AI Creative Studio</h2>
+              <p className="w8-lead w8-muted-hi mt-5">
+                Create, experiment, and produce AI-powered video content
+                with the WENOV8 creative platform — the same engine that
+                produces every piece of work on this page.
+              </p>
+            </Reveal>
 
             <Reveal delay={0.1} className="mt-8">
               <ul className="grid sm:grid-cols-2 gap-x-6 gap-y-3">
@@ -56,21 +73,22 @@ export function StudioSection() {
 
             <Reveal delay={0.15} className="mt-9">
               <div className="flex flex-wrap gap-4">
-                <Link href="/studio" className="w8-btn w8-btn-primary">
+                <Link
+                  href="/studio"
+                  className="w8-btn w8-btn-primary"
+                  data-cursor="open"
+                >
                   Open AI Studio
                   <ArrowRight size={17} strokeWidth={2.2} />
                 </Link>
-                <Link
-                  href="/ai-avatar-video"
-                  className="w8-btn w8-btn-ghost-hi"
-                >
+                <Link href="/ai-avatar-video" className="w8-btn w8-btn-ghost-hi">
                   About AI Avatars
                 </Link>
               </div>
             </Reveal>
           </div>
 
-          {/* visual: real studio preview */}
+          {/* real studio output — actual platform-produced stills */}
           <Reveal delay={0.1}>
             <RevealGroup
               stagger={0.07}
@@ -91,7 +109,10 @@ export function StudioSection() {
                 },
               ].map((shot) => (
                 <RevealItem key={shot.src}>
-                  <div className="relative rounded-xl overflow-hidden aspect-[9/16] border border-white/10">
+                  <div
+                    data-cursor="view"
+                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#c6f135]/40 transition-colors duration-500"
+                  >
                     <img
                       src={shot.src}
                       alt={shot.alt}
@@ -104,6 +125,10 @@ export function StudioSection() {
                 </RevealItem>
               ))}
             </RevealGroup>
+            <p className="mt-4 text-xs w8-muted-hi">
+              Stills from videos produced end-to-end in the studio —
+              no stock, no mockups.
+            </p>
           </Reveal>
         </div>
       </div>

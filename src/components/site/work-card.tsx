@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Play, ArrowUpRight } from "lucide-react";
 import type { PortfolioItem } from "@/lib/site/portfolio";
+import { PixelDissolve } from "./pixel/pixel-dissolve";
 
 /**
  * Portfolio tile — poster image by default, video preview on hover/tap.
@@ -54,6 +55,9 @@ export function WorkCard({
         decoding="async"
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
       />
+
+      {/* pixel dissolve entrance */}
+      <PixelDissolve />
 
       {/* video layer (only for video items) */}
       {item.kind === "video" && (

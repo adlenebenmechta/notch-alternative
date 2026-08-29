@@ -1,5 +1,7 @@
-import { Reveal, RevealGroup, RevealItem } from "../reveal";
-import { SectionHeading } from "./work";
+"use client";
+
+import { Reveal } from "../reveal";
+import { PixelText } from "../pixel/pixel-text";
 
 const BENEFITS = [
   {
@@ -20,34 +22,53 @@ const BENEFITS = [
   },
 ];
 
-/** Why WENOV8 — editorial numbered benefits on dark. */
+/**
+ * WHY AI-POWERED PRODUCTION — four cinematic statement scenes.
+ * Typographic and quiet by design (contrast to the 3D chapters):
+ * huge pixel numbers, bold statements, breathing room.
+ */
 export function WhySection() {
   return (
-    <section className="w8-dark w8-section">
-      <div className="w8-shell">
-        <SectionHeading
-          eyebrow="Why WENOV8"
-          title="Why Brands Use AI-Powered Production"
-        />
+    <section
+      id="why"
+      data-chapter="services"
+      className="relative w8-scrim w8-section-pad"
+    >
+      <div className="w8-shell relative">
+        <Reveal className="max-w-3xl">
+          <p className="w8-eyebrow w8-accent mb-4">Why AI-Powered Production</p>
+          <h2 className="w8-h2 text-balance">
+            The production advantage of AI.
+          </h2>
+        </Reveal>
 
-        <RevealGroup className="mt-12 md:mt-16 grid md:grid-cols-2 gap-px bg-white/10 rounded-2xl overflow-hidden border border-white/10">
+        <div className="mt-14 md:mt-20 divide-y divide-white/10 border-y border-white/10">
           {BENEFITS.map((b, i) => (
-            <RevealItem key={b.title} className="bg-[#0a0a0b]">
-              <div className="h-full p-7 md:p-10 hover:bg-[#121214] transition-colors duration-500">
-                <p
-                  className="w8-eyebrow w8-accent"
-                  style={{ fontFamily: "var(--w8-font-display)" }}
-                >
-                  {String(i + 1).padStart(2, "0")}
-                </p>
-                <h3 className="w8-h3 mt-4">{b.title}</h3>
-                <p className="w8-muted-hi text-sm w8-body mt-3 max-w-md">
-                  {b.text}
-                </p>
+            <Reveal key={b.title} delay={0.05}>
+              <div className="group grid md:grid-cols-12 gap-4 md:gap-8 py-9 md:py-12 items-start">
+                <div className="md:col-span-3 flex md:flex-col items-center md:items-start gap-4 transition-opacity duration-500 group-hover:opacity-100 opacity-70">
+                  <PixelText
+                    text={String(i + 1).padStart(2, "0")}
+                    cell={4}
+                    color="#6d6d74"
+                  />
+                  <span
+                    aria-hidden
+                    className="hidden md:block h-px w-12 bg-[#c6f135]/0 group-hover:bg-[#c6f135]/60 transition-colors duration-500"
+                  />
+                </div>
+                <div className="md:col-span-9">
+                  <h3 className="w8-h3 md:text-2xl lg:text-[1.75rem] group-hover:text-[#c6f135] transition-colors duration-300">
+                    {b.title}
+                  </h3>
+                  <p className="w8-muted-hi text-sm md:text-[15px] w8-body mt-3 max-w-2xl">
+                    {b.text}
+                  </p>
+                </div>
               </div>
-            </RevealItem>
+            </Reveal>
           ))}
-        </RevealGroup>
+        </div>
       </div>
     </section>
   );

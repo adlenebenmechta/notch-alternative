@@ -3,8 +3,9 @@ import { ArrowUpRight } from "lucide-react";
 import { FEATURED_WORK } from "@/lib/site/portfolio";
 import { WorkCard } from "../work-card";
 import { Reveal, RevealGroup, RevealItem } from "../reveal";
+import { PixelText } from "../pixel/pixel-text";
 
-/** Section heading lockup. */
+/** Section heading lockup — cinematic edition. */
 export function SectionHeading({
   eyebrow,
   title,
@@ -31,16 +32,32 @@ export function SectionHeading({
   );
 }
 
-/** Selected Work — horizontal rail on mobile, editorial grid on desktop. */
+/**
+ * Chapter 02 — SELECTED WORK.
+ * A cinematic gallery over the 3D corridor. Each card materializes
+ * through a pixel dissolve; hover previews the real video.
+ */
 export function SelectedWork() {
   return (
-    <section id="work" className="w8-dark w8-section">
-      <div className="w8-shell">
+    <section
+      id="work"
+      data-chapter="work"
+      className="relative w8-scrim w8-section-pad"
+    >
+      {/* ghost chapter number */}
+      <div
+        aria-hidden
+        className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
+      >
+        <PixelText text="02" cell={14} color="#f4f3ee" />
+      </div>
+
+      <div className="w8-shell relative">
         <div className="flex flex-wrap items-end justify-between gap-6 mb-10 md:mb-14">
           <SectionHeading
             eyebrow="Selected Work"
             title="Creative work, produced with AI."
-            intro="A selection of creative work produced for brands, products, and marketing campaigns."
+            intro="A selection of creative work produced for brands, products, and marketing campaigns — every piece made with the WENOV8 AI production workflow."
           />
           <Reveal delay={0.15}>
             <Link
@@ -57,7 +74,9 @@ export function SelectedWork() {
         <RevealGroup className="w8-rail md:grid md:grid-cols-3 lg:grid-cols-5 md:gap-5 !gap-4 pb-2 md:pb-0 -mx-5 px-5 md:mx-0 md:px-0">
           {FEATURED_WORK.map((item) => (
             <RevealItem key={item.src} className="w-[68vw] sm:w-[44vw] md:w-auto">
-              <WorkCard item={item} />
+              <div data-cursor="view">
+                <WorkCard item={item} />
+              </div>
             </RevealItem>
           ))}
         </RevealGroup>
