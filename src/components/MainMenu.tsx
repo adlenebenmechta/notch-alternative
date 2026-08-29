@@ -1335,16 +1335,16 @@ export default function MainMenu({
       description: t("menu.bof-videos-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#9AFF01" strokeWidth="2.5" fill="none" />
-          <path d="M18 18l8 4-8 4V18z" fill="#9AFF01" opacity="0.8" />
-          <path d="M4 40h40" stroke="#9AFF01" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="10" cy="44" r="3" stroke="#9AFF01" strokeWidth="1.5" fill="none" />
+          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#7DD3FC" strokeWidth="2.5" fill="none" />
+          <path d="M18 18l8 4-8 4V18z" fill="#7DD3FC" opacity="0.8" />
+          <path d="M4 40h40" stroke="#7DD3FC" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="10" cy="44" r="3" stroke="#7DD3FC" strokeWidth="1.5" fill="none" />
           <circle cx="24" cy="44" r="3" stroke="#E461AD" strokeWidth="1.5" fill="none" />
           <circle cx="38" cy="44" r="3" stroke="#16B1DE" strokeWidth="1.5" fill="none" />
           <path d="M36 4l4 4m0-4l-4 4" stroke="#E461AD" strokeWidth="2" strokeLinecap="round" />
         </svg>
       ),
-      accentColor: "#9AFF01",
+      accentColor: "#7DD3FC",
     },
     {
       id: "claymotion-videos-machine",

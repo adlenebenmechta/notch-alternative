@@ -88,7 +88,7 @@ export default function DownloadPage() {
           <span style={{
             display: "inline-block",
             backgroundColor: file.label.includes("Part") ? "rgba(154,255,1,0.15)" : "rgba(228,97,173,0.15)",
-            color: file.label.includes("Part") ? "#9AFF01" : "#E461AD",
+            color: file.label.includes("Part") ? "#7DD3FC" : "#E461AD",
             fontSize: 11, fontWeight: 600, padding: "2px 8px", borderRadius: 6
           }}>
             {file.label}
@@ -102,7 +102,7 @@ export default function DownloadPage() {
         onClick={() => handleDownload(file)}
         disabled={downloading !== null}
         style={{
-          backgroundColor: downloading === file.name ? "#9AFF01" : "#E461AD",
+          backgroundColor: downloading === file.name ? "#7DD3FC" : "#E461AD",
           color: downloading === file.name ? "#0A0A0A" : "#fff",
           border: "none", borderRadius: 12,
           padding: "10px 20px", fontSize: 13, fontWeight: 700,
@@ -132,7 +132,7 @@ export default function DownloadPage() {
             onClick={() => setActiveTab("full")}
             style={{
               flex: 1, padding: "12px 16px", borderRadius: 12, border: "none",
-              backgroundColor: activeTab === "full" ? "#9AFF01" : "#1A1A1A",
+              backgroundColor: activeTab === "full" ? "#7DD3FC" : "#1A1A1A",
               color: activeTab === "full" ? "#0A0A0A" : "#9CA3AF",
               fontWeight: 700, fontSize: 13, cursor: "pointer"
             }}
@@ -159,7 +159,7 @@ export default function DownloadPage() {
               backgroundColor: "rgba(154,255,1,0.08)", border: "1px solid rgba(154,255,1,0.2)",
               borderRadius: 12, padding: 16, marginBottom: 20
             }}>
-              <p style={{ color: "#9AFF01", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
+              <p style={{ color: "#7DD3FC", fontSize: 13, fontWeight: 600, marginBottom: 8 }}>
                 FULL PROJECT — Complete without any reduction
               </p>
               <p style={{ color: "#9CA3AF", fontSize: 12, marginBottom: 8 }}>
@@ -179,11 +179,11 @@ export default function DownloadPage() {
                 After downloading both parts:
               </p>
               <div style={{ backgroundColor: "#0A0A0A", borderRadius: 8, padding: 12, fontFamily: "monospace", fontSize: 11 }}>
-                <p style={{ color: "#9AFF01", marginBottom: 4 }}># Windows (Command Prompt):</p>
+                <p style={{ color: "#7DD3FC", marginBottom: 4 }}># Windows (Command Prompt):</p>
                 <p style={{ color: "#E0E0E0", marginBottom: 8 }}>copy /b ai-avatar-machine-full-part1.zip+ai-avatar-machine-full-part2.zip ai-avatar-machine-FULL.zip</p>
-                <p style={{ color: "#9AFF01", marginBottom: 4 }}># Mac / Linux:</p>
+                <p style={{ color: "#7DD3FC", marginBottom: 4 }}># Mac / Linux:</p>
                 <p style={{ color: "#E0E0E0", marginBottom: 8 }}>cat ai-avatar-machine-full-part1.zip ai-avatar-machine-full-part2.zip &gt; ai-avatar-machine-FULL.zip</p>
-                <p style={{ color: "#9AFF01", marginBottom: 4 }}># Then extract normally — no need for npm install!</p>
+                <p style={{ color: "#7DD3FC", marginBottom: 4 }}># Then extract normally — no need for npm install!</p>
               </div>
             </div>
 

@@ -31,7 +31,7 @@ export default function ServicesPage() {
             className="absolute -top-32 left-1/3 w-[520px] h-[520px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(198,241,53,0.06), transparent)",
+                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
             }}
           />
           <div className="w8-shell relative">

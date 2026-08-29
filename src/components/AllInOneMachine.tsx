@@ -1762,7 +1762,7 @@ function AutoCaptionsPage({ onBack }: { onBack: () => void }) {
           font_name: "Montserrat",
           font_weight: "bold",
           font_color: "white",
-          highlight_color: "#9AFF01",
+          highlight_color: "#7DD3FC",
           enable_animation: true,
           animation_style: "pop",
           words_per_subtitle: 2,

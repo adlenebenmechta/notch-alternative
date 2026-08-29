@@ -6,7 +6,7 @@ import { useAuth } from "@/providers/auth-provider";
 const COLORS = {
   pink: "#E461AD",
   cyan: "#16B1DE",
-  lime: "#9AFF01",
+  lime: "#7DD3FC",
   bg: "#0A0A0A",
   cardBg: "#111111",
   cardBorder: "#1E1E1E",

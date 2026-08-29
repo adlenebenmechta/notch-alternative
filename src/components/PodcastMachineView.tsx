@@ -1777,7 +1777,7 @@ export default function PodcastMachineView({ onBack, isAdmin = false }: PodcastM
                     <div className="flex items-center gap-1.5 ml-2">
                       <span className="text-[9px] uppercase" style={{ color: C.textMuted }}>HL:</span>
                       {["yellow", "cyan", "lime", "pink", "white", "orange"].map((c) => (
-                        <button key={c} onClick={() => setSubHighlightColor(c)} className="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 cursor-pointer" style={{ backgroundColor: c === "pink" ? "#E461AD" : c === "lime" ? "#9AFF01" : c === "orange" ? "#F59E0B" : c, borderColor: subHighlightColor === c ? C.dark : "transparent", transform: subHighlightColor === c ? "scale(1.15)" : "scale(1)" }} />
+                        <button key={c} onClick={() => setSubHighlightColor(c)} className="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 cursor-pointer" style={{ backgroundColor: c === "pink" ? "#E461AD" : c === "lime" ? "#7DD3FC" : c === "orange" ? "#F59E0B" : c, borderColor: subHighlightColor === c ? C.dark : "transparent", transform: subHighlightColor === c ? "scale(1.15)" : "scale(1)" }} />
                       ))}
                     </div>
                   </div>

@@ -68,7 +68,7 @@ export function ServicePageTemplate({ service }: { service: Service }) {
             className="absolute -top-32 right-0 w-[480px] h-[480px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(198,241,53,0.06), transparent)",
+                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
             }}
           />
           <div className="w8-shell relative">

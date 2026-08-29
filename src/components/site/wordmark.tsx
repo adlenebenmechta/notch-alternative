@@ -1,8 +1,10 @@
 import Link from "next/link";
 
 /**
- * Typographic WENOV8 wordmark — "8" in signal lime.
- * `onLight` swaps the lime for the accessible deep variant.
+ * Typographic WENOV8 wordmark — "8" in signal light-blue.
+ * Always sets an explicit text color so the mark is readable on any
+ * surface (the header floats transparent over the dark hero).
+ * `onLight` swaps to the accessible deep variant.
  */
 export function Wordmark({
   onLight = false,
@@ -14,10 +16,17 @@ export function Wordmark({
   return (
     <span
       className={`font-semibold tracking-tight ${className}`}
-      style={{ fontFamily: "var(--w8-font-display)" }}
+      style={{
+        fontFamily: "var(--w8-font-display)",
+        color: onLight ? "var(--w8-text-lo)" : "var(--w8-text-hi)",
+      }}
     >
       WENOV
-      <span style={{ color: onLight ? "var(--w8-lime-deep)" : "var(--w8-lime)" }}>
+      <span
+        style={{
+          color: onLight ? "var(--w8-signal-deep)" : "var(--w8-signal)",
+        }}
+      >
         8
       </span>
     </span>
@@ -43,7 +52,7 @@ export function LogoLink({
         className="flex items-center justify-center w-9 h-9 rounded-lg font-black text-[15px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
         style={{
           background: onLight ? "var(--w8-ink)" : "var(--w8-text-hi)",
-          color: onLight ? "var(--w8-lime)" : "var(--w8-ink)",
+          color: onLight ? "var(--w8-signal)" : "var(--w8-ink)",
           fontFamily: "var(--w8-font-display)",
         }}
       >

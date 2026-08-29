@@ -15,9 +15,9 @@ export function Hero() {
     <section
       data-chapter="intro"
       id="intro"
-      className="relative min-h-[105svh] flex flex-col overflow-hidden bg-[#0a0a0b]"
+      className="relative min-h-[105svh] flex flex-col overflow-hidden bg-transparent text-[#f5f4ef]"
     >
-      {/* instant pre-3D backdrop — fades away once the WebGL scene is live */}
+      {/* instant pre-3D backdrop — fades away completely once the WebGL scene is live */}
       <div className="absolute inset-0 w8-hero-fallback" aria-hidden>
         <img
           src="/posters/hero-promo.jpg"
@@ -28,13 +28,18 @@ export function Hero() {
         <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0b]/85 via-[#0a0a0b]/60 to-[#0a0a0b]" />
         <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0b]/85 via-transparent to-[#0a0a0b]/30" />
       </div>
+      {/* readability scrim over the 3D scene — always on */}
+      <div
+        aria-hidden
+        className="absolute inset-0 bg-gradient-to-b from-[#0a0a0b]/70 via-[#0a0a0b]/25 to-[#0a0a0b]/80"
+      />
 
       {/* content */}
       <div className="relative z-10 flex-1 flex flex-col justify-center pt-36 pb-20 md:pt-44">
         <div className="w8-shell">
           <div className="flex items-center gap-4 mb-7">
-            <PixelText text="01" cell={3} color="#c6f135" className="w8-blink" />
-            <span className="h-px w-10 bg-[#c6f135]/50" aria-hidden />
+            <PixelText text="01" cell={3} color="#7dd3fc" className="w8-blink" />
+            <span className="h-px w-10 bg-[#7dd3fc]/50" aria-hidden />
             <p className="w8-eyebrow w8-accent">The Creative Machine</p>
           </div>
 
@@ -61,7 +66,7 @@ export function Hero() {
             </Link>
           </div>
 
-          <p className="mt-10 text-xs w8-muted-hi tracking-wide">
+          <p className="mt-10 text-xs w8-muted-hi tracking-wide w8-pixel">
             WENOV8 LLC — Creative technology company · Wyoming, United States
           </p>
         </div>
@@ -83,11 +88,10 @@ export function Hero() {
               ].map((cap) => (
                 <span
                   key={cap + copy}
-                  className="flex items-center gap-10 text-sm text-[#9b9ba2] whitespace-nowrap"
-                  style={{ fontFamily: "var(--w8-font-display)" }}
+                  className="w8-pixel flex items-center gap-10 text-sm text-[#9b9ba2] whitespace-nowrap"
                 >
                   {cap}
-                  <span className="w-1 h-1 bg-[#C6F135]/60" aria-hidden />
+                  <span className="w-1 h-1 bg-[#7DD3FC]/60" aria-hidden />
                 </span>
               ))}
             </div>

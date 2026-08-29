@@ -63,7 +63,7 @@ export function StudioSection() {
                     <Check
                       size={15}
                       className="mt-0.5 shrink-0"
-                      style={{ color: "var(--w8-lime)" }}
+                      style={{ color: "var(--w8-signal)" }}
                     />
                     <span className="w8-muted-hi">{tool}</span>
                   </li>
@@ -111,7 +111,7 @@ export function StudioSection() {
                 <RevealItem key={shot.src}>
                   <div
                     data-cursor="view"
-                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#c6f135]/40 transition-colors duration-500"
+                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#7dd3fc]/40 transition-colors duration-500"
                   >
                     <img
                       src={shot.src}

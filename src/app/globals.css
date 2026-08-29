@@ -132,14 +132,21 @@
   --w8-ink-3: #1a1a1e;
   --w8-bone: #f4f3ee;
   --w8-paper: #ffffff;
-  --w8-lime: #c6f135;
-  --w8-lime-deep: #55661a;
+  --w8-signal: #7dd3fc;
+  --w8-signal-deep: #2563eb;
   --w8-text-hi: #f5f4ef;
   --w8-text-lo: #0e0e10;
   --w8-muted-hi: #9b9ba2;
   --w8-muted-lo: #6d6d74;
   --w8-line-hi: rgba(255, 255, 255, 0.1);
   --w8-line-lo: rgba(10, 10, 11, 0.1);
+}
+
+/* Font tokens must live on <body>: they reference the next/font variables
+   (--font-sora, --font-geist-sans) which are scoped to <body> — custom
+   properties resolve var() at their definition scope, so defining these
+   on :root would silently fall back to system fonts. */
+body {
   --w8-font-display: var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
 
@@ -169,7 +176,12 @@
 }
 
 /* ── scrim: keeps text readable over the 3D scene ──────────────────────── */
-.w8-scrim { position: relative; background: rgba(10, 10, 11, 0.72); }
+/* NOTE: also sets the light text color — sections using the scrim are dark. */
+.w8-scrim {
+  position: relative;
+  background: rgba(10, 10, 11, 0.72);
+  color: var(--w8-text-hi);
+}
 .w8-scrim::before {
   content: "";
   position: absolute;
@@ -191,12 +203,20 @@
 .w8-paper { background: var(--w8-paper); color: var(--w8-text-lo); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
+/* Eyebrows use the Minecraft pixel font — the machine's label maker.
+   NOTE: resolved at usage point because --font-minecraft lives on <body>. */
 .w8-eyebrow {
-  font-family: var(--w8-font-display);
-  font-size: 0.6875rem;
-  font-weight: 600;
-  letter-spacing: 0.22em;
+  font-family: var(--font-minecraft), "Minecraft", "Segoe UI", ui-monospace, monospace;
+  font-size: 0.75rem;
+  font-weight: 400;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
+}
+
+/* Utility: pixel font for selected micro-copy (REC, ON AIR, footnotes…). */
+.w8-pixel {
+  font-family: var(--font-minecraft), "Minecraft", "Segoe UI", ui-monospace, monospace;
+  letter-spacing: 0.08em;
 }
 
 .w8-h1 {
@@ -231,8 +251,8 @@
 .w8-body { line-height: 1.7; }
 
 /* ── accents ─────────────────────────────────────────────────────────────── */
-.w8-accent { color: var(--w8-lime); }
-.w8-accent-lo { color: var(--w8-lime-deep); }
+.w8-accent { color: var(--w8-signal); }
+.w8-accent-lo { color: var(--w8-signal-deep); }
 .w8-muted-hi { color: var(--w8-muted-hi); }
 .w8-muted-lo { color: var(--w8-muted-lo); }
 
@@ -257,10 +277,10 @@
 .w8-btn:active { transform: scale(0.98); }
 
 .w8-btn-primary {
-  background: var(--w8-lime);
+  background: var(--w8-signal);
   color: var(--w8-ink);
 }
-.w8-btn-primary:hover { transform: translateY(-2px); background: #d3f954; }
+.w8-btn-primary:hover { transform: translateY(-2px); background: #a8e2ff; }
 
 .w8-btn-invert {
   background: var(--w8-text-hi);
@@ -295,7 +315,7 @@
   border-radius: 1.25rem;
   transition: border-color 0.35s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s;
 }
-.w8-card-hi:hover { border-color: rgba(198, 241, 53, 0.35); transform: translateY(-4px); }
+.w8-card-hi:hover { border-color: rgba(125, 211, 252, 0.35); transform: translateY(-4px); }
 
 .w8-card-lo {
   background: var(--w8-paper);
@@ -367,8 +387,56 @@
 /* ── focus visibility ────────────────────────────────────────────────────── */
 .w8-btn:focus-visible,
 .w8-link:focus-visible {
-  outline: 2px solid var(--w8-lime);
+  outline: 2px solid var(--w8-signal);
   outline-offset: 3px;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WENOV8 — route transitions
+   template.tsx remounts per navigation: the veil masks the swap and the
+   light-blue scanline sweeps once. Content fades in beneath.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@keyframes w8-page-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.w8-page-enter {
+  animation: w8-page-in 0.5s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes w8-veil-out {
+  from { opacity: 1; }
+  to { opacity: 0; visibility: hidden; }
+}
+.w8-route-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  pointer-events: none;
+  background: #060607;
+  animation: w8-veil-out 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@keyframes w8-veil-sweep {
+  from { top: -2px; opacity: 1; }
+  to { top: 100%; opacity: 0.35; }
+}
+.w8-route-veil-line {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  height: 2px;
+  background: linear-gradient(to right, transparent, var(--w8-signal), transparent);
+  animation: w8-veil-sweep 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w8-page-enter { animation: none; }
+  .w8-route-veil,
+  .w8-route-veil-line { animation: none; }
+  .w8-route-veil { opacity: 0; visibility: hidden; }
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
@@ -406,12 +474,12 @@ body.w8-pixel-cursor [data-cursor] {
   .w8-intro-fade { animation: none; }
 }
 
-/* hero fallback dims once the live WebGL scene takes over */
+/* hero fallback: fully hands over to the live WebGL studio scene */
 .w8-hero-fallback {
   transition: opacity 1.2s ease 0.2s;
 }
 body.w8-scene-on .w8-hero-fallback {
-  opacity: 0.34;
+  opacity: 0;
 }
 
 /* ── atmosphere: scanlines + animated grain ─────────────────────────────── */
@@ -447,6 +515,6 @@ canvas { image-rendering: auto; }
 
 /* selection */
 ::selection {
-  background: var(--w8-lime);
+  background: var(--w8-signal);
   color: var(--w8-ink);
 }

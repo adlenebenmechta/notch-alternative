@@ -21,7 +21,7 @@ import NotchAltView from "@/components/NotchAltView";
 // ─── Colors (matching the existing design) ────────────────────────────────────
 
 const C = {
-  lime: "#9AFF01",
+  lime: "#7DD3FC",
   pink: "#E461AD",
   cyan: "#16B1DE",
   dark: "#0A0A0A",

@@ -164,7 +164,7 @@ function ProgressHairline() {
     <motion.div
       aria-hidden
       className="fixed top-0 left-0 right-0 h-[2px] z-[60] origin-left"
-      style={{ scaleX, background: "linear-gradient(to right, #55661a, #c6f135)" }}
+      style={{ scaleX, background: "linear-gradient(to right, #2563eb, #7dd3fc)" }}
     />
   );
 }

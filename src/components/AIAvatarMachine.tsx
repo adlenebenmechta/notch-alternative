@@ -35,7 +35,7 @@ interface Scene {
 // ─── Colors (holystrips.com style) ────────────────────────────────────────────
 
 const C = {
-  lime: "#9AFF01",
+  lime: "#7DD3FC",
   pink: "#E461AD",
   cyan: "#16B1DE",
   dark: "#0A0A0A",
@@ -179,7 +179,7 @@ function EyeIcon({ open, size = 16 }: { open: boolean; size?: number }) {
 // ─── Dark Theme Colors ──────────────────────────────────────────────────────
 
 const DC = {
-  lime: "#9AFF01",
+  lime: "#7DD3FC",
   pink: "#E461AD",
   cyan: "#16B1DE",
   dark: "#0A0A0A",
@@ -5275,7 +5275,7 @@ export default function AIAvatarMachine({ isAdmin = false, theme = "light", init
                             onClick={() => setSubHighlightColor(c)}
                             className="w-6 h-6 rounded-full border-2 transition-all hover:scale-110 cursor-pointer"
                             style={{
-                              backgroundColor: c === "pink" ? "#E461AD" : c === "lime" ? "#9AFF01" : c === "orange" ? "#F59E0B" : c,
+                              backgroundColor: c === "pink" ? "#E461AD" : c === "lime" ? "#7DD3FC" : c === "orange" ? "#F59E0B" : c,
                               borderColor: subHighlightColor === c ? T.dark : "transparent",
                               transform: subHighlightColor === c ? "scale(1.15)" : "scale(1)",
                             }}

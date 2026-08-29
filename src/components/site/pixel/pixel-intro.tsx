@@ -110,7 +110,7 @@ export function PixelIntro() {
           const x = p.x0 + (p.tx - p.x0) * conv;
           const y = p.y0 + (p.ty - p.y0) * conv;
           ctx.globalAlpha = appear * (0.55 + 0.45 * conv);
-          ctx.fillStyle = p.lime ? "#c6f135" : "#f4f3ee";
+          ctx.fillStyle = p.lime ? "#7dd3fc" : "#f4f3ee";
           const s = p.sz * (1 + (1 - conv) * 0.8);
           ctx.fillRect(x, y, s, s);
         }

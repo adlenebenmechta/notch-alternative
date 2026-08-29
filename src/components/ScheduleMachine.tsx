@@ -13,7 +13,7 @@ const C = {
   pink: "#E461AD",
   cyan: "#16B1DE",
   gold: "#C9A96E",
-  lime: "#9AFF01",
+  lime: "#7DD3FC",
   dark: "#0A0A0A",
   text: "#1A1A2E",
   textMuted: "#6B7280",

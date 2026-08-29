@@ -89,7 +89,7 @@ export function ProcessSection() {
                 className="h-full origin-left"
                 style={{
                   scaleX: reduce ? 1 : lineScale,
-                  background: "linear-gradient(to right, #55661a, #c6f135)",
+                  background: "linear-gradient(to right, #2563eb, #7dd3fc)",
                 }}
               />
             </div>
@@ -111,13 +111,13 @@ export function ProcessSection() {
                   {/* pixel node */}
                   <span
                     aria-hidden
-                    className="block w-[15px] h-[15px] bg-[#0a0a0b] border-2 border-[#c6f135] mb-6"
+                    className="block w-[15px] h-[15px] bg-[#0a0a0b] border-2 border-[#7dd3fc] mb-6"
                     style={{ boxShadow: "0 0 0 4px rgba(10,10,11,0.9)" }}
                   />
                   {/* storyboard panel */}
                   <div className="border border-white/12 bg-[#0d0d10]/80 p-4 h-full">
                     <div className="flex items-center justify-between mb-3">
-                      <PixelText text={step.n} cell={2} color="#c6f135" />
+                      <PixelText text={step.n} cell={2} color="#7dd3fc" />
                       <span className="text-[8px] tracking-[0.2em] text-white/40 font-bold">
                         {step.tag}
                       </span>
@@ -144,7 +144,7 @@ export function ProcessSection() {
                 className="w-full h-full origin-top"
                 style={{
                   scaleY: reduce ? 1 : lineScaleY,
-                  background: "linear-gradient(to bottom, #55661a, #c6f135)",
+                  background: "linear-gradient(to bottom, #2563eb, #7dd3fc)",
                 }}
               />
             </div>
@@ -164,11 +164,11 @@ export function ProcessSection() {
                 >
                   <span
                     aria-hidden
-                    className="absolute left-0 top-1 block w-[15px] h-[15px] bg-[#0a0a0b] border-2 border-[#c6f135]"
+                    className="absolute left-0 top-1 block w-[15px] h-[15px] bg-[#0a0a0b] border-2 border-[#7dd3fc]"
                   />
                   <div className="border border-white/12 bg-[#0d0d10]/80 p-4">
                     <div className="flex items-center justify-between mb-2">
-                      <PixelText text={step.n} cell={2} color="#c6f135" />
+                      <PixelText text={step.n} cell={2} color="#7dd3fc" />
                       <span className="text-[8px] tracking-[0.2em] text-white/40 font-bold">
                         {step.tag}
                       </span>

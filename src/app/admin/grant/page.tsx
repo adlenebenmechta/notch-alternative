@@ -329,7 +329,7 @@ export default function AdminGrantPage() {
                       color: "#FFFFFF",
                       border: "1px solid #2E2E2E",
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#9AFF01")}
+                    onFocus={(e) => (e.target.style.borderColor = "#7DD3FC")}
                     onBlur={(e) => (e.target.style.borderColor = "#2E2E2E")}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase" style={{ color: "#6B7280" }}>

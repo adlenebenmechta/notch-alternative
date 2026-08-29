@@ -305,9 +305,9 @@ export default function UserProfilePanel({
             onClick={() => { setIsOpen(false); window.location.href = "/admin/grant"; }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{
-              background: "linear-gradient(135deg, #9AFF01 0%, #7ACC00 100%)",
+              background: "linear-gradient(135deg, #7DD3FC 0%, #7ACC00 100%)",
               color: "#0A0A0A",
-              boxShadow: "0 4px 16px #9AFF0140",
+              boxShadow: "0 4px 16px #7DD3FC40",
             }}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

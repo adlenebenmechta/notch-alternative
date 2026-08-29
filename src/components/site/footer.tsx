@@ -106,10 +106,10 @@ export function SiteFooter() {
       {/* bottom bar */}
       <div className="w8-rule-hi">
         <div className="w8-shell py-7 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
-          <p className="text-xs w8-muted-hi">
+          <p className="w8-pixel text-xs w8-muted-hi">
             © 2026 {SITE.legalName}. All rights reserved.
           </p>
-          <p className="text-xs w8-muted-hi">
+          <p className="w8-pixel text-xs w8-muted-hi">
             {SITE.legalName} · {SITE.location}
           </p>
         </div>

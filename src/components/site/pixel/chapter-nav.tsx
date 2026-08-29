@@ -22,8 +22,7 @@ export function ChapterNav({
     >
       <span
         aria-hidden
-        className="absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] text-[#6d6d74] select-none"
-        style={{ fontFamily: "var(--w8-font-display)" }}
+        className="w8-pixel absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] text-[#6d6d74] select-none"
       >
         JOURNEY
       </span>
@@ -40,19 +39,18 @@ export function ChapterNav({
             className="group flex items-center gap-3 py-0.5"
           >
             <span
-              className={`text-[9px] tracking-[0.22em] uppercase transition-all duration-300 ${
+              className={`w8-pixel text-[9px] tracking-[0.14em] uppercase transition-all duration-300 ${
                 isActive
                   ? "text-[#f4f3ee] opacity-100"
                   : "text-[#9b9ba2] opacity-0 group-hover:opacity-100"
               }`}
-              style={{ fontFamily: "var(--w8-font-display)" }}
             >
               {id.replace("-", " ")}
             </span>
             <PixelText
               text={String(i + 1).padStart(2, "0")}
               cell={isActive ? 3 : 2}
-              color={isActive ? "#c6f135" : "#6d6d74"}
+              color={isActive ? "#7dd3fc" : "#6d6d74"}
               className={isActive ? "w8-blink" : ""}
             />
           </button>
