@@ -54,11 +54,11 @@ export function WhySection() {
                   />
                   <span
                     aria-hidden
-                    className="hidden md:block h-px w-12 bg-[#7dd3fc]/0 group-hover:bg-[#7dd3fc]/60 transition-colors duration-500"
+                    className="hidden md:block h-px w-12 bg-[#00e5ff]/0 group-hover:bg-[#00e5ff]/60 transition-colors duration-500"
                   />
                 </div>
                 <div className="md:col-span-9">
-                  <h3 className="w8-h3 md:text-2xl lg:text-[1.75rem] group-hover:text-[#7dd3fc] transition-colors duration-300">
+                  <h3 className="w8-h3 md:text-2xl lg:text-[1.75rem] group-hover:text-[#00e5ff] transition-colors duration-300">
                     {b.title}
                   </h3>
                   <p className="w8-muted-hi text-sm md:text-[15px] w8-body mt-3 max-w-2xl">

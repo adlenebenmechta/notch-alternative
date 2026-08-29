@@ -3,6 +3,9 @@
 import { CHAPTER_IDS } from "../scene/scene-state";
 import { PixelText } from "./pixel-text";
 
+/** Arcade player palette — each chapter gets its own high-score color. */
+const CHAPTER_COLORS = ["#00e5ff", "#ff2e88", "#ffd60a", "#8a5cff", "#00e5ff", "#ff2e88", "#ffd60a"];
+
 /**
  * ChapterNav — fixed pixel chapter indicator (desktop ≥lg).
  * Shows the 7 chapters of the journey; active chapter animates.
@@ -22,7 +25,7 @@ export function ChapterNav({
     >
       <span
         aria-hidden
-        className="w8-pixel absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] text-[#6d6d74] select-none"
+        className="w8-pixel absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] text-[#6d6a8f] select-none"
       >
         JOURNEY
       </span>
@@ -42,7 +45,7 @@ export function ChapterNav({
               className={`w8-pixel text-[9px] tracking-[0.14em] uppercase transition-all duration-300 ${
                 isActive
                   ? "text-[#f4f3ee] opacity-100"
-                  : "text-[#9b9ba2] opacity-0 group-hover:opacity-100"
+                  : "text-[#a3a0c2] opacity-0 group-hover:opacity-100"
               }`}
             >
               {id.replace("-", " ")}
@@ -50,7 +53,7 @@ export function ChapterNav({
             <PixelText
               text={String(i + 1).padStart(2, "0")}
               cell={isActive ? 3 : 2}
-              color={isActive ? "#7dd3fc" : "#6d6d74"}
+              color={isActive ? CHAPTER_COLORS[i % CHAPTER_COLORS.length] : "#6d6a8f"}
               className={isActive ? "w8-blink" : ""}
             />
           </button>

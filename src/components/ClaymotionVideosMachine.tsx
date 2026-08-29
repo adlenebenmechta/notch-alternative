@@ -1597,7 +1597,7 @@ export default function ClaymotionVideosMachine({ onBack }: ClaymotionVideosMach
                       key={i}
                       className="py-0.5"
                       style={{
-                        color: log.includes("ERROR") || log.includes("error") ? "#EF4444" : log.includes("complete") || log.includes("success") || log.includes("ready") || log.includes("done") ? "#7DD3FC" : log.includes("retry") || log.includes("Retry") ? "#FBBF24" : C.gray400,
+                        color: log.includes("ERROR") || log.includes("error") ? "#EF4444" : log.includes("complete") || log.includes("success") || log.includes("ready") || log.includes("done") ? "#00E5FF" : log.includes("retry") || log.includes("Retry") ? "#FBBF24" : C.gray400,
                       }}
                     >
                       {log}

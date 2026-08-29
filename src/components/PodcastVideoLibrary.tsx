@@ -10,7 +10,7 @@ import {
 // ─── Colors (matching PodcastMachineView) ────────────────────────────────
 
 const C = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   gold: "#C9A96E",
   cyan: "#16B1DE",
   dark: "#0A0A0A",

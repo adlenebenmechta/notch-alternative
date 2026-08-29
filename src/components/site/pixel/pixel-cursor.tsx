@@ -79,14 +79,14 @@ export function PixelCursor() {
         ref={box}
         className="fixed top-0 left-0 w-7 h-7 border transition-colors duration-200"
         style={{
-          borderColor: label ? "#7dd3fc" : "rgba(244,243,238,0.65)",
+          borderColor: label ? "#00e5ff" : "rgba(244,243,238,0.65)",
           background: label ? "rgba(125,211,252,0.12)" : "transparent",
         }}
       >
         {label && (
           <span
             className="w8-pixel absolute left-1/2 -translate-x-1/2 top-[34px] text-[9px] tracking-[0.14em] whitespace-nowrap"
-            style={{ color: "#7dd3fc" }}
+            style={{ color: "#00e5ff" }}
           >
             {label}
           </span>
@@ -96,7 +96,7 @@ export function PixelCursor() {
       <div
         ref={dot}
         className="fixed top-0 left-0 w-1 h-1"
-        style={{ background: "#7dd3fc" }}
+        style={{ background: "#00e5ff" }}
       />
     </div>
   );

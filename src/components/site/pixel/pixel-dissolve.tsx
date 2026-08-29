@@ -63,7 +63,7 @@ export function PixelDissolve() {
           const ease = 1 - Math.pow(1 - p, 2);
           const s = b.s * (1 - ease);
           if (s <= 0.4) continue;
-          ctx.fillStyle = "#0a0a0b";
+          ctx.fillStyle = "#0e0b26";
           ctx.fillRect(b.x + (b.s - s) / 2, b.y + (b.s - s) / 2, s, s);
         }
         if (alive) {
@@ -73,7 +73,7 @@ export function PixelDissolve() {
         }
       };
       // initial fill so the poster is hidden until the reveal starts
-      ctx.fillStyle = "#0a0a0b";
+      ctx.fillStyle = "#0e0b26";
       ctx.fillRect(0, 0, parent.clientWidth, parent.clientHeight);
       raf = requestAnimationFrame(draw);
     };

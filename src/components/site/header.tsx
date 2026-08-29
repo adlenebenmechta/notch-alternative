@@ -39,7 +39,7 @@ export function SiteHeader() {
     <header
       className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
         scrolled
-          ? "bg-[#060607]/90 backdrop-blur-md border-b border-white/10"
+          ? "bg-[#090620]/90 backdrop-blur-md border-b border-white/10"
           : "bg-transparent border-b border-transparent"
       }`}
     >
@@ -57,7 +57,7 @@ export function SiteHeader() {
                 key={item.href}
                 href={item.href}
                 className={`w8-link text-sm transition-colors ${
-                  active ? "text-[#F5F4EF]" : "text-[#9b9ba2] hover:text-[#F5F4EF]"
+                  active ? "text-[#F5F4EF]" : "text-[#a3a0c2] hover:text-[#F5F4EF]"
                 }`}
                 style={{ fontFamily: "var(--w8-font-display)" }}
               >
@@ -77,7 +77,7 @@ export function SiteHeader() {
             <>
               <Link
                 href="/studio"
-                className="w8-link text-sm text-[#9b9ba2] hover:text-[#F5F4EF] transition-colors"
+                className="w8-link text-sm text-[#a3a0c2] hover:text-[#F5F4EF] transition-colors"
                 style={{ fontFamily: "var(--w8-font-display)" }}
               >
                 AI Studio
@@ -103,7 +103,7 @@ export function SiteHeader() {
 
       {/* mobile overlay menu */}
       <div
-        className={`lg:hidden fixed inset-0 top-0 pt-20 bg-[#060607] transition-all duration-500 lg:transition-none ${
+        className={`lg:hidden fixed inset-0 top-0 pt-20 bg-[#090620] transition-all duration-500 lg:transition-none ${
           open ? "opacity-100 visible" : "opacity-0 invisible"
         }`}
         aria-hidden={!open}

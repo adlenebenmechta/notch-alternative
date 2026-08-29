@@ -44,7 +44,7 @@ export function WorkCard({
       onMouseLeave={stop}
       onFocus={start}
       onBlur={stop}
-      className={`group relative overflow-hidden rounded-2xl bg-[#0a0a0b] text-left w-full ${aspectClass} ${className}`}
+      className={`group relative overflow-hidden rounded-2xl bg-[#0e0b26] text-left w-full ${aspectClass} ${className}`}
       aria-label={`${item.title} — ${item.category}. Play preview.`}
     >
       {/* poster */}
@@ -77,12 +77,12 @@ export function WorkCard({
       )}
 
       {/* gradient + meta */}
-      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/10 to-black/20" />
+      <div className="absolute inset-0 bg-gradient-to-t from-black/90 via-black/25 to-black/25" />
 
       <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p
-            className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.18em] text-[#7DD3FC] mb-1.5"
+            className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.18em] text-[#00E5FF] mb-1.5"
           >
             {item.category}
           </p>
@@ -93,7 +93,7 @@ export function WorkCard({
             {item.title}
           </p>
         </div>
-        <span className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white transition-all duration-300 group-hover:bg-[#7DD3FC] group-hover:text-[#0a0a0b] group-hover:scale-110">
+        <span className="shrink-0 flex items-center justify-center w-9 h-9 rounded-full bg-white/10 backdrop-blur-sm border border-white/20 text-white transition-all duration-300 group-hover:bg-[#00E5FF] group-hover:text-[#0e0b26] group-hover:scale-110">
           <Play size={13} className="ml-0.5" fill="currentColor" />
         </span>
       </div>

@@ -1268,8 +1268,8 @@ async function generateSlideImageKie(
   console.error(`${logPrefix} errors: ${errors.join(" | ")}`);
   const placeholderSvg = `<svg xmlns="http://www.w3.org/2000/svg" width="768" height="1344" viewBox="0 0 768 1344">
     <rect width="768" height="1344" fill="#1A1A1A"/>
-    <rect x="40" y="40" width="688" height="1264" rx="20" fill="none" stroke="#E461AD" stroke-width="3" stroke-dasharray="10 8"/>
-    <text x="384" y="620" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="42" font-weight="bold" fill="#E461AD">Image unavailable</text>
+    <rect x="40" y="40" width="688" height="1264" rx="20" fill="none" stroke="#FF2E88" stroke-width="3" stroke-dasharray="10 8"/>
+    <text x="384" y="620" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="42" font-weight="bold" fill="#FF2E88">Image unavailable</text>
     <text x="384" y="680" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="24" fill="#888">Slide ${slideIndex + 1} of ${totalSlides}</text>
     <text x="384" y="720" text-anchor="middle" font-family="-apple-system, sans-serif" font-size="18" fill="#666">Try regenerating this carousel</text>
   </svg>`;

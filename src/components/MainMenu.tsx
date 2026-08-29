@@ -8,7 +8,7 @@ import { useAppLang, APP_LOCALES } from "@/lib/i18n";
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
 const C = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   dark: "#0A0A0A",
   text: "#1A1A2E",
   white: "#FFFFFF",
@@ -1335,16 +1335,16 @@ export default function MainMenu({
       description: t("menu.bof-videos-machine.description"),
       icon: (
         <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#7DD3FC" strokeWidth="2.5" fill="none" />
-          <path d="M18 18l8 4-8 4V18z" fill="#7DD3FC" opacity="0.8" />
-          <path d="M4 40h40" stroke="#7DD3FC" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="10" cy="44" r="3" stroke="#7DD3FC" strokeWidth="1.5" fill="none" />
-          <circle cx="24" cy="44" r="3" stroke="#E461AD" strokeWidth="1.5" fill="none" />
+          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
+          <path d="M18 18l8 4-8 4V18z" fill="#00E5FF" opacity="0.8" />
+          <path d="M4 40h40" stroke="#00E5FF" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="10" cy="44" r="3" stroke="#00E5FF" strokeWidth="1.5" fill="none" />
+          <circle cx="24" cy="44" r="3" stroke="#FF2E88" strokeWidth="1.5" fill="none" />
           <circle cx="38" cy="44" r="3" stroke="#16B1DE" strokeWidth="1.5" fill="none" />
-          <path d="M36 4l4 4m0-4l-4 4" stroke="#E461AD" strokeWidth="2" strokeLinecap="round" />
+          <path d="M36 4l4 4m0-4l-4 4" stroke="#FF2E88" strokeWidth="2" strokeLinecap="round" />
         </svg>
       ),
-      accentColor: "#7DD3FC",
+      accentColor: "#00E5FF",
     },
     {
       id: "claymotion-videos-machine",
@@ -1431,7 +1431,7 @@ export default function MainMenu({
           <rect x="27" y="26" width="17" height="17" rx="4" stroke="#c026d3" strokeWidth="2.5" fill="none" />
           <circle cx="12.5" cy="34.5" r="3" fill="#593dfa" opacity="0.7" />
           <circle cx="35.5" cy="34.5" r="3" fill="#c026d3" opacity="0.7" />
-          <path d="M24 20l3 3m0-3l-3 3" stroke="#2563eb" strokeWidth="2" strokeLinecap="round" />
+          <path d="M24 20l3 3m0-3l-3 3" stroke="#c026d3" strokeWidth="2" strokeLinecap="round" />
         </svg>
       ),
       accentColor: "#593dfa",
@@ -1450,7 +1450,7 @@ export default function MainMenu({
             onClick={() => setLocale(l.code)}
             className="rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
             style={{
-              backgroundColor: locale === l.code ? "#E461AD" : "transparent",
+              backgroundColor: locale === l.code ? "#FF2E88" : "transparent",
               color: locale === l.code ? "#fff" : "#1A1A2E",
               cursor: "pointer",
             }}

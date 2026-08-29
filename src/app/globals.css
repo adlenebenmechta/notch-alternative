@@ -127,19 +127,23 @@
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root {
-  --w8-ink: #0a0a0b;
-  --w8-ink-2: #121214;
-  --w8-ink-3: #1a1a1e;
+  /* WENOV8 arcade palette — deep space indigo + vibrant arcade hues */
+  --w8-ink: #0e0b26;
+  --w8-ink-2: #171243;
+  --w8-ink-3: #201a5e;
   --w8-bone: #f4f3ee;
   --w8-paper: #ffffff;
-  --w8-signal: #7dd3fc;
-  --w8-signal-deep: #2563eb;
+  --w8-signal: #00e5ff;      /* Arcade Cyan — primary signal */
+  --w8-signal-deep: #d6218c; /* Deep Magenta — accessible on light */
+  --w8-magenta: #ff2e88;     /* Neon Magenta — secondary accent */
+  --w8-sun: #ffd60a;         /* Arcade Yellow — highlight */
+  --w8-nova: #8a5cff;        /* Nova Purple — support */
   --w8-text-hi: #f5f4ef;
   --w8-text-lo: #0e0e10;
-  --w8-muted-hi: #9b9ba2;
-  --w8-muted-lo: #6d6d74;
+  --w8-muted-hi: #a3a0c2;
+  --w8-muted-lo: #6d6a8f;
   --w8-line-hi: rgba(255, 255, 255, 0.1);
-  --w8-line-lo: rgba(10, 10, 11, 0.1);
+  --w8-line-lo: rgba(14, 11, 38, 0.1);
 }
 
 /* Font tokens must live on <body>: they reference the next/font variables
@@ -179,7 +183,7 @@ body {
 /* NOTE: also sets the light text color — sections using the scrim are dark. */
 .w8-scrim {
   position: relative;
-  background: rgba(10, 10, 11, 0.72);
+  background: rgba(14, 11, 38, 0.52);
   color: var(--w8-text-hi);
 }
 .w8-scrim::before {
@@ -190,15 +194,15 @@ body {
   background: linear-gradient(
     to bottom,
     var(--w8-ink),
-    rgba(10, 10, 11, 0.66) 14%,
-    rgba(10, 10, 11, 0.66) 86%,
+    rgba(14, 11, 38, 0.42) 16%,
+    rgba(14, 11, 38, 0.42) 84%,
     var(--w8-ink)
   );
 }
 .w8-scrim > * { position: relative; }
 
 .w8-dark { background: var(--w8-ink); color: var(--w8-text-hi); }
-.w8-darker { background: #060607; color: var(--w8-text-hi); }
+.w8-darker { background: #090620; color: var(--w8-text-hi); }
 .w8-light { background: var(--w8-bone); color: var(--w8-text-lo); }
 .w8-paper { background: var(--w8-paper); color: var(--w8-text-lo); }
 
@@ -280,7 +284,7 @@ body {
   background: var(--w8-signal);
   color: var(--w8-ink);
 }
-.w8-btn-primary:hover { transform: translateY(-2px); background: #a8e2ff; }
+.w8-btn-primary:hover { transform: translateY(-2px); background: #6ff0ff; }
 
 .w8-btn-invert {
   background: var(--w8-text-hi);
@@ -292,7 +296,7 @@ body {
   background: var(--w8-ink);
   color: var(--w8-text-hi);
 }
-.w8-btn-ink:hover { transform: translateY(-2px); background: #1c1c1f; }
+.w8-btn-ink:hover { transform: translateY(-2px); background: #221b5e; }
 
 .w8-btn-ghost-hi {
   border: 1px solid var(--w8-line-hi);
@@ -306,7 +310,7 @@ body {
   color: var(--w8-text-lo);
   background: transparent;
 }
-.w8-btn-ghost-lo:hover { transform: translateY(-2px); border-color: rgba(10, 10, 11, 0.35); background: rgba(10, 10, 11, 0.03); }
+.w8-btn-ghost-lo:hover { transform: translateY(-2px); border-color: rgba(14, 11, 38, 0.35); background: rgba(14, 11, 38, 0.03); }
 
 /* ── cards ───────────────────────────────────────────────────────────────── */
 .w8-card-hi {
@@ -315,7 +319,7 @@ body {
   border-radius: 1.25rem;
   transition: border-color 0.35s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s;
 }
-.w8-card-hi:hover { border-color: rgba(125, 211, 252, 0.35); transform: translateY(-4px); }
+.w8-card-hi:hover { border-color: rgba(0, 229, 255, 0.4); transform: translateY(-4px); }
 
 .w8-card-lo {
   background: var(--w8-paper);
@@ -323,7 +327,7 @@ body {
   border-radius: 1.25rem;
   transition: border-color 0.35s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s;
 }
-.w8-card-lo:hover { border-color: rgba(10, 10, 11, 0.22); transform: translateY(-4px); box-shadow: 0 24px 48px -24px rgba(10, 10, 11, 0.18); }
+.w8-card-lo:hover { border-color: rgba(14, 11, 38, 0.22); transform: translateY(-4px); box-shadow: 0 24px 48px -24px rgba(14, 11, 38, 0.18); }
 
 /* ── hairline rules ──────────────────────────────────────────────────────── */
 .w8-rule-hi { border-top: 1px solid var(--w8-line-hi); }
@@ -414,7 +418,7 @@ body {
   inset: 0;
   z-index: 90;
   pointer-events: none;
-  background: #060607;
+  background: #090620;
   animation: w8-veil-out 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -474,12 +478,10 @@ body.w8-pixel-cursor [data-cursor] {
   .w8-intro-fade { animation: none; }
 }
 
-/* hero fallback: fully hands over to the live WebGL studio scene */
+/* hero fallback: brief gradient behind the pixel world before the
+   canvas mounts (content paints instantly, canvas follows within ~60ms) */
 .w8-hero-fallback {
-  transition: opacity 1.2s ease 0.2s;
-}
-body.w8-scene-on .w8-hero-fallback {
-  opacity: 0;
+  background: linear-gradient(to bottom, #0b0920 0%, #15103a 55%, #221a5e 82%, #0e0b26 100%);
 }
 
 /* ── atmosphere: scanlines + animated grain ─────────────────────────────── */

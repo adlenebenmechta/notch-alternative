@@ -22,15 +22,15 @@ function VignetteFilm() {
     <div className="relative h-full w-full" aria-hidden>
       <div className="absolute inset-x-6 top-6 bottom-0 border border-white/15 bg-[#111114] translate-x-3 rotate-2" />
       <div className="absolute inset-x-3 top-3 bottom-0 border border-white/20 bg-[#15151a] -translate-x-2 -rotate-1" />
-      <div className="absolute inset-0 border border-[#7dd3fc]/40 bg-[#0a0a0b] overflow-hidden">
+      <div className="absolute inset-0 border border-[#00e5ff]/40 bg-[#0e0b26] overflow-hidden">
         <PixelImage
           src="/posters/hero-promo.jpg"
           alt=""
           className="absolute inset-0"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent" />
-        <span className="w8-pixel absolute left-3 top-3 flex items-center gap-1.5 text-[9px] tracking-[0.18em] text-[#7dd3fc]">
-          <span className="w-1.5 h-1.5 bg-[#7dd3fc] w8-blink" /> REC
+        <span className="w8-pixel absolute left-3 top-3 flex items-center gap-1.5 text-[9px] tracking-[0.18em] text-[#00e5ff]">
+          <span className="w-1.5 h-1.5 bg-[#00e5ff] w8-blink" /> REC
         </span>
       </div>
     </div>
@@ -49,7 +49,7 @@ function VignetteAds() {
         <div
           key={i}
           className={`relative w-[28%] border ${
-            f.lime ? "border-[#7dd3fc]/60" : "border-white/15"
+            f.lime ? "border-[#00e5ff]/60" : "border-white/15"
           } bg-[#101013] overflow-hidden`}
           style={{ height: f.h }}
         >
@@ -91,9 +91,9 @@ function VignetteUGC() {
         </span>
       </div>
       {/* ambient blocks */}
-      <span className="absolute left-8 top-8 w-3 h-3 bg-[#7dd3fc]/70" />
+      <span className="absolute left-8 top-8 w-3 h-3 bg-[#00e5ff]/70" />
       <span className="absolute right-10 bottom-10 w-2 h-2 bg-white/40" />
-      <span className="absolute right-16 top-12 w-1.5 h-1.5 bg-[#7dd3fc]/50" />
+      <span className="absolute right-16 top-12 w-1.5 h-1.5 bg-[#00e5ff]/50" />
     </div>
   );
 }
@@ -112,7 +112,7 @@ function VignetteProduct() {
         }}
       />
       {/* product frame */}
-      <div className="absolute left-1/2 -translate-x-1/2 top-[16%] w-[34%] aspect-[9/16] border border-[#7dd3fc]/40 overflow-hidden">
+      <div className="absolute left-1/2 -translate-x-1/2 top-[16%] w-[34%] aspect-[9/16] border border-[#00e5ff]/40 overflow-hidden">
         <PixelImage
           src="/posters/work-product-story.jpg"
           alt=""
@@ -142,7 +142,7 @@ function VignetteStrategy() {
         <div key={label} className="relative flex-1">
           <div
             className={`aspect-[4/3] border ${
-              i === 1 ? "border-[#7dd3fc]/50" : "border-white/15"
+              i === 1 ? "border-[#00e5ff]/50" : "border-white/15"
             } bg-[#111114] p-2 flex flex-col gap-1.5`}
           >
             <span className="h-1 w-2/3 bg-white/20" />
@@ -152,7 +152,7 @@ function VignetteStrategy() {
             </span>
           </div>
           {i < 2 && (
-            <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 text-[#7dd3fc] text-[10px] font-bold">
+            <span className="absolute -right-2.5 top-1/2 -translate-y-1/2 text-[#00e5ff] text-[10px] font-bold">
               →
             </span>
           )}
@@ -173,11 +173,11 @@ function VignetteAvatar() {
           className="absolute inset-0"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent" />
-        <span className="w8-pixel absolute left-2 top-2 text-[8px] tracking-[0.16em] text-[#7dd3fc]">
+        <span className="w8-pixel absolute left-2 top-2 text-[8px] tracking-[0.16em] text-[#00e5ff]">
           AI PRESENTER
         </span>
       </div>
-      <span className="absolute left-10 top-10 w-2.5 h-2.5 bg-[#7dd3fc]/60" />
+      <span className="absolute left-10 top-10 w-2.5 h-2.5 bg-[#00e5ff]/60" />
       <span className="absolute right-12 bottom-12 w-2 h-2 bg-white/40" />
       <span className="absolute right-8 top-16 w-1.5 h-1.5 bg-white/30" />
     </div>
@@ -207,7 +207,7 @@ export function ServicesSection() {
         aria-hidden
         className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
       >
-        <PixelText text="03" cell={14} color="#f4f3ee" />
+        <PixelText text="03" cell={14} color="#ff2e88" />
       </div>
 
       <div className="w8-shell relative">
@@ -232,7 +232,7 @@ export function ServicesSection() {
                 <Link
                   href={`/${service.slug}`}
                   data-cursor="explore"
-                  className="group grid md:grid-cols-12 gap-5 md:gap-8 items-stretch border border-white/10 bg-[#0a0a0b]/60 hover:border-[#7dd3fc]/35 transition-colors duration-500"
+                  className="group grid md:grid-cols-12 gap-5 md:gap-8 items-stretch border border-white/10 bg-[#0e0b26]/60 hover:border-[#00e5ff]/35 transition-colors duration-500"
                 >
                   {/* vignette stage */}
                   <div
@@ -249,15 +249,15 @@ export function ServicesSection() {
                       <PixelText
                         text={String(i + 1).padStart(2, "0")}
                         cell={2}
-                        color="#7dd3fc"
+                        color="#00e5ff"
                       />
                       <span className="h-px flex-1 bg-white/10" aria-hidden />
                       <ArrowUpRight
                         size={18}
-                        className="text-[#6d6d74] transition-all duration-300 group-hover:text-[#7dd3fc] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
+                        className="text-[#6d6d74] transition-all duration-300 group-hover:text-[#00e5ff] group-hover:translate-x-0.5 group-hover:-translate-y-0.5"
                       />
                     </div>
-                    <h3 className="w8-h3 mt-4 group-hover:text-[#7dd3fc] transition-colors duration-300">
+                    <h3 className="w8-h3 mt-4 group-hover:text-[#00e5ff] transition-colors duration-300">
                       {service.name}
                     </h3>
                     <p className="w8-muted-hi text-sm w8-body mt-3 max-w-xl">

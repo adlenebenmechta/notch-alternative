@@ -6,7 +6,7 @@ import { useAppLang } from "@/lib/i18n";
 // ─── Colors (matching the app design) ────────────────────────────────────────
 
 const C = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   dark: "#0A0A0A",
   text: "#1A1A2E",
   white: "#FFFFFF",

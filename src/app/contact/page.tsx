@@ -71,7 +71,7 @@ export default function ContactPage() {
                     ].map((step, i) => (
                       <li key={i} className="flex gap-3.5 text-sm">
                         <span
-                          className="flex items-center justify-center w-6 h-6 rounded-full bg-[#7DD3FC]/12 text-[#7DD3FC] text-xs font-bold shrink-0"
+                          className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00E5FF]/12 text-[#00E5FF] text-xs font-bold shrink-0"
                           style={{ fontFamily: "var(--w8-font-display)" }}
                         >
                           {i + 1}

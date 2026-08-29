@@ -146,7 +146,7 @@ export default function AdminGrantPage() {
         <div className="text-center">
           <div
             className="w-10 h-10 border-2 border-t-transparent rounded-full animate-spin mx-auto mb-4"
-            style={{ borderColor: "#E461AD", borderTopColor: "transparent" }}
+            style={{ borderColor: "#FF2E88", borderTopColor: "transparent" }}
           />
           <p className="text-sm" style={{ color: "#6B7280" }}>Verifying access...</p>
         </div>
@@ -172,7 +172,7 @@ export default function AdminGrantPage() {
           <button
             onClick={() => router.push("/studio")}
             className="px-6 py-3 rounded-2xl text-sm font-bold text-white transition-all hover:scale-105"
-            style={{ backgroundColor: "#E461AD" }}
+            style={{ backgroundColor: "#FF2E88" }}
           >
             Back to Home
           </button>
@@ -214,7 +214,7 @@ export default function AdminGrantPage() {
           <div className="flex items-center gap-2">
             <div
               className="w-8 h-8 rounded-lg flex items-center justify-center text-xs font-bold"
-              style={{ backgroundColor: "#E461AD", color: "#FFFFFF" }}
+              style={{ backgroundColor: "#FF2E88", color: "#FFFFFF" }}
             >
               {user.name?.[0]?.toUpperCase() || "A"}
             </div>
@@ -301,9 +301,9 @@ export default function AdminGrantPage() {
                   backgroundColor: "#1A1A1A",
                   color: "#FFFFFF",
                   border: "1px solid #2E2E2E",
-                  focusRingColor: "#E461AD40",
+                  focusRingColor: "#FF2E8840",
                 }}
-                onFocus={(e) => (e.target.style.borderColor = "#E461AD")}
+                onFocus={(e) => (e.target.style.borderColor = "#FF2E88")}
                 onBlur={(e) => (e.target.style.borderColor = "#2E2E2E")}
               />
             </div>
@@ -329,7 +329,7 @@ export default function AdminGrantPage() {
                       color: "#FFFFFF",
                       border: "1px solid #2E2E2E",
                     }}
-                    onFocus={(e) => (e.target.style.borderColor = "#7DD3FC")}
+                    onFocus={(e) => (e.target.style.borderColor = "#00E5FF")}
                     onBlur={(e) => (e.target.style.borderColor = "#2E2E2E")}
                   />
                   <span className="absolute right-3 top-1/2 -translate-y-1/2 text-[10px] font-bold uppercase" style={{ color: "#6B7280" }}>
@@ -350,9 +350,9 @@ export default function AdminGrantPage() {
                       onClick={() => setPlan(p)}
                       className="flex-1 py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all"
                       style={{
-                        backgroundColor: plan === p ? (p === "enterprise" ? "#E461AD20" : p === "pro" ? "#16B1DE20" : "#9CA3AF20") : "#1A1A1A",
-                        color: plan === p ? (p === "enterprise" ? "#E461AD" : p === "pro" ? "#16B1DE" : "#9CA3AF") : "#4B5563",
-                        border: `1px solid ${plan === p ? (p === "enterprise" ? "#E461AD40" : p === "pro" ? "#16B1DE40" : "#9CA3AF40") : "#2E2E2E"}`,
+                        backgroundColor: plan === p ? (p === "enterprise" ? "#FF2E8820" : p === "pro" ? "#16B1DE20" : "#9CA3AF20") : "#1A1A1A",
+                        color: plan === p ? (p === "enterprise" ? "#FF2E88" : p === "pro" ? "#16B1DE" : "#9CA3AF") : "#4B5563",
+                        border: `1px solid ${plan === p ? (p === "enterprise" ? "#FF2E8840" : p === "pro" ? "#16B1DE40" : "#9CA3AF40") : "#2E2E2E"}`,
                       }}
                     >
                       {p}
@@ -416,9 +416,9 @@ export default function AdminGrantPage() {
               style={{
                 background: processing
                   ? "linear-gradient(135deg, #374151 0%, #1F2937 100%)"
-                  : "linear-gradient(135deg, #E461AD 0%, #C7488E 100%)",
+                  : "linear-gradient(135deg, #FF2E88 0%, #C7488E 100%)",
                 color: "#FFFFFF",
-                boxShadow: "0 4px 24px #E461AD30",
+                boxShadow: "0 4px 24px #FF2E8830",
               }}
             >
               {processing ? (
@@ -474,8 +474,8 @@ export default function AdminGrantPage() {
                       <span
                         className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded"
                         style={{
-                          backgroundColor: log.plan === "enterprise" ? "#E461AD20" : "#16B1DE20",
-                          color: log.plan === "enterprise" ? "#E461AD" : "#16B1DE",
+                          backgroundColor: log.plan === "enterprise" ? "#FF2E8820" : "#16B1DE20",
+                          color: log.plan === "enterprise" ? "#FF2E88" : "#16B1DE",
                         }}
                       >
                         {log.plan}
@@ -526,7 +526,7 @@ export default function AdminGrantPage() {
               <p className="text-xs" style={{ color: "#6B7280" }}>
                 You are about to grant <span className="font-bold" style={{ color: "#FFFFFF" }}>{parseInt(credits || "0").toLocaleString()} credits</span> to:
               </p>
-              <p className="text-sm font-bold mt-1" style={{ color: "#E461AD" }}>{targetEmail}</p>
+              <p className="text-sm font-bold mt-1" style={{ color: "#FF2E88" }}>{targetEmail}</p>
             </div>
             <div className="flex gap-3">
               <button
@@ -539,7 +539,7 @@ export default function AdminGrantPage() {
               <button
                 onClick={handleGrant}
                 className="flex-1 py-3 rounded-xl text-sm font-bold text-white transition-all hover:scale-105"
-                style={{ backgroundColor: "#E461AD" }}
+                style={{ backgroundColor: "#FF2E88" }}
               >
                 Confirm
               </button>

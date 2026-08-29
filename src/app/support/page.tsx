@@ -4,9 +4,9 @@ import { useState } from "react";
 import { useAuth } from "@/providers/auth-provider";
 
 const COLORS = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   cyan: "#16B1DE",
-  lime: "#7DD3FC",
+  lime: "#00E5FF",
   bg: "#0A0A0A",
   cardBg: "#111111",
   cardBorder: "#1E1E1E",

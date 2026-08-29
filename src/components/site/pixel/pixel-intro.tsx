@@ -110,7 +110,7 @@ export function PixelIntro() {
           const x = p.x0 + (p.tx - p.x0) * conv;
           const y = p.y0 + (p.ty - p.y0) * conv;
           ctx.globalAlpha = appear * (0.55 + 0.45 * conv);
-          ctx.fillStyle = p.lime ? "#7dd3fc" : "#f4f3ee";
+          ctx.fillStyle = p.lime ? "#00e5ff" : "#f4f3ee";
           const s = p.sz * (1 + (1 - conv) * 0.8);
           ctx.fillRect(x, y, s, s);
         }
@@ -125,7 +125,7 @@ export function PixelIntro() {
             (vw - subW) / 2,
             oy + wH + unit * 4,
             subCell,
-            "#9b9ba2"
+            "#a3a0c2"
           );
         }
 
@@ -156,7 +156,7 @@ export function PixelIntro() {
   return (
     <div
       aria-hidden
-      className="fixed inset-0 z-[100] bg-[#0a0a0b] flex items-center justify-center w8-intro-fade"
+      className="fixed inset-0 z-[100] bg-[#0e0b26] flex items-center justify-center w8-intro-fade"
       data-nosnippet
     >
       <canvas ref={canvasRef} className="block" />

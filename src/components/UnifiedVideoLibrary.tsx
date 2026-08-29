@@ -12,8 +12,8 @@ import {
 // ─── Colors ──────────────────────────────────────────────────────────────────
 
 const C = {
-  lime: "#7DD3FC",
-  pink: "#E461AD",
+  lime: "#00E5FF",
+  pink: "#FF2E88",
   cyan: "#16B1DE",
   gold: "#C9A96E",
   dark: "#0A0A0A",

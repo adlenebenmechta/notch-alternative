@@ -85,7 +85,7 @@ export function ConvergeCanvas({
           oy +
           (p.y0 * h + driftY + (p.ty * scale - p.y0 * h) * e);
         ctx.globalAlpha = 0.35 + 0.65 * e;
-        ctx.fillStyle = p.lime ? "#7dd3fc" : "#f4f3ee";
+        ctx.fillStyle = p.lime ? "#00e5ff" : "#f4f3ee";
         ctx.fillRect(x, y, scale * 0.92, scale * 0.92);
       }
       ctx.globalAlpha = 1;

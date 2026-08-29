@@ -72,7 +72,7 @@ export default function GoogleOAuthCallback() {
             width: 40,
             height: 40,
             border: "3px solid rgba(228, 97, 173, 0.3)",
-            borderTopColor: "#E461AD",
+            borderTopColor: "#FF2E88",
             borderRadius: "50%",
             animation: "spin 0.8s linear infinite",
             margin: "0 auto 16px",

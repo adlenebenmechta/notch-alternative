@@ -49,7 +49,7 @@ export function SelectedWork() {
         aria-hidden
         className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
       >
-        <PixelText text="02" cell={14} color="#f4f3ee" />
+        <PixelText text="02" cell={14} color="#00e5ff" />
       </div>
 
       <div className="w8-shell relative">

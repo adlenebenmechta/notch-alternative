@@ -8,10 +8,10 @@ import PipelineMonitor from "@/components/PipelineMonitor";
 // ─── Colors (matching existing design) ─────────────────────────────────────
 
 const C = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   gold: "#C9A96E",
   cyan: "#16B1DE",
-  lime: "#7DD3FC",
+  lime: "#00E5FF",
   dark: "#0A0A0A",
   text: "#1A1A2E",
   textMuted: "#6B7280",

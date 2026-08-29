@@ -7,7 +7,7 @@ import JSZip from "jszip";
 // ─── Colors ─────────────────────────────────────────────────────────────────
 
 const C = {
-  pink: "#E461AD",
+  pink: "#FF2E88",
   gold: "#C9A96E",
   dark: "#0A0A0A",
   text: "#1A1A2E",
@@ -49,7 +49,7 @@ interface CarouselViewProps {
 // ─── Slide type colors/icons ───────────────────────────────────────────────
 const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string; emoji: string }> = {
   // UGC methodology slide types (primary)
-  hook: { color: "#E461AD", bg: "#E461AD25", label: "Hook", emoji: "🎯" },
+  hook: { color: "#FF2E88", bg: "#FF2E8825", label: "Hook", emoji: "🎯" },
   problem: { color: "#EF4444", bg: "#EF444425", label: "Problem", emoji: "😤" },
   solution: { color: "#22C55E", bg: "#22C55E25", label: "Solution", emoji: "💡" },
   person_using: { color: "#22C55E", bg: "#22C55E25", label: "Person Using", emoji: "📱" },
@@ -59,7 +59,7 @@ const SLIDE_TYPE_META: Record<string, { color: string; bg: string; label: string
   proof: { color: "#06B6D4", bg: "#06B6D425", label: "Proof", emoji: "📊" },
   product: { color: "#C9A96E", bg: "#C9A96E25", label: "Product", emoji: "📦" },
   // Legacy slide types (kept for backward compatibility)
-  hero: { color: "#E461AD", bg: "#E461AD25", label: "Hero Shot", emoji: "🎯" },
+  hero: { color: "#FF2E88", bg: "#FF2E8825", label: "Hero Shot", emoji: "🎯" },
   quote: { color: "#3B82F6", bg: "#3B82F625", label: "Quote", emoji: "💬" },
   tip: { color: "#8B5CF6", bg: "#8B5CF625", label: "Tip", emoji: "💡" },
   stat: { color: "#06B6D4", bg: "#06B6D425", label: "Stat", emoji: "📊" },

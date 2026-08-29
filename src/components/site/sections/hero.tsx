@@ -17,29 +17,18 @@ export function Hero() {
       id="intro"
       className="relative min-h-[105svh] flex flex-col overflow-hidden bg-transparent text-[#f5f4ef]"
     >
-      {/* instant pre-3D backdrop — fades away completely once the WebGL scene is live */}
-      <div className="absolute inset-0 w8-hero-fallback" aria-hidden>
-        <img
-          src="/posters/hero-promo.jpg"
-          alt=""
-          className="absolute inset-0 w-full h-full object-cover opacity-20"
-          fetchPriority="high"
-        />
-        <div className="absolute inset-0 bg-gradient-to-b from-[#0a0a0b]/85 via-[#0a0a0b]/60 to-[#0a0a0b]" />
-        <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0b]/85 via-transparent to-[#0a0a0b]/30" />
-      </div>
-      {/* readability scrim over the 3D scene — always on */}
+      {/* readability scrim over the pixel world — light veil, text stays king */}
       <div
         aria-hidden
-        className="absolute inset-0 bg-gradient-to-b from-[#0a0a0b]/70 via-[#0a0a0b]/25 to-[#0a0a0b]/80"
+        className="absolute inset-0 bg-gradient-to-b from-[#0e0b26]/45 via-[#0e0b26]/10 to-[#0e0b26]/45"
       />
 
       {/* content */}
       <div className="relative z-10 flex-1 flex flex-col justify-center pt-36 pb-20 md:pt-44">
         <div className="w8-shell">
           <div className="flex items-center gap-4 mb-7">
-            <PixelText text="01" cell={3} color="#7dd3fc" className="w8-blink" />
-            <span className="h-px w-10 bg-[#7dd3fc]/50" aria-hidden />
+            <PixelText text="01" cell={3} color="#00e5ff" className="w8-blink" />
+            <span className="h-px w-10 bg-[#00e5ff]/50" aria-hidden />
             <p className="w8-eyebrow w8-accent">The Creative Machine</p>
           </div>
 
@@ -73,7 +62,7 @@ export function Hero() {
       </div>
 
       {/* capability marquee */}
-      <div className="relative z-10 border-t border-white/10 py-5 overflow-hidden bg-[#0a0a0b]/40">
+      <div className="relative z-10 border-t border-white/10 py-5 overflow-hidden bg-[#0e0b26]/25">
         <div className="w8-marquee-track" aria-hidden>
           {[0, 1].map((copy) => (
             <div key={copy} className="flex items-center gap-10 pr-10">
@@ -88,10 +77,10 @@ export function Hero() {
               ].map((cap) => (
                 <span
                   key={cap + copy}
-                  className="w8-pixel flex items-center gap-10 text-sm text-[#9b9ba2] whitespace-nowrap"
+                  className="w8-pixel flex items-center gap-10 text-sm text-[#a3a0c2] whitespace-nowrap"
                 >
                   {cap}
-                  <span className="w-1 h-1 bg-[#7DD3FC]/60" aria-hidden />
+                  <span className="w-1 h-1 bg-[#00e5ff]/60" aria-hidden />
                 </span>
               ))}
             </div>
@@ -103,7 +92,7 @@ export function Hero() {
       <a
         href="#work"
         aria-label="Scroll to selected work"
-        className="hidden md:flex absolute bottom-24 right-8 z-10 items-center justify-center w-11 h-11 border border-white/15 text-[#9b9ba2] hover:text-[#F5F4EF] hover:border-white/40 transition-colors"
+        className="hidden md:flex absolute bottom-24 right-8 z-10 items-center justify-center w-11 h-11 border border-white/15 text-[#a3a0c2] hover:text-[#F5F4EF] hover:border-white/40 transition-colors"
       >
         <ArrowDown size={16} />
       </a>

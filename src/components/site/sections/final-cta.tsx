@@ -21,8 +21,8 @@ export function FinalCta() {
     >
       <div className="w8-shell relative text-center">
         <Reveal className="flex items-center justify-center gap-4 mb-8">
-          <PixelText text="07" cell={3} color="#7dd3fc" className="w8-blink" />
-          <span className="h-px w-10 bg-[#7dd3fc]/50" aria-hidden />
+          <PixelText text="07" cell={3} color="#ffd60a" className="w8-blink" />
+          <span className="h-px w-10 bg-[#00e5ff]/50" aria-hidden />
           <p className="w8-eyebrow w8-accent">Final Scene</p>
         </Reveal>
 

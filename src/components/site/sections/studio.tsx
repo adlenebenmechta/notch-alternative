@@ -37,7 +37,7 @@ export function StudioSection() {
         aria-hidden
         className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
       >
-        <PixelText text="05" cell={14} color="#f4f3ee" />
+        <PixelText text="05" cell={14} color="#8a5cff" />
       </div>
 
       <div className="w8-shell relative">
@@ -111,7 +111,7 @@ export function StudioSection() {
                 <RevealItem key={shot.src}>
                   <div
                     data-cursor="view"
-                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#7dd3fc]/40 transition-colors duration-500"
+                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#00e5ff]/40 transition-colors duration-500"
                   >
                     <img
                       src={shot.src}

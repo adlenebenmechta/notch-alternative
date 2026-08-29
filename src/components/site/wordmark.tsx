@@ -51,8 +51,8 @@ export function LogoLink({
         aria-hidden
         className="flex items-center justify-center w-9 h-9 rounded-lg font-black text-[15px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
         style={{
-          background: onLight ? "var(--w8-ink)" : "var(--w8-text-hi)",
-          color: onLight ? "var(--w8-signal)" : "var(--w8-ink)",
+          background: "var(--w8-signal)",
+          color: "var(--w8-ink)",
           fontFamily: "var(--w8-font-display)",
         }}
       >

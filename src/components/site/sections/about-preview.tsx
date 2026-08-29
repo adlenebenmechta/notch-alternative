@@ -19,8 +19,8 @@ export function AboutPreview() {
         <div className="grid lg:grid-cols-12 gap-10 lg:gap-16">
           <Reveal className="lg:col-span-5">
             <div className="flex items-center gap-4 mb-5">
-              <PixelText text="06" cell={3} color="#2563eb" />
-              <span className="h-px w-8 bg-[#2563eb]/40" aria-hidden />
+              <PixelText text="06" cell={3} color="#ff2e88" />
+              <span className="h-px w-8 bg-[#ff2e88]/40" aria-hidden />
               <p className="w8-eyebrow w8-accent-lo">About WENOV8</p>
             </div>
             <h2 className="w8-h2 text-balance">

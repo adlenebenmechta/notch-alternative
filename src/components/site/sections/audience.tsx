@@ -56,7 +56,7 @@ export function AudienceSection() {
                   />
                 </div>
                 <h3
-                  className="md:col-span-5 text-xl md:text-2xl font-semibold tracking-tight text-[#f5f4ef] group-hover:text-[#7dd3fc] transition-colors duration-300"
+                  className="md:col-span-5 text-xl md:text-2xl font-semibold tracking-tight text-[#f5f4ef] group-hover:text-[#00e5ff] transition-colors duration-300"
                   style={{ fontFamily: "var(--w8-font-display)" }}
                 >
                   {a.title}

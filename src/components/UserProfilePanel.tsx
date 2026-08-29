@@ -71,7 +71,7 @@ export default function UserProfilePanel({
 
   const planColors: Record<string, string> = {
     free: "#9CA3AF",
-    pro: "#E461AD",
+    pro: "#FF2E88",
     enterprise: "#16B1DE",
   };
 
@@ -124,7 +124,7 @@ export default function UserProfilePanel({
     >
       <div
         className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
-        style={{ backgroundColor: "#E461AD", color: "#FFFFFF" }}
+        style={{ backgroundColor: "#FF2E88", color: "#FFFFFF" }}
       >
         {initials}
       </div>
@@ -147,7 +147,7 @@ export default function UserProfilePanel({
     >
       <div
         className="w-8 h-8 rounded-xl flex items-center justify-center text-xs font-bold"
-        style={{ backgroundColor: "#E461AD", color: "#FFFFFF" }}
+        style={{ backgroundColor: "#FF2E88", color: "#FFFFFF" }}
       >
         {initials}
       </div>
@@ -305,9 +305,9 @@ export default function UserProfilePanel({
             onClick={() => { setIsOpen(false); window.location.href = "/admin/grant"; }}
             className="w-full flex items-center justify-center gap-2 py-3 rounded-2xl text-sm font-bold uppercase tracking-wider transition-all duration-200 hover:scale-[1.02] active:scale-[0.98]"
             style={{
-              background: "linear-gradient(135deg, #7DD3FC 0%, #7ACC00 100%)",
+              background: "linear-gradient(135deg, #00E5FF 0%, #FF2E88 100%)",
               color: "#0A0A0A",
-              boxShadow: "0 4px 16px #7DD3FC40",
+              boxShadow: "0 4px 16px #00E5FF40",
             }}
           >
             <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">

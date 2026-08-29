@@ -73,7 +73,7 @@ export function ContactForm() {
   if (status === "sent") {
     return (
       <div className="w8-card-hi p-8 md:p-10 text-center">
-        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#7DD3FC] text-[#0a0a0b] mb-5">
+        <span className="inline-flex items-center justify-center w-14 h-14 rounded-full bg-[#00E5FF] text-[#0e0b26] mb-5">
           <Check size={22} strokeWidth={2.5} />
         </span>
         <h3
@@ -98,10 +98,10 @@ export function ContactForm() {
   }
 
   const inputCls =
-    "w-full rounded-xl bg-white/[0.04] border border-white/12 px-4 py-3.5 text-sm text-[#F5F4EF] placeholder:text-[#6d6d74] outline-none transition-colors focus:border-[#7DD3FC]/60 focus:bg-white/[0.06]";
+    "w-full rounded-xl bg-white/[0.04] border border-white/12 px-4 py-3.5 text-sm text-[#F5F4EF] placeholder:text-[#6d6d74] outline-none transition-colors focus:border-[#00E5FF]/60 focus:bg-white/[0.06]";
   const labelCls =
     "block text-xs font-semibold uppercase tracking-[0.14em] w8-muted-hi mb-2";
-  const selectCls = `${inputCls} appearance-none cursor-pointer [&>option]:bg-[#121214] [&>option]:text-[#F5F4EF]`;
+  const selectCls = `${inputCls} appearance-none cursor-pointer [&>option]:bg-[#171243] [&>option]:text-[#F5F4EF]`;
 
   return (
     <form onSubmit={onSubmit} className="w8-card-hi p-7 md:p-9 space-y-5" noValidate>
