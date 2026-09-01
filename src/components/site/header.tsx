@@ -49,8 +49,18 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { user, loading } = useAuth();
 
+  // On the homepage the opening brand film owns the first viewport:
+  // the header stays out of the way (no copy over the film) and
+  // slides in as soon as the visitor starts scrolling. Every other
+  // page keeps the header visible at all times, as before.
+  const isHome = pathname === "/";
+  const [pastFilm, setPastFilm] = useState(false);
+
   useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 24);
+    const onScroll = () => {
+      setScrolled(window.scrollY > 24);
+      setPastFilm(window.scrollY > Math.min(180, window.innerHeight * 0.22));
+    };
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -65,10 +75,15 @@ export function SiteHeader() {
     };
   }, [open]);
 
+  const overFilm = isHome && !pastFilm;
+
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
       style={{
+        ...(overFilm
+          ? { opacity: 0, transform: "translateY(-100%)", pointerEvents: "none" }
+          : {}),
         background: scrolled
           ? "color-mix(in srgb, var(--w8-bg) 88%, transparent)"
           : "transparent",

@@ -22,10 +22,17 @@ const smooth = (t: number) => {
  * The VideoBackdrop (retro astronaut film + pixel grid) and the
  * PixelDust layer paint the universe behind everything; all page
  * content renders as normal, crawlable DOM above it.
+ *
+ * While the opening brand film fills the screen (heroLive), the
+ * floating chrome — chapter nav, atmosphere, progress hairline —
+ * fades out so the film plays absolutely clean: no veil, no copy.
+ * The chrome fades back in as soon as the visitor scrolls.
  */
 export function ScrollStage({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0);
   const activeRef = useRef(0);
+  const [heroLive, setHeroLive] = useState(true);
+  const heroLiveRef = useRef(true);
 
   // scroll → chapter progress
   useEffect(() => {
@@ -62,6 +69,12 @@ export function ScrollStage({ children }: { children: ReactNode }) {
         activeRef.current = idx;
         setActive(idx);
       }
+      // the brand film owns the first viewport — hide all chrome over it
+      const filmLive = window.scrollY < vh * 0.3;
+      if (filmLive !== heroLiveRef.current) {
+        heroLiveRef.current = filmLive;
+        setHeroLive(filmLive);
+      }
     };
 
     const onScroll = () => {
@@ -92,12 +105,43 @@ export function ScrollStage({ children }: { children: ReactNode }) {
       {/* the astronaut film + pixel grid + drifting pixel dust */}
       <VideoBackdrop />
       <PixelDust />
-      <ChapterNav active={active} onJump={jump} />
+      {/* chrome fades out while the opening film fills the screen */}
+      <Fade when={!heroLive} interactive>
+        <ChapterNav active={active} onJump={jump} />
+      </Fade>
       <PixelCursor />
-      <Atmosphere />
-      <ProgressHairline />
+      <Fade when={!heroLive}>
+        <Atmosphere />
+        <ProgressHairline />
+      </Fade>
       <div className="relative z-10">{children}</div>
     </>
+  );
+}
+
+/**
+ * Fade — opacity transition wrapper for the fixed chrome layers.
+ * Fixed-position children still anchor to the viewport; the wrapper
+ * only blends their visibility (and disables interaction when off).
+ */
+function Fade({
+  when,
+  interactive = false,
+  children,
+}: {
+  when: boolean;
+  interactive?: boolean;
+  children: ReactNode;
+}) {
+  return (
+    <div
+      aria-hidden
+      className={`transition-opacity duration-700 ease-out ${
+        when ? "opacity-100" : `opacity-0${interactive ? " pointer-events-none" : ""}`
+      }`}
+    >
+      {children}
+    </div>
   );
 }
 
