@@ -66,7 +66,7 @@ export function WhySection() {
                   />
                 </div>
                 <div className="md:col-span-9">
-                  <h3 className="w8-h3 md:text-2xl lg:text-[1.75rem] transition-colors duration-300 group-hover:text-[var(--w8-ember)]">
+                  <h3 className="w8-h3 md:text-xl lg:text-2xl transition-colors duration-300 group-hover:text-[var(--w8-ember)]">
                     {b.title}
                   </h3>
                   <p className="w8-muted-hi text-sm md:text-[15px] w8-body mt-3 max-w-2xl">

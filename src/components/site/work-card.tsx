@@ -90,7 +90,6 @@ export function WorkCard({
           </p>
           <p
             className="text-sm sm:text-base font-semibold text-white leading-snug truncate"
-            style={{ fontFamily: "var(--font-cyber), var(--w8-font-display)" }}
           >
             {item.title}
           </p>

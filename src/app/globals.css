@@ -235,9 +235,10 @@ html[data-w8-theme="light"] body { background: #f4f2fe; }
    (--font-cyber, --font-kabisat, --font-sora, --font-geist-sans) which are
    scoped to <body> — custom properties resolve var() at their definition
    scope, so defining these on :root would silently fall back to system
-   fonts. Display = Cyberwave 2000 (Y2K); body text stays Geist/Sora. */
+   fonts. Display = Sora (clean, professional, always legible); the Y2K
+   faces (Cyberwave / Kabisat) are reserved for short decorative accents. */
 body {
-  --w8-font-display: var(--font-cyber), var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
+  --w8-font-display: var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
 
 /* ── layout shell ────────────────────────────────────────────────────────── */
@@ -322,28 +323,28 @@ body {
 
 .w8-h1 {
   font-family: var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.06;
-  font-size: clamp(2.1rem, 5.4vw, 4.1rem);
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.12;
+  font-size: clamp(1.9rem, 3.9vw, 2.9rem);
   text-wrap: balance;
 }
 
 .w8-h2 {
   font-family: var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0.01em;
-  line-height: 1.1;
-  font-size: clamp(1.55rem, 3.6vw, 2.7rem);
+  font-weight: 700;
+  letter-spacing: -0.015em;
+  line-height: 1.16;
+  font-size: clamp(1.4rem, 2.7vw, 2.05rem);
   text-wrap: balance;
 }
 
 .w8-h3 {
   font-family: var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0.02em;
-  line-height: 1.2;
-  font-size: clamp(1.02rem, 1.8vw, 1.3rem);
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.25;
+  font-size: clamp(1rem, 1.4vw, 1.15rem);
 }
 
 .w8-lead {
@@ -894,7 +895,7 @@ html[data-w8-theme="light"] .w8-chrome-text {
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.04em;
-  font-size: clamp(2.6rem, 9vw, 7rem);
+  font-size: clamp(2rem, 6vw, 4.6rem);
   text-align: center;
   user-select: none;
 }

@@ -30,7 +30,7 @@ export function FinalCta() {
           <p className="w8-eyebrow w8-accent">Final Scene</p>
         </Reveal>
 
-        <h2 className="w8-h2 md:text-5xl lg:text-6xl text-balance">
+        <h2 className="w8-h2 md:text-3xl lg:text-4xl text-balance">
           Let&apos;s create something.
         </h2>
 

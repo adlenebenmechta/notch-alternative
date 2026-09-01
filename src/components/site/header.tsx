@@ -103,11 +103,11 @@ export function SiteHeader() {
                 className={`w8-link text-[15px] transition-colors`}
                 style={{
                   color: active ? "var(--w8-text)" : "var(--w8-muted)",
-                  fontFamily:
-                    "var(--font-kabisat), var(--font-geist-sans), sans-serif",
-                  fontStyle: "italic",
+                  fontFamily: "var(--font-sora), var(--font-geist-sans), sans-serif",
+                  fontWeight: 600,
                   textTransform: "uppercase",
-                  letterSpacing: "0.08em",
+                  letterSpacing: "0.05em",
+                  fontSize: "13.5px",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "var(--w8-text)")}
                 onMouseLeave={(e) =>
@@ -134,11 +134,11 @@ export function SiteHeader() {
                 className="w8-link text-[15px] hidden xl:inline transition-colors"
                 style={{
                   color: "var(--w8-muted)",
-                  fontFamily:
-                    "var(--font-kabisat), var(--font-geist-sans), sans-serif",
-                  fontStyle: "italic",
+                  fontFamily: "var(--font-sora), var(--font-geist-sans), sans-serif",
+                  fontWeight: 600,
                   textTransform: "uppercase",
-                  letterSpacing: "0.08em",
+                  letterSpacing: "0.05em",
+                  fontSize: "13.5px",
                 }}
                 onMouseEnter={(e) => (e.currentTarget.style.color = "var(--w8-text)")}
                 onMouseLeave={(e) => (e.currentTarget.style.color = "var(--w8-muted)")}
@@ -188,11 +188,10 @@ export function SiteHeader() {
               href={item.href}
               className="flex items-center justify-between py-4 border-b text-2xl"
               style={{
-                fontFamily:
-                  "var(--font-kabisat), var(--font-geist-sans), sans-serif",
-                fontStyle: "italic",
+                fontFamily: "var(--font-sora), var(--font-geist-sans), sans-serif",
+                fontWeight: 700,
                 textTransform: "uppercase",
-                letterSpacing: "0.04em",
+                letterSpacing: "-0.01em",
                 color: "var(--w8-text)",
                 borderColor: "var(--w8-line)",
                 transitionDelay: `${i * 40}ms`,
