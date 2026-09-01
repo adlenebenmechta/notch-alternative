@@ -39,7 +39,11 @@ function ThemeToggle() {
 }
 
 /**
- * Site header — transparent over the hero, solid surface on scroll.
+ * Site header — always visible. On the homepage the opening brand
+ * film is bright at the top, so the bar sits on its solid surface
+ * (blurred bg + hairline) from the first frame so Work / Services /
+ * Studio / About / Contact / Get a Quote stay readable over the film.
+ * Every other page keeps the transparent-over-hero look until scroll.
  * Shows "Open Studio" instead of "Get a Quote" primary CTA when
  * the visitor is authenticated (checks the existing Firebase session).
  */
@@ -49,18 +53,10 @@ export function SiteHeader() {
   const pathname = usePathname();
   const { user, loading } = useAuth();
 
-  // On the homepage the opening brand film owns the first viewport:
-  // the header stays out of the way (no copy over the film) and
-  // slides in as soon as the visitor starts scrolling. Every other
-  // page keeps the header visible at all times, as before.
   const isHome = pathname === "/";
-  const [pastFilm, setPastFilm] = useState(false);
 
   useEffect(() => {
-    const onScroll = () => {
-      setScrolled(window.scrollY > 24);
-      setPastFilm(window.scrollY > Math.min(180, window.innerHeight * 0.22));
-    };
+    const onScroll = () => setScrolled(window.scrollY > 24);
     onScroll();
     window.addEventListener("scroll", onScroll, { passive: true });
     return () => window.removeEventListener("scroll", onScroll);
@@ -75,21 +71,20 @@ export function SiteHeader() {
     };
   }, [open]);
 
-  const overFilm = isHome && !pastFilm;
+  // homepage: solid surface from the top (readable over the bright film);
+  // other pages: transparent over the hero, solid once the visitor scrolls
+  const solid = scrolled || isHome;
 
   return (
     <header
       className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
       style={{
-        ...(overFilm
-          ? { opacity: 0, transform: "translateY(-100%)", pointerEvents: "none" }
-          : {}),
-        background: scrolled
+        background: solid
           ? "color-mix(in srgb, var(--w8-bg) 88%, transparent)"
           : "transparent",
-        borderBottom: `1px solid ${scrolled ? "var(--w8-line)" : "transparent"}`,
-        backdropFilter: scrolled ? "blur(12px)" : "none",
-        WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+        borderBottom: `1px solid ${solid ? "var(--w8-line)" : "transparent"}`,
+        backdropFilter: solid ? "blur(12px)" : "none",
+        WebkitBackdropFilter: solid ? "blur(12px)" : "none",
       }}
     >
       <div className="w8-shell flex items-center justify-between h-16 md:h-[76px]">

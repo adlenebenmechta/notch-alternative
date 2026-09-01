@@ -404,6 +404,56 @@ body {
   color: var(--w8-inv-text);
 }
 
+/* ── scroll cue (opening brand film) ─────────────────────────────────────── */
+.w8-scroll-cue {
+  position: absolute;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border-radius: 9999px;
+  background: rgba(6, 4, 16, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.22);
+  color: #ffffff;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  box-shadow: 0 8px 24px -12px rgba(6, 4, 16, 0.6);
+  transition: background-color 0.3s, border-color 0.3s;
+  z-index: 5;
+  /* subtle inviting bob — keeps the film clean, just a hint of motion */
+  animation: w8-cue-bob 2.4s ease-in-out infinite;
+}
+.w8-scroll-cue:hover {
+  background: rgba(6, 4, 16, 0.62);
+  border-color: rgba(255, 255, 255, 0.4);
+}
+@keyframes w8-cue-bob {
+  0%,
+  100% {
+    transform: translate(-50%, 0);
+  }
+  50% {
+    transform: translate(-50%, 9px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-scroll-cue { animation: none; }
+}
+
+/* smooth anchor jumps (hero scroll cue → first window) */
+html {
+  scroll-behavior: smooth;
+}
+/* keep section tops clear of the fixed top bar when anchor-jumping */
+section[id],
+[data-chapter] {
+  scroll-margin-top: 84px;
+}
+
 /* ── cards ───────────────────────────────────────────────────────────────── */
 .w8-card-hi {
   background: color-mix(in srgb, var(--w8-bg-2) 88%, transparent);
