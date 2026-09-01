@@ -1,192 +1,109 @@
 "use client";
 
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAuth } from "@/providers/auth-provider";
 import UserProfilePanel from "@/components/UserProfilePanel";
 import { useAppLang, APP_LOCALES } from "@/lib/i18n";
 
-// ─── Colors ─────────────────────────────────────────────────────────────────
+// ─── Colors (restrained: one accent + neutrals) ─────────────────────────────
 
 const C = {
-  pink: "#FF2E88",
-  dark: "#0A0A0A",
-  text: "#1A1A2E",
+  accent: "#FF2E88",
+  dark: "#0A0A0B",
   white: "#FFFFFF",
-  cream: "#FFF8F0",
-  beige: "#F5E6D3",
-  warmGray: "#B8A99A",
-  gold: "#C9A96E",
-  cyan: "#16B1DE",
+  text: "#1A1A2E",
+  textMuted: "#6B7280",
   softPink: "#FDE8F0",
   lightPink: "#F9E4EE",
-  overlay: "rgba(10, 10, 10, 0.45)",
-  cardBg: "rgba(255, 255, 255, 0.85)",
-  cardBorder: "rgba(228, 97, 173, 0.25)",
 };
 
-// ─── Carousel Image Display (looped curved scroll) ──────────────────────────
+// ─── Machine icons (clean, consistent 24px strokes) ─────────────────────────
 
-function CarouselImageDisplay() {
-  const carouselImages = [
-    "/carousel/1.jpeg",
-    "/carousel/2.jpeg",
-    "/carousel/3.jpeg",
-    "/carousel/4.jpeg",
-    "/carousel/5.jpeg",
-  ];
-
-  // 3 copies = 15 images. When we scroll past 1 set (5), we teleport back by that amount.
-  const allImages = [
-    ...carouselImages, ...carouselImages, ...carouselImages,
-  ];
-
-  const containerRef = useRef<HTMLDivElement>(null);
-  const offsetRef = useRef(0);
-  const animRef = useRef<number>(0);
-
-  useEffect(() => {
-    const container = containerRef.current;
-    if (!container) return;
-
-    // Calculate width of one full set (5 images + 4 gaps)
-    const oneSetWidth = 5 * 140 + 4 * 8; // 140px img + 8px gap
-
-    let lastTime = performance.now();
-
-    function tick(now: number) {
-      if (!container) return;
-      const delta = (now - lastTime) / 1000;
-      lastTime = now;
-
-      offsetRef.current += delta * 80; // 80px per second = fast smooth scroll
-
-      // When scrolled past one full set, teleport back instantly (invisible jump)
-      if (offsetRef.current >= oneSetWidth) {
-        offsetRef.current -= oneSetWidth;
-      }
-
-      container.style.transform = "translateX(" + (-offsetRef.current) + "px)";
-      animRef.current = requestAnimationFrame(tick);
-    }
-
-    animRef.current = requestAnimationFrame(tick);
-
-    return () => {
-      if (animRef.current) cancelAnimationFrame(animRef.current);
-    };
-  }, []);
-
-  return (
-    <div className="relative z-10 mt-2 w-full">
-      <div className="relative w-full overflow-hidden">
-        <div ref={containerRef} className="flex gap-2">
-          {allImages.map((src, i) => (
-            <div
-              key={i}
-              className="flex-shrink-0 rounded-xl overflow-hidden shadow-lg"
-              style={{ width: "140px", height: "230px" }}
-            >
-              <img
-                src={src}
-                alt={"Carousel slide " + (i + 1)}
-                className="w-full h-full object-cover"
-                draggable={false}
-              />
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ─── Cursor Effect ──────────────────────────────────────────────────────────
-
-function CursorEffect() {
-  const cursorRef = useRef<HTMLDivElement>(null);
-  const trailRef = useRef<HTMLDivElement>(null);
-  const posRef = useRef({ x: 0, y: 0 });
-  const trailPosRef = useRef({ x: 0, y: 0 });
-  const isVisible = useRef(false);
-
-  const handleMouseMove = useCallback((e: MouseEvent) => {
-    posRef.current = { x: e.clientX, y: e.clientY };
-    if (!isVisible.current) {
-      isVisible.current = true;
-      if (cursorRef.current) cursorRef.current.style.opacity = "1";
-      if (trailRef.current) trailRef.current.style.opacity = "1";
-    }
-  }, []);
-
-  const handleMouseLeave = useCallback(() => {
-    isVisible.current = false;
-    if (cursorRef.current) cursorRef.current.style.opacity = "0";
-    if (trailRef.current) trailRef.current.style.opacity = "0";
-  }, []);
-
-  useEffect(() => {
-    // Check for touch device
-    if (typeof window !== "undefined" && "ontouchstart" in window) return;
-
-    window.addEventListener("mousemove", handleMouseMove);
-    document.addEventListener("mouseleave", handleMouseLeave);
-
-    let rafId: number;
-
-    const animate = () => {
-      // Main cursor - snappy
-      if (cursorRef.current) {
-        cursorRef.current.style.transform = `translate(${posRef.current.x - 6}px, ${posRef.current.y - 6}px)`;
-      }
-      // Trail - smooth lag
-      trailPosRef.current.x += (posRef.current.x - trailPosRef.current.x) * 0.15;
-      trailPosRef.current.y += (posRef.current.y - trailPosRef.current.y) * 0.15;
-      if (trailRef.current) {
-        trailRef.current.style.transform = `translate(${trailPosRef.current.x - 20}px, ${trailPosRef.current.y - 20}px)`;
-      }
-      rafId = requestAnimationFrame(animate);
-    };
-
-    rafId = requestAnimationFrame(animate);
-
-    return () => {
-      window.removeEventListener("mousemove", handleMouseMove);
-      document.removeEventListener("mouseleave", handleMouseLeave);
-      cancelAnimationFrame(rafId);
-    };
-  }, [handleMouseMove, handleMouseLeave]);
-
-  return (
-    <>
-      {/* Glow trail */}
-      <div
-        ref={trailRef}
-        className="fixed top-0 left-0 pointer-events-none z-[10001] rounded-full"
-        style={{
-          width: 40,
-          height: 40,
-          opacity: 0,
-          background: `radial-gradient(circle, ${C.pink}30 0%, transparent 70%)`,
-          transition: "opacity 0.3s ease",
-          willChange: "transform",
-        }}
-      />
-      {/* Main dot */}
-      <div
-        ref={cursorRef}
-        className="fixed top-0 left-0 pointer-events-none z-[10001] rounded-full"
-        style={{
-          width: 12,
-          height: 12,
-          opacity: 0,
-          background: C.pink,
-          boxShadow: `0 0 12px ${C.pink}80, 0 0 24px ${C.pink}40`,
-          transition: "opacity 0.3s ease",
-          willChange: "transform",
-        }}
-      />
-    </>
-  );
+function MachineIcon({ id }: { id: string }) {
+  const common = {
+    width: 21,
+    height: 21,
+    viewBox: "0 0 24 24",
+    fill: "none",
+    stroke: "currentColor",
+    strokeWidth: 1.8,
+    strokeLinecap: "round" as const,
+    strokeLinejoin: "round" as const,
+  };
+  switch (id) {
+    case "ai-avatar-machine": // talking-head videos
+      return (
+        <svg {...common}>
+          <rect x="2" y="6" width="13" height="12" rx="2" />
+          <path d="m22 8-7 4 7 4V8Z" />
+        </svg>
+      );
+    case "ai-viral-carousel": // three vertical panels
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="16" rx="2" />
+          <path d="M9 4v16M15 4v16" />
+        </svg>
+      );
+    case "ai-podcast-machine": // microphone
+      return (
+        <svg {...common}>
+          <path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3Z" />
+          <path d="M19 10v1a7 7 0 0 1-14 0v-1M12 18v4" />
+        </svg>
+      );
+    case "bof-videos-machine": // package / bulk products
+      return (
+        <svg {...common}>
+          <path d="M21 8v12H3V8" />
+          <path d="m1.5 3.5 10.5 5 10.5-5" />
+          <path d="M12 8.5V21" />
+        </svg>
+      );
+    case "claymotion-videos-machine": // film strip
+      return (
+        <svg {...common}>
+          <rect x="2" y="4" width="20" height="16" rx="2" />
+          <path d="M7 4v16M17 4v16M2 9h5M2 15h5M17 9h5M17 15h5" />
+        </svg>
+      );
+    case "allinone-machine": // dashboard grid
+      return (
+        <svg {...common}>
+          <rect x="3" y="3" width="7" height="7" rx="1.5" />
+          <rect x="14" y="3" width="7" height="7" rx="1.5" />
+          <rect x="3" y="14" width="7" height="7" rx="1.5" />
+          <rect x="14" y="14" width="7" height="7" rx="1.5" />
+        </svg>
+      );
+    case "autopublish-machine": // paper plane
+      return (
+        <svg {...common}>
+          <path d="m22 2-7 20-4-9-9-4 20-7Z" />
+          <path d="m22 2-11 11" />
+        </svg>
+      );
+    case "schedule-machine": // calendar
+      return (
+        <svg {...common}>
+          <rect x="3" y="4" width="18" height="17" rx="2" />
+          <path d="M16 2v4M8 2v4M3 10h18" />
+        </svg>
+      );
+    case "notch-alternative": // clone / copy
+      return (
+        <svg {...common}>
+          <rect x="9" y="9" width="12" height="12" rx="2" />
+          <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+        </svg>
+      );
+    default:
+      return (
+        <svg {...common}>
+          <circle cx="12" cy="12" r="9" />
+        </svg>
+      );
+  }
 }
 
 // ─── Auth Modal ─────────────────────────────────────────────────────────────
@@ -274,9 +191,9 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
 
       {/* Modal */}
       <div
-        className="relative w-full max-w-md rounded-3xl overflow-hidden shadow-2xl"
+        className="relative w-full max-w-md rounded-2xl overflow-hidden shadow-2xl"
         style={{
-          animation: "authModalIn 0.35s ease-out",
+          animation: "authModalIn 0.3s ease-out",
           backgroundColor: C.white,
         }}
       >
@@ -291,21 +208,21 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
           </svg>
         </button>
 
-        {/* Top pink bar */}
-        <div className="w-full h-1.5" style={{ backgroundColor: C.pink }} />
+        {/* Top accent bar */}
+        <div className="w-full h-1" style={{ backgroundColor: C.accent }} />
 
-        <div className="p-7 sm:p-9">
+        <div className="p-7 sm:p-8">
           {/* Logo */}
           <div className="text-center mb-6">
             <div
-              className="inline-flex items-center justify-center w-14 h-14 rounded-2xl mb-3"
-              style={{ backgroundColor: `${C.softPink}` }}
+              className="inline-flex items-center justify-center w-12 h-12 rounded-xl mb-3"
+              style={{ backgroundColor: C.softPink }}
             >
-              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.pink} strokeWidth="2">
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="2">
                 <path strokeLinecap="round" strokeLinejoin="round" d="M15.75 6a3.75 3.75 0 1 1-7.5 0 3.75 3.75 0 0 1 7.5 0ZM4.501 20.118a7.5 7.5 0 0 1 14.998 0" />
               </svg>
             </div>
-            <h2 className="text-xl font-bold uppercase tracking-wide" style={{ color: C.dark }}>
+            <h2 className="text-xl font-bold tracking-tight" style={{ color: C.dark }}>
               {isLogin ? t("auth.welcomeBack") : t("auth.createAccount")}
             </h2>
           </div>
@@ -344,16 +261,17 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
 
           {/* Tab Toggle */}
           <div
-            className="flex rounded-2xl p-1 mb-5"
-            style={{ backgroundColor: `${C.lightPink}` }}
+            className="flex rounded-xl p-1 mb-5"
+            style={{ backgroundColor: "#F3F4F6" }}
           >
             <button
               type="button"
               onClick={() => { setIsLogin(true); setError(""); }}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-200"
+              className="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200"
               style={{
-                backgroundColor: isLogin ? C.pink : "transparent",
-                color: isLogin ? C.white : "#6B7280",
+                backgroundColor: isLogin ? C.white : "transparent",
+                color: isLogin ? C.dark : C.textMuted,
+                boxShadow: isLogin ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
               }}
             >
               Sign In
@@ -361,10 +279,11 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
             <button
               type="button"
               onClick={() => { setIsLogin(false); setError(""); }}
-              className="flex-1 py-2.5 text-sm font-bold rounded-xl transition-all duration-200"
+              className="flex-1 py-2.5 text-sm font-semibold rounded-lg transition-all duration-200"
               style={{
-                backgroundColor: !isLogin ? C.pink : "transparent",
-                color: !isLogin ? C.white : "#6B7280",
+                backgroundColor: !isLogin ? C.white : "transparent",
+                color: !isLogin ? C.dark : C.textMuted,
+                boxShadow: !isLogin ? "0 1px 3px rgba(0,0,0,0.08)" : "none",
               }}
             >
               Sign Up
@@ -385,7 +304,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
           <form onSubmit={handleEmailSubmit} className="space-y-3.5">
             {!isLogin && (
               <div>
-                <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: C.text }}>
+                <label className="block text-xs font-semibold mb-1.5" style={{ color: C.text }}>
                   Full Name
                 </label>
                 <input
@@ -396,15 +315,15 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                   required={!isLogin}
                   className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
                   style={{
-                    backgroundColor: `${C.lightPink}40`,
-                    border: `1.5px solid ${C.lightPink}`,
+                    backgroundColor: "#FAFAFA",
+                    border: "1.5px solid #E5E7EB",
                     color: C.text,
                   }}
                 />
               </div>
             )}
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: C.text }}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: C.text }}>
                 Email
               </label>
               <input
@@ -415,14 +334,14 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                 required
                 className="w-full px-4 py-3 rounded-xl text-sm outline-none transition-all"
                 style={{
-                  backgroundColor: `${C.lightPink}40`,
-                  border: `1.5px solid ${C.lightPink}`,
+                  backgroundColor: "#FAFAFA",
+                  border: "1.5px solid #E5E7EB",
                   color: C.text,
                 }}
               />
             </div>
             <div>
-              <label className="block text-xs font-bold uppercase tracking-wider mb-1" style={{ color: C.text }}>
+              <label className="block text-xs font-semibold mb-1.5" style={{ color: C.text }}>
                 Password
               </label>
               <div className="relative">
@@ -435,8 +354,8 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
                   minLength={6}
                   className="w-full px-4 py-3 pr-11 rounded-xl text-sm outline-none transition-all"
                   style={{
-                    backgroundColor: `${C.lightPink}40`,
-                    border: `1.5px solid ${C.lightPink}`,
+                    backgroundColor: "#FAFAFA",
+                    border: "1.5px solid #E5E7EB",
                     color: C.text,
                   }}
                 />
@@ -463,8 +382,8 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
             <button
               type="submit"
               disabled={loading}
-              className="w-full py-3.5 rounded-xl text-sm font-bold uppercase tracking-wider transition-all disabled:opacity-50"
-              style={{ backgroundColor: C.pink, color: C.white }}
+              className="w-full py-3.5 rounded-xl text-sm font-semibold transition-all disabled:opacity-50"
+              style={{ backgroundColor: C.accent, color: C.white }}
             >
               {loading ? (
                 <span className="inline-flex items-center gap-2">
@@ -483,7 +402,7 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
         @keyframes authModalIn {
           from {
             opacity: 0;
-            transform: scale(0.92) translateY(20px);
+            transform: scale(0.95) translateY(12px);
           }
           to {
             opacity: 1;
@@ -495,711 +414,24 @@ function AuthModal({ isOpen, onClose, defaultMode }: {
   );
 }
 
-// ─── Plans Section ──────────────────────────────────────────────────────────
-
-function PlansSection({ onGetStarted }: { onGetStarted: () => void }) {
-  const { t } = useAppLang();
-  const [hoveredPlan, setHoveredPlan] = useState<number | null>(null);
-  const sectionRef = useRef<HTMLDivElement>(null);
-  const [isVisible, setIsVisible] = useState(false);
-
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          setIsVisible(true);
-        }
-      },
-      { threshold: 0.15 }
-    );
-
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    return () => observer.disconnect();
-  }, []);
-
-  const plans = [
-    {
-      name: t("plan.free"),
-      price: "$0",
-      period: "",
-      credits: "3",
-      creditsLabel: "credits",
-      features: [
-        "3 AI avatar credits",
-        "Standard resolution",
-        "Basic support",
-        "1 concurrent job",
-      ],
-      color: "#B8A99A",
-      highlight: false,
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2L15.09 8.26L22 9.27L17 14.14L18.18 21.02L12 17.77L5.82 21.02L7 14.14L2 9.27L8.91 8.26L12 2Z" stroke="#B8A99A" strokeWidth="1.5" fill="none" />
-        </svg>
-      ),
-    },
-    {
-      name: t("plan.pro"),
-      price: "$19",
-      period: ".99/mo",
-      credits: "50",
-      creditsLabel: "credits",
-      features: [
-        "50 AI avatar credits",
-        "HD 1080p resolution",
-        "Priority processing",
-        "3 concurrent jobs",
-        "Priority support",
-      ],
-      color: C.pink,
-      highlight: true,
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z" stroke={C.pink} strokeWidth="1.5" fill="none" strokeLinejoin="round" />
-        </svg>
-      ),
-    },
-    {
-      name: t("plan.enterprise"),
-      price: "$49",
-      period: ".99/mo",
-      credits: "\u221E",
-      creditsLabel: "unlimited",
-      features: [
-        "Unlimited credits",
-        "4K resolution",
-        "Priority processing",
-        "10 concurrent jobs",
-        "Custom branding",
-        "API access",
-      ],
-      color: C.gold,
-      highlight: false,
-      icon: (
-        <svg width="24" height="24" viewBox="0 0 24 24" fill="none">
-          <path d="M12 2l3 7h7l-5.5 4 2 7L12 16l-6.5 4 2-7L2 9h7l3-7z" stroke={C.gold} strokeWidth="1.5" fill="none" />
-          <circle cx="12" cy="12" r="3" fill={C.gold} opacity="0.3" />
-        </svg>
-      ),
-    },
-  ];
-
-  return (
-    <div
-      ref={sectionRef}
-      className="w-full max-w-5xl mx-auto px-5 sm:px-10 py-10 sm:py-16"
-    >
-      {/* Section Header */}
-      <div
-        className="text-center mb-10 sm:mb-14 transition-all duration-700"
-        style={{
-          opacity: isVisible ? 1 : 0,
-          transform: isVisible ? "translateY(0)" : "translateY(30px)",
-        }}
-      >
-        <div className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-4" style={{ backgroundColor: "rgba(228,97,173,0.15)" }}>
-          <div className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: C.pink }} />
-          <span className="text-xs font-bold uppercase tracking-widest" style={{ color: C.pink }}>Pricing</span>
-        </div>
-        <h3
-          className="text-2xl sm:text-4xl font-bold uppercase tracking-wide mb-3"
-          style={{ color: C.white, textShadow: "0 2px 12px rgba(0,0,0,0.3)" }}
-        >
-          Choose Your <span style={{ color: C.pink }}>Plan</span>
-        </h3>
-        <p className="text-sm max-w-md mx-auto" style={{ color: "rgba(255,255,255,0.55)" }}>
-          Start free and scale as you grow. No hidden fees, cancel anytime.
-        </p>
-      </div>
-
-      {/* Plans Grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 sm:gap-5">
-        {plans.map((plan, index) => (
-          <div
-            key={plan.name}
-            className="relative transition-all duration-700 cursor-pointer"
-            style={{
-              opacity: isVisible ? 1 : 0,
-              transform: isVisible ? "translateY(0)" : "translateY(40px)",
-              transitionDelay: `${200 + index * 150}ms`,
-            }}
-            onMouseEnter={() => setHoveredPlan(index)}
-            onMouseLeave={() => setHoveredPlan(null)}
-          >
-            {/* Highlight glow behind Pro card */}
-            {plan.highlight && (
-              <div
-                className="absolute -inset-1 rounded-3xl transition-opacity duration-500"
-                style={{
-                  opacity: hoveredPlan === index ? 1 : 0.5,
-                  background: `linear-gradient(135deg, ${C.pink}60, ${C.gold}60)`,
-                  filter: "blur(12px)",
-                }}
-              />
-            )}
-
-            <div
-              className="relative rounded-2xl sm:rounded-3xl p-6 sm:p-7 h-full transition-all duration-300 overflow-hidden"
-              style={{
-                background: hoveredPlan === index
-                  ? "rgba(255,255,255,0.12)"
-                  : "rgba(255,255,255,0.06)",
-                border: `1.5px solid ${
-                  plan.highlight
-                    ? `${C.pink}${hoveredPlan === index ? "80" : "50"}`
-                    : hoveredPlan === index
-                    ? "rgba(255,255,255,0.20)"
-                    : "rgba(255,255,255,0.08)"
-                }`,
-                backdropFilter: "blur(20px)",
-                WebkitBackdropFilter: "blur(20px)",
-                transform: hoveredPlan === index ? "translateY(-8px)" : "translateY(0)",
-                boxShadow: hoveredPlan === index
-                  ? `0 20px 60px ${plan.color}25`
-                  : "none",
-              }}
-            >
-              {/* Top gradient line */}
-              <div
-                className="absolute top-0 left-0 right-0 h-0.5"
-                style={{
-                  background: plan.highlight
-                    ? `linear-gradient(90deg, transparent, ${C.pink}, ${C.gold}, transparent)`
-                    : `linear-gradient(90deg, transparent, ${plan.color}60, transparent)`,
-                }}
-              />
-
-              {/* Popular badge */}
-              {plan.highlight && (
-                <div className="absolute top-4 right-4">
-                  <div
-                    className="px-2.5 py-1 rounded-full text-[9px] font-bold uppercase tracking-widest"
-                    style={{
-                      background: `linear-gradient(135deg, ${C.pink}, ${C.gold})`,
-                      color: C.white,
-                    }}
-                  >
-                    Popular
-                  </div>
-                </div>
-              )}
-
-              {/* Icon + Name */}
-              <div className="mb-5">
-                <div
-                  className="w-10 h-10 rounded-xl flex items-center justify-center mb-3 transition-all duration-300"
-                  style={{
-                    backgroundColor: `${plan.color}15`,
-                    border: `1px solid ${plan.color}25`,
-                    transform: hoveredPlan === index ? "scale(1.1) rotate(-3deg)" : "scale(1)",
-                  }}
-                >
-                  {plan.icon}
-                </div>
-                <h4
-                  className="text-sm font-bold uppercase tracking-wider"
-                  style={{ color: plan.color }}
-                >
-                  {plan.name}
-                </h4>
-              </div>
-
-              {/* Price */}
-              <div className="mb-5">
-                <div className="flex items-baseline gap-1">
-                  <span
-                    className="text-3xl sm:text-4xl font-black"
-                    style={{ color: C.white }}
-                  >
-                    {plan.price}
-                  </span>
-                  {plan.period && (
-                    <span className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.45)" }}>
-                      {plan.period}
-                    </span>
-                  )}
-                </div>
-                <div className="flex items-center gap-1.5 mt-1.5">
-                  <div className="w-4 h-4 rounded-full flex items-center justify-center" style={{ backgroundColor: `${plan.color}20` }}>
-                    <svg width="8" height="8" viewBox="0 0 20 20" fill={plan.color}>
-                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
-                    </svg>
-                  </div>
-                  <span className="text-xs font-semibold" style={{ color: "rgba(255,255,255,0.6)" }}>
-                    {plan.credits} {plan.creditsLabel}
-                  </span>
-                </div>
-              </div>
-
-              {/* Divider */}
-              <div
-                className="h-px mb-5"
-                style={{
-                  background: `linear-gradient(90deg, transparent, ${plan.color}30, transparent)`,
-                }}
-              />
-
-              {/* Features */}
-              <ul className="space-y-2.5 mb-6">
-                {plan.features.map((feature, i) => (
-                  <li
-                    key={i}
-                    className="flex items-start gap-2 text-xs sm:text-sm transition-all duration-500"
-                    style={{
-                      color: hoveredPlan === index ? "rgba(255,255,255,0.85)" : "rgba(255,255,255,0.5)",
-                      opacity: isVisible ? 1 : 0,
-                      transform: isVisible ? "translateX(0)" : "translateX(-10px)",
-                      transitionDelay: `${500 + i * 80}ms`,
-                    }}
-                  >
-                    <svg
-                      className="w-3.5 h-3.5 mt-0.5 flex-shrink-0"
-                      viewBox="0 0 20 20"
-                      fill={plan.color}
-                      style={{ opacity: hoveredPlan === index ? 1 : 0.6 }}
-                    >
-                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                    </svg>
-                    <span>{feature}</span>
-                  </li>
-                ))}
-              </ul>
-
-              {/* CTA Button */}
-              <button
-                onClick={onGetStarted}
-                className="w-full py-3 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-300"
-                style={{
-                  background: plan.highlight
-                    ? `linear-gradient(135deg, ${C.pink}, ${C.gold})`
-                    : hoveredPlan === index
-                    ? `${plan.color}25`
-                    : "rgba(255,255,255,0.06)",
-                  color: plan.highlight ? C.white : plan.color,
-                  border: plan.highlight
-                    ? "none"
-                    : `1.5px solid ${hoveredPlan === index ? `${plan.color}50` : "rgba(255,255,255,0.10)"}`,
-                  boxShadow: plan.highlight && hoveredPlan === index
-                    ? `0 8px 30px ${C.pink}40`
-                    : "none",
-                  transform: hoveredPlan === index ? "scale(1.02)" : "scale(1)",
-                }}
-              >
-                {plan.name === t("plan.free") ? t("plan.getStarted") : t("plan.upgradeTo", { name: plan.name })}
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Video Carousel Display for Cards ──────────────────────────────────
-
-const CARD_VIDEOS = ["/videos/1.mp4", "/videos/2.mp4", "/videos/3.mp4", "/videos/4.mp4", "/videos/5.mp4"];
-const PODCAST_VIDEO = "/videos/podcast-preview.mp4";
-
-function VideoCardDisplay({ isHovered }: { isHovered: boolean }) {
-  const [currentIdx, setCurrentIdx] = useState(() => Math.floor(Math.random() * CARD_VIDEOS.length));
-  const [fading, setFading] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-
-  // Auto-rotate videos every 3.5s with fade
-  useEffect(() => {
-    const interval = setInterval(() => {
-      setFading(true);
-      setTimeout(() => {
-        setCurrentIdx((prev) => (prev + 1) % CARD_VIDEOS.length);
-        setFading(false);
-      }, 350);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, []);
-
-  // 9:16 aspect ratio - vertical phone-style
-  const frameW = 140;
-  const frameH = Math.round(frameW * (16 / 9)); // ~249
-
-  return (
-    <div
-      ref={containerRef}
-      className="relative flex flex-col items-center"
-      style={{
-        transition: "transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)",
-        transform: isHovered ? "scale(1.03)" : "scale(1)",
-      }}
-    >
-      {/* Phone Frame */}
-      <div
-        className="relative"
-        style={{
-          width: frameW,
-          height: frameH,
-          borderRadius: "22px",
-          background: "linear-gradient(145deg, #1a1a2e 0%, #0A0A0A 100%)",
-          padding: "4px",
-          boxShadow: isHovered
-            ? `0 12px 40px rgba(228,97,173,0.35), 0 4px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(228,97,173,0.2)`
-            : `0 6px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.08)`,
-          transition: "box-shadow 0.5s ease",
-        }}
-      >
-        {/* Inner screen */}
-        <div
-          className="relative w-full h-full overflow-hidden"
-          style={{
-            borderRadius: "18px",
-            background: "#000",
-          }}
-        >
-          {/* Video */}
-          <video
-            key={currentIdx}
-            autoPlay
-            loop
-            muted
-            playsInline
-            className="absolute inset-0 w-full h-full"
-            style={{
-              objectFit: "cover",
-              borderRadius: "18px",
-              objectPosition: "center center",
-              opacity: fading ? 0 : 1,
-              transition: "opacity 0.35s ease",
-            }}
-          >
-            <source src={CARD_VIDEOS[currentIdx]} type="video/mp4" />
-          </video>
-
-          {/* Top gradient overlay (notch area) */}
-          <div
-            className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
-            style={{
-              height: 32,
-              background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%)",
-              borderRadius: "18px 18px 0 0",
-            }}
-          >
-            {/* Dynamic Island / Notch */}
-            <div
-              className="absolute left-1/2 -translate-x-1/2"
-              style={{
-                top: 7,
-                width: 40,
-                height: 10,
-                borderRadius: 6,
-                backgroundColor: "rgba(0,0,0,0.7)",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}
-            />
-          </div>
-
-          {/* Bottom gradient overlay */}
-          <div
-            className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
-            style={{
-              height: 40,
-              background: "linear-gradient(0deg, rgba(0,0,0,0.6) 0%, transparent 100%)",
-              borderRadius: "0 0 18px 18px",
-            }}
-          />
-
-          {/* Play icon overlay */}
-          <div
-            className="absolute inset-0 flex items-center justify-center pointer-events-none z-10"
-            style={{
-              opacity: isHovered ? 0 : 0.35,
-              transition: "opacity 0.4s ease",
-            }}
-          >
-            <div
-              className="flex items-center justify-center"
-              style={{
-                width: 38,
-                height: 38,
-                borderRadius: "50%",
-                backgroundColor: "rgba(0,0,0,0.45)",
-                backdropFilter: "blur(8px)",
-                border: "1px solid rgba(255,255,255,0.1)",
-              }}
-            >
-              <svg width="15" height="15" viewBox="0 0 18 18" fill="white">
-                <path d="M6 3l10 6-10 6V3z" />
-              </svg>
-            </div>
-          </div>
-
-          {/* Hover shimmer */}
-          {isHovered && (
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: "linear-gradient(105deg, transparent 30%, rgba(228,97,173,0.08) 50%, transparent 70%)",
-                animation: "cardShimmer 2s ease-in-out infinite",
-                borderRadius: "18px",
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Progress dots */}
-      <div className="flex items-center gap-1.5 mt-2">
-        {CARD_VIDEOS.map((_, i) => (
-          <div
-            key={i}
-            className="rounded-full transition-all duration-400"
-            style={{
-              width: currentIdx === i ? 14 : 4,
-              height: 4,
-              backgroundColor: currentIdx === i ? C.pink : "rgba(255,255,255,0.25)",
-              boxShadow: currentIdx === i ? `0 0 8px ${C.pink}80` : "none",
-            }}
-          />
-        ))}
-      </div>
-    </div>
-  );
-}
-
-// ─── Podcast Video Card Display (Creative) ──────────────────────────────
-
-function PodcastVideoCardDisplay({ isHovered }: { isHovered: boolean }) {
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const [videoLoaded, setVideoLoaded] = useState(false);
-
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!videoLoaded) setVideoLoaded(true);
-    }, 3000);
-    return () => clearTimeout(timer);
-  }, [videoLoaded]);
-
-  // 9:16 vertical phone-style frame
-  const frameW = 140;
-  const frameH = Math.round(frameW * (16 / 9));
-
-  return (
-    <div
-      className="relative flex flex-col items-center"
-      style={{
-        transition: "transform 0.6s cubic-bezier(0.23, 1, 0.32, 1)",
-        transform: isHovered ? "scale(1.03)" : "scale(1)",
-      }}
-    >
-      {/* Floating sound wave rings */}
-      {isHovered && (
-        <>
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: -8,
-              left: -14,
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              border: `1.5px solid ${C.cyan}40`,
-              animation: "podcastWave 2s ease-out infinite",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              top: -16,
-              left: -22,
-              width: 66,
-              height: 66,
-              borderRadius: "50%",
-              border: `1px solid ${C.pink}30`,
-              animation: "podcastWave 2s ease-out infinite 0.4s",
-            }}
-          />
-          <div
-            className="absolute pointer-events-none"
-            style={{
-              bottom: -8,
-              right: -14,
-              width: 50,
-              height: 50,
-              borderRadius: "50%",
-              border: `1.5px solid ${C.cyan}40`,
-              animation: "podcastWave 2s ease-out infinite 0.8s",
-            }}
-          />
-        </>
-      )}
-
-      {/* Phone Frame */}
-      <div
-        className="relative"
-        style={{
-          width: frameW,
-          height: frameH,
-          borderRadius: "22px",
-          background: "linear-gradient(145deg, #0a1628 0%, #060d1a 100%)",
-          padding: "4px",
-          boxShadow: isHovered
-            ? `0 12px 40px rgba(22,177,222,0.35), 0 4px 12px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(22,177,222,0.2)`
-            : `0 6px 24px rgba(0,0,0,0.2), inset 0 0 0 1px rgba(255,255,255,0.08)`,
-          transition: "box-shadow 0.5s ease",
-        }}
-      >
-        {/* Inner screen */}
-        <div
-          className="relative w-full h-full overflow-hidden"
-          style={{
-            borderRadius: "18px",
-            background: "#000",
-          }}
-        >
-          {/* Video */}
-          <video
-            ref={videoRef}
-            autoPlay
-            loop
-            muted
-            playsInline
-            onCanPlayThrough={() => setVideoLoaded(true)}
-            onLoadedData={() => setVideoLoaded(true)}
-            className="absolute inset-0 w-full h-full"
-            style={{
-              objectFit: "cover",
-              borderRadius: "18px",
-              objectPosition: "center center",
-              opacity: videoLoaded ? 1 : 0,
-              transition: "opacity 0.6s ease",
-            }}
-          >
-            <source src={PODCAST_VIDEO} type="video/mp4" />
-          </video>
-
-          {/* Loading placeholder */}
-          {!videoLoaded && (
-            <div
-              className="absolute inset-0 flex items-center justify-center"
-              style={{
-                borderRadius: "18px",
-                background: `linear-gradient(135deg, #0a1628, #0d1f3c)`,
-              }}
-            >
-              <div
-                className="flex items-center justify-center"
-                style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: "50%",
-                  background: `linear-gradient(135deg, ${C.cyan}30, ${C.pink}30)`,
-                  animation: "pulse 1.5s ease-in-out infinite",
-                }}
-              >
-                <svg width="18" height="18" viewBox="0 0 24 24" fill={C.cyan}>
-                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 14.5v-9l6 4.5-6 4.5z" />
-                </svg>
-              </div>
-            </div>
-          )}
-
-          {/* Top gradient overlay (notch) */}
-          <div
-            className="absolute top-0 left-0 right-0 z-10 pointer-events-none"
-            style={{
-              height: 32,
-              background: "linear-gradient(180deg, rgba(0,0,0,0.5) 0%, transparent 100%)",
-              borderRadius: "18px 18px 0 0",
-            }}
-          >
-            {/* Dynamic Island */}
-            <div
-              className="absolute left-1/2 -translate-x-1/2"
-              style={{
-                top: 7,
-                width: 40,
-                height: 10,
-                borderRadius: 6,
-                backgroundColor: "rgba(0,0,0,0.7)",
-                border: "1px solid rgba(255,255,255,0.08)",
-              }}
-            />
-          </div>
-
-          {/* Bottom gradient overlay with podcast badge */}
-          <div
-            className="absolute bottom-0 left-0 right-0 z-10 pointer-events-none"
-            style={{
-              height: 48,
-              background: "linear-gradient(0deg, rgba(0,0,0,0.7) 0%, transparent 100%)",
-              borderRadius: "0 0 18px 18px",
-            }}
-          >
-            {/* LIVE badge */}
-            <div
-              className="absolute bottom-3 left-3 flex items-center gap-1.5"
-              style={{
-                animation: isHovered ? "pulse 1.5s ease-in-out infinite" : "none",
-              }}
-            >
-              <div
-                style={{
-                  width: 6,
-                  height: 6,
-                  borderRadius: "50%",
-                  backgroundColor: "#FF3B3B",
-                  boxShadow: "0 0 6px #FF3B3B80",
-                }}
-              />
-              <span
-                className="text-[8px] font-bold uppercase tracking-widest"
-                style={{ color: "rgba(255,255,255,0.9)" }}
-              >
-                Podcast
-              </span>
-            </div>
-
-            {/* Sound wave equalizer bars */}
-            <div className="absolute bottom-2.5 right-3 flex items-end gap-[2px]">
-              {[12, 8, 16, 6, 10, 14, 7, 11].map((h, i) => (
-                <div
-                  key={i}
-                  style={{
-                    width: 2,
-                    height: h,
-                    borderRadius: 1,
-                    background: `linear-gradient(180deg, ${C.cyan}, ${C.pink})`,
-                    opacity: isHovered ? 0.8 : 0.4,
-                    animation: `equalizerBar ${0.6 + i * 0.15}s ease-in-out infinite alternate`,
-                    transition: "opacity 0.3s ease",
-                  }}
-                />
-              ))}
-            </div>
-          </div>
-
-          {/* Hover shimmer */}
-          {isHovered && (
-            <div
-              className="absolute inset-0 z-10 pointer-events-none"
-              style={{
-                background: "linear-gradient(105deg, transparent 30%, rgba(22,177,222,0.08) 50%, transparent 70%)",
-                animation: "cardShimmer 2s ease-in-out infinite",
-                borderRadius: "18px",
-              }}
-            />
-          )}
-        </div>
-      </div>
-
-
-    </div>
-  );
-}
-
-// ─── MainMenu Component ─────────────────────────────────────────────────────
+// ─── MainMenu — one clean screen, no scroll ──────────────────────────────────
 
 interface MainMenuProps {
   onNavigate: (destination: string) => void;
   onOpenLibrary?: () => void;
 }
+
+const MACHINES = [
+  "ai-avatar-machine",
+  "ai-viral-carousel",
+  "ai-podcast-machine",
+  "bof-videos-machine",
+  "claymotion-videos-machine",
+  "allinone-machine",
+  "autopublish-machine",
+  "schedule-machine",
+  "notch-alternative",
+];
 
 export default function MainMenu({
   onNavigate,
@@ -1209,10 +441,10 @@ export default function MainMenu({
   const { locale, setLocale, t, rtl } = useAppLang();
   const videoRef = useRef<HTMLVideoElement>(null);
   const [videoLoaded, setVideoLoaded] = useState(false);
-  const [activeCard, setActiveCard] = useState<number | null>(null);
   const [mounted, setMounted] = useState(false);
   const [showAuth, setShowAuth] = useState(false);
   const [authMode, setAuthMode] = useState<"login" | "signup">("login");
+  const [hovered, setHovered] = useState<string | null>(null);
 
   const isAuthenticated = !!user;
   const userName = user?.name || "User";
@@ -1224,35 +456,16 @@ export default function MainMenu({
     setMounted(true);
   }, []);
 
-  // Show loading screen while auth session is being restored
-  if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center" style={{ backgroundColor: C.cream }}>
-        <div className="text-center">
-          <div
-            className="w-12 h-12 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
-            style={{ borderColor: `${C.pink}33`, borderTopColor: C.pink }}
-          />
-          <p className="text-sm font-medium" style={{ color: C.warmGray }}>Loading...</p>
-        </div>
-      </div>
-    );
-  }
+  // Fallback: if the video doesn't fire canplaythrough within 4s, reveal anyway
+  useEffect(() => {
+    const timer = setTimeout(() => setVideoLoaded(true), 4000);
+    return () => clearTimeout(timer);
+  }, []);
 
   const handleVideoCanPlay = () => {
     setVideoLoaded(true);
-    if (videoRef.current) {
-      videoRef.current.play().catch(() => {});
-    }
+    videoRef.current?.play().catch(() => {});
   };
-
-  // Fallback: if video doesn't fire canplaythrough within 4s, show it anyway
-  useEffect(() => {
-    const timer = setTimeout(() => {
-      if (!videoLoaded) setVideoLoaded(true);
-    }, 4000);
-    return () => clearTimeout(timer);
-  }, [videoLoaded]);
 
   const handleCardClick = (id: string) => {
     if (!isAuthenticated) {
@@ -1273,692 +486,270 @@ export default function MainMenu({
     setShowAuth(true);
   };
 
-  const userEmail = user?.email || "";
-  const userRole = user?.role || "user";
-  const initials = userName.split(" ").map((n) => n[0]).join("").toUpperCase().slice(0, 2);
-
-  const menuItems = [
-    {
-      id: "ai-avatar-machine",
-      title: t("menu.ai-avatar-machine.title"),
-      subtitle: t("menu.ai-avatar-machine.subtitle"),
-      description: t("menu.ai-avatar-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="40" height="32" rx="6" stroke={C.pink} strokeWidth="2.5" fill="none" />
-          <circle cx="16" cy="20" r="4" stroke={C.pink} strokeWidth="2" fill="none" />
-          <path d="M8 36c0-5 3.5-8 8-8s8 3 8 8" stroke={C.pink} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M30 18l4 4m0-4l-4 4" stroke={C.gold} strokeWidth="2.5" strokeLinecap="round" />
-          <path d="M28 28h12" stroke={C.pink} strokeWidth="2" strokeLinecap="round" />
-          <path d="M28 33h8" stroke={C.pink} strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        </svg>
-      ),
-      accentColor: C.pink,
-    },
-    {
-      id: "ai-viral-carousel",
-      title: t("menu.ai-viral-carousel.title"),
-      subtitle: t("menu.ai-viral-carousel.subtitle"),
-      description: t("menu.ai-viral-carousel.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="6" y="4" width="36" height="40" rx="6" stroke={C.gold} strokeWidth="2" fill="none" />
-          <path d="M14 14h20M14 20h16M14 26h12" stroke={C.gold} strokeWidth="2" strokeLinecap="round" />
-          <path d="M32 30l4 4 6-8" stroke={C.pink} strokeWidth="2.5" fill="none" strokeLinecap="round" strokeLinejoin="round" />
-          <circle cx="24" cy="4" r="3" fill={C.pink} opacity="0.8" />
-        </svg>
-      ),
-      accentColor: C.gold,
-    },
-    {
-      id: "ai-podcast-machine",
-      title: t("menu.ai-podcast-machine.title"),
-      subtitle: t("menu.ai-podcast-machine.subtitle"),
-      description: t("menu.ai-podcast-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <circle cx="14" cy="18" r="6" stroke={C.cyan} strokeWidth="2" fill="none" />
-          <circle cx="34" cy="18" r="6" stroke={C.pink} strokeWidth="2" fill="none" />
-          <path d="M14 28c0-4 2.7-7 6-7s6 3 6 7" stroke={C.cyan} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M34 28c0-4-2.7-7-6-7s-6 3-6 7" stroke={C.pink} strokeWidth="2" fill="none" strokeLinecap="round" />
-          <path d="M20 22c0 0 2-3 4 0s4 0 4 0" stroke={C.gold} strokeWidth="1.5" strokeLinecap="round" />
-          <path d="M12 36h24" stroke={C.warmGray} strokeWidth="2" strokeLinecap="round" />
-          <path d="M16 33h16" stroke={C.warmGray} strokeWidth="1.5" strokeLinecap="round" opacity="0.5" />
-        </svg>
-      ),
-      accentColor: C.cyan,
-    },
-    {
-      id: "bof-videos-machine",
-      title: t("menu.bof-videos-machine.title"),
-      subtitle: t("menu.bof-videos-machine.subtitle"),
-      description: t("menu.bof-videos-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#00E5FF" strokeWidth="2.5" fill="none" />
-          <path d="M18 18l8 4-8 4V18z" fill="#00E5FF" opacity="0.8" />
-          <path d="M4 40h40" stroke="#00E5FF" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="10" cy="44" r="3" stroke="#00E5FF" strokeWidth="1.5" fill="none" />
-          <circle cx="24" cy="44" r="3" stroke="#FF2E88" strokeWidth="1.5" fill="none" />
-          <circle cx="38" cy="44" r="3" stroke="#16B1DE" strokeWidth="1.5" fill="none" />
-          <path d="M36 4l4 4m0-4l-4 4" stroke="#FF2E88" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      ),
-      accentColor: "#00E5FF",
-    },
-    {
-      id: "claymotion-videos-machine",
-      title: t("menu.claymotion-videos-machine.title"),
-      subtitle: t("menu.claymotion-videos-machine.subtitle"),
-      description: t("menu.claymotion-videos-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="16" height="24" rx="3" stroke="#FFFFFF" strokeWidth="2" fill="none" />
-          <rect x="28" y="8" width="16" height="24" rx="3" stroke="#FFFFFF" strokeWidth="2" fill="none" />
-          <path d="M20 20h8" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" />
-          <path d="M24 16l4 4-4 4" stroke="#FFFFFF" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-          <path d="M4 40h40" stroke="#FFFFFF" strokeWidth="1.5" strokeLinecap="round" opacity="0.4" />
-        </svg>
-      ),
-      accentColor: "#FFFFFF",
-    },
-    {
-      id: "allinone-machine",
-      title: t("menu.allinone-machine.title"),
-      subtitle: t("menu.allinone-machine.subtitle"),
-      description: t("menu.allinone-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="4" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
-          <rect x="27" y="4" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
-          <rect x="4" y="27" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
-          <rect x="27" y="27" width="17" height="17" rx="4" stroke="#8B5CF6" strokeWidth="2.5" fill="none" />
-          <circle cx="12.5" cy="12.5" r="3" fill="#8B5CF6" opacity="0.6" />
-          <circle cx="35.5" cy="12.5" r="3" fill="#8B5CF6" opacity="0.6" />
-          <circle cx="12.5" cy="35.5" r="3" fill="#8B5CF6" opacity="0.6" />
-          <circle cx="35.5" cy="35.5" r="3" fill="#8B5CF6" opacity="0.6" />
-        </svg>
-      ),
-      accentColor: "#8B5CF6",
-    },
-    {
-      id: "autopublish-machine",
-      title: t("menu.autopublish-machine.title"),
-      subtitle: t("menu.autopublish-machine.subtitle"),
-      description: t("menu.autopublish-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="4" y="8" width="40" height="28" rx="4" stroke="#FF0050" strokeWidth="2.5" fill="none" />
-          <path d="M18 18l8 4-8 4V18z" fill="#FF0050" opacity="0.8" />
-          <path d="M4 40h40" stroke="#FF0050" strokeWidth="2" strokeLinecap="round" />
-          <circle cx="38" cy="14" r="6" fill="#25F4EE" opacity="0.2" />
-          <path d="M36 12l4 4m0-4l-4 4" stroke="#25F4EE" strokeWidth="2" strokeLinecap="round" />
-          <path d="M14 4l3 3m0-3l-3 3" stroke="#FF0050" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      ),
-      accentColor: "#FF0050",
-    },
-    {
-      id: "schedule-machine",
-      title: t("menu.schedule-machine.title"),
-      subtitle: t("menu.schedule-machine.subtitle"),
-      description: t("menu.schedule-machine.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <rect x="6" y="8" width="36" height="34" rx="5" stroke="#10B981" strokeWidth="2.5" fill="none" />
-          <path d="M6 18h36" stroke="#10B981" strokeWidth="2" strokeLinecap="round" />
-          <path d="M16 4v8M32 4v8" stroke="#10B981" strokeWidth="2.5" strokeLinecap="round" />
-          <rect x="12" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.85" />
-          <rect x="21" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.5" />
-          <rect x="30" y="24" width="6" height="6" rx="1" fill="#10B981" opacity="0.25" />
-          <rect x="12" y="33" width="6" height="6" rx="1" fill="#10B981" opacity="0.5" />
-          <rect x="21" y="33" width="6" height="6" rx="1" fill="#10B981" opacity="0.85" />
-          <circle cx="36" cy="38" r="6" fill="#10B981" />
-          <path d="M33.5 38l1.8 1.8 3.2-3.6" stroke="white" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
-        </svg>
-      ),
-      accentColor: "#10B981",
-    },
-    {
-      id: "notch-alternative",
-      title: t("menu.notch-alternative.title"),
-      subtitle: t("menu.notch-alternative.subtitle"),
-      description: t("menu.notch-alternative.description"),
-      icon: (
-        <svg width="40" height="40" viewBox="0 0 48 48" fill="none">
-          <path d="M13 2L4.5 13.5H11L10 22L19.5 10H13L13 2Z" fill="#593dfa" />
-          <rect x="4" y="26" width="17" height="17" rx="4" stroke="#593dfa" strokeWidth="2.5" fill="none" />
-          <rect x="27" y="26" width="17" height="17" rx="4" stroke="#c026d3" strokeWidth="2.5" fill="none" />
-          <circle cx="12.5" cy="34.5" r="3" fill="#593dfa" opacity="0.7" />
-          <circle cx="35.5" cy="34.5" r="3" fill="#c026d3" opacity="0.7" />
-          <path d="M24 20l3 3m0-3l-3 3" stroke="#c026d3" strokeWidth="2" strokeLinecap="round" />
-        </svg>
-      ),
-      accentColor: "#593dfa",
-    }];
+  // Show loading screen while auth session is being restored
+  if (loading) {
+    return (
+      <div className="h-screen flex items-center justify-center" style={{ backgroundColor: C.dark }}>
+        <div className="text-center">
+          <div
+            className="w-10 h-10 rounded-full border-4 border-t-transparent animate-spin mx-auto mb-4"
+            style={{ borderColor: "rgba(255,255,255,0.15)", borderTopColor: C.accent }}
+          />
+          <p className="text-sm font-medium" style={{ color: "rgba(255,255,255,0.5)" }}>Loading...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="min-h-screen relative overflow-hidden" dir={rtl ? "rtl" : "ltr"} style={{ fontFamily: "var(--font-etna), 'Etna', sans-serif" }}>
-      {/* ─── Language Switcher (floating, top corner) ─── */}
-      <div
-        className="fixed z-[100] flex items-center gap-1 rounded-full border border-white/40 bg-white/80 backdrop-blur-md shadow-lg"
-        style={{ top: 16, [rtl ? "left" : "right"]: 16, padding: "4px 6px" } as React.CSSProperties}
-      >
-        {APP_LOCALES.map((l) => (
-          <button
-            key={l.code}
-            onClick={() => setLocale(l.code)}
-            className="rounded-full px-3 py-1.5 text-xs font-semibold transition-all"
-            style={{
-              backgroundColor: locale === l.code ? "#FF2E88" : "transparent",
-              color: locale === l.code ? "#fff" : "#1A1A2E",
-              cursor: "pointer",
-            }}
-            aria-pressed={locale === l.code}
-          >
-            {l.short}
-          </button>
-        ))}
-      </div>
-
+    <div
+      className="h-screen overflow-hidden relative"
+      dir={rtl ? "rtl" : "ltr"}
+      style={{ fontFamily: "var(--font-etna), 'Etna', sans-serif" }}
+    >
       {/* ─── Video Background ─────────────────────────────────── */}
-      <div className="absolute inset-0 z-0">
-        {!videoLoaded && (
-          <div className="absolute inset-0" style={{ backgroundColor: C.cream }} />
-        )}
-        <video
-          ref={videoRef}
-          autoPlay
-          loop
-          muted
-          playsInline
-          onCanPlayThrough={handleVideoCanPlay}
-          onLoadedData={handleVideoCanPlay}
-          preload="auto"
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-1000 ${videoLoaded ? "opacity-100" : "opacity-0"}`}
-          style={{ objectFit: "cover" }}
-        >
-          <source src="/videos/menu-bg.mp4" type="video/mp4" />
-        </video>
-        <div
-          className="absolute inset-0 transition-opacity duration-1000"
-          style={{
-            background: `linear-gradient(180deg, rgba(10,10,10,0.50) 0%, rgba(10,10,10,0.55) 40%, rgba(10,10,10,0.72) 100%)`,
-          }}
-        />
-      </div>
+      <div className="absolute inset-0 z-0" style={{ backgroundColor: C.dark }} />
+      <video
+        ref={videoRef}
+        autoPlay
+        loop
+        muted
+        playsInline
+        onCanPlayThrough={handleVideoCanPlay}
+        onLoadedData={handleVideoCanPlay}
+        preload="auto"
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-700 ${videoLoaded ? "opacity-100" : "opacity-0"}`}
+      >
+        <source src="/videos/menu-bg.mp4" type="video/mp4" />
+      </video>
+      {/* readable scrim — keeps text legible on any frame */}
+      <div
+        className="absolute inset-0"
+        style={{
+          background:
+            "linear-gradient(180deg, rgba(8,8,10,0.62) 0%, rgba(8,8,10,0.52) 45%, rgba(8,8,10,0.82) 100%)",
+        }}
+      />
 
-      {/* ─── Content ──────────────────────────────────────────── */}
-      <div className="relative z-10 min-h-screen flex flex-col">
+      {/* ─── Content (fits one screen, no scroll) ─────────────── */}
+      <div className="relative z-10 h-full flex flex-col px-5 sm:px-8 py-4 sm:py-6">
 
-        {/* ─── Top Bar ─────────────────────────────────────── */}
-        <header className="w-full px-5 sm:px-10 py-5">
-          <div className="max-w-6xl mx-auto flex items-center justify-between">
-            {/* Logo */}
+        {/* Top Bar */}
+        <header className="flex items-center justify-between shrink-0">
+          {/* Wordmark */}
+          <div
+            className="flex items-center gap-2.5 transition-all duration-500"
+            style={{ opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(-8px)" }}
+          >
             <div
-              className="flex items-center gap-3 transition-all duration-700"
-              style={{
-                opacity: mounted ? 1 : 0,
-                transform: mounted ? "translateY(0)" : "translateY(-20px)",
-              }}
+              className="w-8 h-8 rounded-lg flex items-center justify-center text-[13px] font-black tracking-tight"
+              style={{ backgroundColor: C.accent, color: C.white }}
             >
-              <div
-                className="w-10 h-10 rounded-xl flex items-center justify-center shadow-lg"
-                style={{ backgroundColor: C.pink, boxShadow: `0 4px 15px ${C.pink}40` }}
-              >
-                <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 2L2 7l10 5 10-5-10-5z" />
-                  <path d="M2 17l10 5 10-5" />
-                  <path d="M2 12l10 5 10-5" />
-                </svg>
+              W8
+            </div>
+            <div className="leading-none">
+              <div className="text-[15px] font-bold tracking-tight" style={{ color: C.white }}>
+                WENOV8
               </div>
-              <div className="hidden sm:block">
-                <h1
-                  className="text-lg sm:text-xl font-bold uppercase tracking-wider leading-none"
-                  style={{ color: C.white, textShadow: "0 2px 10px rgba(0,0,0,0.3)" }}
-                >
-                  WENOV8
-                </h1>
-                <p
-                  className="text-xs sm:text-sm uppercase tracking-widest leading-none"
-                  style={{ color: C.pink, textShadow: "0 1px 8px rgba(228,97,173,0.4)" }}
-                >
-                  AI Studio
-                </p>
+              <div className="text-[9px] font-medium tracking-[0.22em] uppercase mt-0.5" style={{ color: "rgba(255,255,255,0.45)" }}>
+                Studio
               </div>
             </div>
+          </div>
 
-            {/* Right Side: Auth buttons OR User info */}
+          {/* Right: language + auth / user */}
+          <div
+            className="flex items-center gap-2 sm:gap-3 transition-all duration-500 delay-100"
+            style={{ opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(-8px)" }}
+          >
+            {/* Language switcher */}
             <div
-              className="flex items-center gap-2.5 transition-all duration-700 delay-200"
-              style={{
-                opacity: mounted ? 1 : 0,
-                transform: mounted ? "translateY(0)" : "translateY(-20px)",
-              }}
+              className="flex items-center rounded-full p-0.5"
+              style={{ backgroundColor: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.12)" }}
             >
-              {isAuthenticated ? (
-                <>
-                  {/* Credits Pill */}
-                  <div
-                    className="hidden sm:flex items-center gap-2 px-3.5 py-2 rounded-full backdrop-blur-md"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.12)",
-                      border: "1px solid rgba(255,255,255,0.18)",
-                    }}
-                  >
-                    <svg width="13" height="13" viewBox="0 0 20 20" fill={C.gold}>
-                      <path d="M10 2a6 6 0 00-6 6v3.586l-.707.707A1 1 0 004 14h12a1 1 0 00.707-1.707L16 11.586V8a6 6 0 00-6-6z" />
-                    </svg>
-                    <span className="text-xs font-bold" style={{ color: C.white }}>
-                      {userPlan === "enterprise" ? "0/\u221E" : `${creditsUsed}/${creditsLimit}`}
-                    </span>
-                  </div>
-
-                  {/* Plan Badge */}
-                  <div
-                    className="hidden sm:block px-3 py-1.5 rounded-full text-[10px] font-bold uppercase tracking-wider backdrop-blur-md"
-                    style={{
-                      backgroundColor: `${C.pink}25`,
-                      color: C.pink,
-                      border: `1px solid ${C.pink}35`,
-                    }}
-                  >
-                    {userPlan}
-                  </div>
-
-                  {/* My Library Button */}
-                  <button
-                    onClick={() => onOpenLibrary?.()}
-                    className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-xs font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg backdrop-blur-md"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.12)",
-                      color: C.white,
-                      border: "1.5px solid rgba(255,255,255,0.25)",
-                    }}
-                  >
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                      <path d="M3.375 19.5h17.25m-17.25 0a1.125 1.125 0 0 1-1.125-1.125M3.375 19.5h1.5C5.496 19.5 6 18.996 6 18.375m-3.75 0V5.625m0 12.75v-1.5c0-.621.504-1.125 1.125-1.125m18.375 2.625V5.625m0 12.75c0 .621-.504 1.125-1.125 1.125m1.125-1.125v-1.5c0-.621-.504 1.125-1.125 1.125m0 3.75h-1.5A1.125 1.125 0 0 1 18 18.375M20.625 4.5H3.375m17.25 0c.621 0 1.125.504 1.125 1.125M20.625 4.5h-1.5C18.504 4.5 18 5.004 18 5.625m3.75 0v1.5c0 .621-.504 1.125-1.125 1.125M3.375 4.5c-.621 0-1.125.504-1.125 1.125M3.375 4.5h1.5C5.496 4.5 6 5.004 6 5.625m-3.75 0v1.5c0 .621.504 1.125 1.125 1.125m0 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 8.25 6 7.746 6 7.125v-1.5M4.875 8.25C5.496 8.25 6 8.754 6 9.375v1.5m0-5.25v5.25m0-5.25C6 5.004 6.504 4.5 7.125 4.5h9.75c.621 0 1.125.504 1.125 1.125m1.125 2.625h1.5m-1.5 0A1.125 1.125 0 0 1 18 7.125v-1.5m1.125 2.625c-.621 0-1.125.504-1.125 1.125v1.5m2.625-2.625c.621 0 1.125.504 1.125 1.125v1.5c0 .621-.504 1.125-1.125 1.125M18 5.625v5.25M7.125 12h9.75m-9.75 0A1.125 1.125 0 0 1 6 10.875M7.125 12C6.504 12 6 12.504 6 13.125m0-2.25C6 11.496 5.496 12 4.875 12M18 10.875c0 .621-.504 1.125-1.125 1.125M18 10.875c0 .621.504 1.125 1.125 1.125m-2.25 0c.621 0 1.125.504 1.125 1.125m-12 5.25v-5.25m0 5.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125m-12 0v-1.5c0-.621-.504 1.125-1.125-1.125M18 18.375v-5.25m0 5.25v-1.5c0-.621-.504 1.125-1.125-1.125M18 13.125v1.5c0 .621.504 1.125 1.125 1.125M18 13.125c0-.621.504-1.125 1.125-1.125M6 13.125v1.5c0 .621.504 1.125 1.125 1.125M6 13.125C6 12.504 5.496 12 4.875 12m-1.5 0h1.5m-1.5 0c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125m1.5-3.75C5.496 12.75 6 12.246 6 11.625v-1.5" />
-                    </svg>
-                    <span className="hidden sm:inline">My Library</span>
-                  </button>
-
-                  {/* User Profile Panel */}
-                  <UserProfilePanel
-                    name={userName}
-                    email={userEmail}
-                    role={userRole}
-                    plan={userPlan}
-                    creditsUsed={creditsUsed}
-                    creditsLimit={creditsLimit}
-                    variant="dark"
-                    onSignOut={() => { signOut(); }}
-                  />
-                </>
-              ) : (
-                <>
-                  {/* Sign In Button */}
-                  <button
-                    onClick={openSignIn}
-                    className="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
-                    style={{
-                      backgroundColor: "rgba(255,255,255,0.12)",
-                      color: C.white,
-                      border: "1.5px solid rgba(255,255,255,0.25)",
-                      backdropFilter: "blur(10px)",
-                    }}
-                  >
-                    Sign In
-                  </button>
-
-                  {/* Sign Up Button */}
-                  <button
-                    onClick={openSignUp}
-                    className="px-4 sm:px-5 py-2.5 rounded-xl text-xs sm:text-sm font-bold uppercase tracking-wider transition-all duration-200 hover:shadow-lg"
-                    style={{
-                      backgroundColor: C.pink,
-                      color: C.white,
-                      boxShadow: `0 4px 20px ${C.pink}40`,
-                    }}
-                  >
-                    Sign Up
-                  </button>
-                </>
-              )}
+              {APP_LOCALES.map((l) => (
+                <button
+                  key={l.code}
+                  onClick={() => setLocale(l.code)}
+                  className="px-2.5 py-1.5 rounded-full text-[11px] font-semibold transition-colors"
+                  style={{
+                    backgroundColor: locale === l.code ? C.accent : "transparent",
+                    color: locale === l.code ? C.white : "rgba(255,255,255,0.55)",
+                    cursor: "pointer",
+                  }}
+                  aria-pressed={locale === l.code}
+                >
+                  {l.short}
+                </button>
+              ))}
             </div>
+
+            {isAuthenticated ? (
+              <>
+                <button
+                  onClick={() => onOpenLibrary?.()}
+                  className="hidden sm:flex items-center gap-2 px-4 py-2 rounded-full text-xs font-semibold transition-colors"
+                  style={{
+                    backgroundColor: "rgba(255,255,255,0.08)",
+                    color: C.white,
+                    border: "1px solid rgba(255,255,255,0.14)",
+                  }}
+                >
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M3 5.5C3 4.67 3.67 4 4.5 4h2.6c.7 0 1.3.46 1.48 1.13l.6 2.2c.15.55-.04 1.14-.48 1.5L7.4 10.4a13.5 13.5 0 0 0 6.2 6.2l1.57-1.3c.36-.44.95-.63 1.5-.48l2.2.6c.67.18 1.13.78 1.13 1.48v2.6c0 .83-.67 1.5-1.5 1.5C9.9 21 3 14.1 3 5.5Z" />
+                  </svg>
+                  {t("menu.library")}
+                </button>
+                <UserProfilePanel
+                  name={userName}
+                  email={user?.email || ""}
+                  role={user?.role || "user"}
+                  plan={userPlan}
+                  creditsUsed={creditsUsed}
+                  creditsLimit={creditsLimit}
+                  variant="dark"
+                  onSignOut={() => { signOut(); }}
+                />
+              </>
+            ) : (
+              <>
+                <button
+                  onClick={openSignIn}
+                  className="px-4 py-2 rounded-full text-xs font-semibold transition-colors"
+                  style={{ color: C.white, border: "1px solid rgba(255,255,255,0.22)" }}
+                >
+                  {t("auth.signIn")}
+                </button>
+                <button
+                  onClick={openSignUp}
+                  className="px-4 sm:px-5 py-2 rounded-full text-xs font-semibold transition-colors"
+                  style={{ backgroundColor: C.accent, color: C.white }}
+                >
+                  {t("auth.signUp")}
+                </button>
+              </>
+            )}
           </div>
         </header>
 
-        {/* ─── Main Content ────────────────────────────────── */}
-        <main className="flex-1 flex flex-col items-center justify-center px-5 sm:px-10 py-6 sm:py-8">
-          <div className="max-w-5xl w-full">
-            {/* Hero Text */}
-            <div
-              className="text-center mb-8 sm:mb-14 transition-all duration-700 delay-100"
-              style={{
-                opacity: mounted ? 1 : 0,
-                transform: mounted ? "translateY(0)" : "translateY(20px)",
-              }}
+        {/* Main — compact heading + machine grid */}
+        <main className="flex-1 min-h-0 flex flex-col justify-center max-w-5xl w-full mx-auto">
+          {/* Heading */}
+          <div
+            className="text-center mb-5 sm:mb-7 transition-all duration-500 delay-150"
+            style={{ opacity: mounted ? 1 : 0, transform: mounted ? "translateY(0)" : "translateY(10px)" }}
+          >
+            <h2
+              className="text-xl sm:text-2xl lg:text-[28px] font-bold tracking-tight leading-tight"
+              style={{ color: C.white, textShadow: "0 1px 12px rgba(0,0,0,0.45)" }}
             >
-              <p
-                className="text-sm sm:text-base font-medium uppercase tracking-[0.3em] mb-3"
-                style={{ color: C.gold, textShadow: "0 1px 6px rgba(0,0,0,0.3)" }}
-              >
-                {isAuthenticated ? t("header.welcomeBackName", { name: userName.split(" ")[0] }) : t("header.createVideos")}
-              </p>
-              <h2
-                className="text-3xl sm:text-5xl lg:text-6xl font-bold uppercase leading-tight mb-4"
-                style={{
-                  color: C.white,
-                  textShadow: "0 4px 20px rgba(0,0,0,0.4)",
-                }}
-              >
-                What would you
-                <br />
-                <span style={{ color: C.pink }}>like to create?</span>
-              </h2>
-              <p
-                className="text-sm sm:text-base max-w-lg mx-auto leading-relaxed"
-                style={{ color: "rgba(255,255,255,0.65)", textShadow: "0 1px 4px rgba(0,0,0,0.2)" }}
-              >
-                {isAuthenticated
-                  ? t("header.subAuth")
-                  : t("header.subGuest")}
-              </p>
-            </div>
+              {isAuthenticated
+                ? t("header.welcomeBackName", { name: userName.split(" ")[0] })
+                : t("menu.title")}
+            </h2>
+            <p
+              className="mt-1.5 text-[13px] sm:text-sm max-w-md mx-auto leading-relaxed"
+              style={{ color: "rgba(255,255,255,0.68)" }}
+            >
+              {isAuthenticated ? t("header.subAuth") : t("header.subGuest")}
+            </p>
+          </div>
 
-            {/* Menu Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5 sm:gap-6">
-              {menuItems.map((item, index) => {
-                const isVideoCard = !item.disabled && item.id === "ai-avatar-machine";
-                const isPodcastCard = !item.disabled && item.id === "ai-podcast-machine";
-                const isCarouselCard = !item.disabled && item.id === "ai-viral-carousel";
-                const isBofCard = !item.disabled && item.id === "bof-videos-machine";
-                const isClaymotionCard = !item.disabled && item.id === "claymotion-videos-machine";
-                const isAllInOneCard = !item.disabled && item.id === "allinone-machine";
-                const isAutoPublishCard = !item.disabled && item.id === "autopublish-machine";
-                const isScheduleCard = !item.disabled && item.id === "schedule-machine";
-                const isFeatured = isVideoCard || isPodcastCard || isCarouselCard || isBofCard || isClaymotionCard || isAllInOneCard || isAutoPublishCard || isScheduleCard;
-                const isHovered = activeCard === index && !item.disabled;
-                return (
-                <div
-                  key={item.id}
-                  className={`transition-all duration-700 ${item.disabled ? "cursor-default" : "cursor-pointer"} ${isVideoCard ? "sm:col-span-1 lg:col-span-1" : ""}`}
+          {/* Machine grid — 9 tools, always visible on one screen */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-2.5 sm:gap-3.5">
+            {MACHINES.map((id, index) => {
+              const isHovered = hovered === id;
+              const isLast = index === MACHINES.length - 1;
+              return (
+                <button
+                  key={id}
+                  onClick={() => handleCardClick(id)}
+                  onMouseEnter={() => setHovered(id)}
+                  onMouseLeave={() => setHovered(null)}
+                  className={`group text-left rounded-xl sm:rounded-2xl px-3.5 sm:px-5 py-3.5 sm:py-4 flex items-center gap-3.5 sm:gap-4 transition-all duration-200 ${isLast ? "col-span-2 md:col-span-1" : ""}`}
                   style={{
+                    backgroundColor: "rgba(15,15,19,0.78)",
+                    border: `1px solid ${isHovered ? "rgba(255,255,255,0.26)" : "rgba(255,255,255,0.10)"}`,
+                    backdropFilter: "blur(12px)",
+                    WebkitBackdropFilter: "blur(12px)",
+                    transform: isHovered ? "translateY(-2px)" : "translateY(0)",
                     opacity: mounted ? 1 : 0,
-                    transform: mounted ? "translateY(0)" : "translateY(40px)",
-                    transitionDelay: `${300 + index * 150}ms`,
+                    transitionDelay: mounted ? `${200 + index * 50}ms` : "0ms",
                   }}
-                  onMouseEnter={() => !item.disabled && setActiveCard(index)}
-                  onMouseLeave={() => setActiveCard(null)}
-                  onClick={() => !item.disabled && handleCardClick(item.id)}
                 >
-                  <div
-                    className={`relative overflow-hidden rounded-2xl sm:rounded-3xl h-full transition-all duration-500 ${isFeatured ? "p-5 sm:p-6 flex flex-col items-center" : "p-6 sm:p-7"}`}
+                  {/* Icon */}
+                  <span
+                    className="shrink-0 w-8 h-8 sm:w-10 sm:h-10 rounded-lg flex items-center justify-center transition-colors duration-200"
                     style={{
-                      background: item.disabled
-                        ? "rgba(255,255,255,0.06)"
-                        : isFeatured
-                          ? "linear-gradient(180deg, rgba(255,255,255,0.95) 0%, rgba(255,255,255,0.85) 100%)"
-                          : C.cardBg,
-                      border: `1.5px solid ${
-                        isHovered
-                          ? `${item.accentColor}60`
-                          : item.disabled
-                          ? "rgba(255,255,255,0.06)"
-                          : "rgba(255,255,255,0.25)"
-                      }`,
-                      backdropFilter: "blur(20px)",
-                      WebkitBackdropFilter: "blur(20px)",
-                      boxShadow:
-                        isHovered
-                          ? isFeatured
-                            ? `0 25px 60px ${item.accentColor}30, 0 8px 30px rgba(0,0,0,0.2)`
-                            : `0 20px 60px ${item.accentColor}20, 0 8px 24px rgba(0,0,0,0.1)`
-                          : "0 4px 24px rgba(0,0,0,0.06)",
-                      transform: isHovered
-                        ? isFeatured
-                          ? "translateY(-8px) scale(1.02)"
-                          : "translateY(-6px) scale(1.02)"
-                        : "translateY(0) scale(1)",
+                      backgroundColor: "rgba(255,255,255,0.07)",
+                      color: isHovered ? C.white : "rgba(255,255,255,0.62)",
                     }}
                   >
-                    {item.disabled && (
-                      <div className="absolute inset-0 z-10" style={{ backgroundColor: "rgba(0,0,0,0.15)" }} />
-                    )}
+                    <MachineIcon id={id} />
+                  </span>
 
-                    {!item.disabled && isHovered && (
-                      <div
-                        className="absolute -top-20 -right-20 w-40 h-40 rounded-full blur-3xl transition-opacity duration-500"
-                        style={{ backgroundColor: `${item.accentColor}30`, opacity: 1 }}
-                      />
-                    )}
+                  {/* Text */}
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[13.5px] sm:text-[15px] font-semibold leading-snug line-clamp-2" style={{ color: C.white }}>
+                      {t(`menu.${id}.title`)}
+                    </span>
+                    <span className="block text-[11px] sm:text-xs leading-snug line-clamp-2 sm:line-clamp-1 mt-0.5" style={{ color: "rgba(255,255,255,0.48)" }}>
+                      {t(`menu.${id}.subtitle`)}
+                    </span>
+                  </span>
 
-                    {/* Video display for AI Avatar Machine card - phone mockup */}
-                    {isVideoCard && (
-                      <div className="relative z-10 mb-5">
-                        <VideoCardDisplay isHovered={isHovered} />
-                      </div>
-                    )}
-
-                    {/* Video display for AI Podcast Machine card - creative podcast mockup */}
-                    {isPodcastCard && (
-                      <div className="relative z-10 mb-5">
-                        <PodcastVideoCardDisplay isHovered={isHovered} />
-                      </div>
-                    )}
-
-                    {/* Icon - only show for non-featured cards */}
-                    {!isFeatured && (
-                    <div className="relative z-10 mb-5">
-                      <div
-                        className="w-14 h-14 sm:w-16 sm:h-16 rounded-2xl flex items-center justify-center transition-all duration-300"
-                        style={{
-                          backgroundColor: item.disabled ? "rgba(255,255,255,0.08)" : `${item.accentColor}10`,
-                          border: `1.5px solid ${item.disabled ? "rgba(255,255,255,0.08)" : `${item.accentColor}28`}`,
-                          transform: isHovered ? "scale(1.1) rotate(-3deg)" : "scale(1)",
-                        }}
-                      >
-                        {item.icon}
-                      </div>
-                    </div>
-                    )}
-
-                    {/* Title */}
-                    <div className={`relative z-10 ${isFeatured ? "text-center w-full" : ""}`}>
-                      <div className={`items-center gap-2 mb-1.5 ${isFeatured ? "flex justify-center" : "flex"}`}>
-                        <h3
-                          className="text-base sm:text-lg font-bold uppercase tracking-wide"
-                          style={{
-                            color: item.disabled ? "rgba(255,255,255,0.35)" : C.dark,
-                          }}
-                        >
-                          {item.title}
-                        </h3>
-                        {item.disabled && (
-                          <span
-                            className="text-[10px] font-bold uppercase tracking-widest px-2 py-0.5 rounded-full"
-                            style={{
-                              backgroundColor: "rgba(255,255,255,0.12)",
-                              color: "rgba(255,255,255,0.45)",
-                            }}
-                          >
-                            Soon
-                          </span>
-                        )}
-                      </div>
-
-                      {!item.disabled && (
-                        <p
-                          className="text-xs font-medium uppercase tracking-wider mb-3"
-                          style={{ color: item.accentColor }}
-                        >
-                          {item.subtitle}
-                        </p>
-                      )}
-
-                      <p
-                        className={`text-xs sm:text-sm leading-relaxed ${isFeatured ? "max-w-[200px] mx-auto" : ""}`}
-                        style={{
-                          color: item.disabled ? "rgba(255,255,255,0.3)" : "#6B7280",
-                        }}
-                      >
-                        {item.description}
-                      </p>
-                    </div>
-
-                    {/* CTA Arrow */}
-                    {!item.disabled && (
-                      <div className={`relative z-10 mt-5 flex items-center gap-2 ${isFeatured ? "justify-center" : ""}`}>
-                        <span
-                          className="text-xs font-bold uppercase tracking-wider"
-                          style={{
-                            color: item.accentColor,
-                            opacity: isHovered ? 1 : 0.6,
-                            transition: "opacity 0.3s",
-                          }}
-                        >
-                          {isAuthenticated ? t("header.getStarted") : t("header.signUpToStart")}
-                        </span>
-                        <svg
-                          width="16" height="16" viewBox="0 0 16 16" fill="none"
-                          style={{
-                            color: item.accentColor,
-                            transform: isHovered ? "translateX(6px)" : "translateX(0)",
-                            transition: "transform 0.3s",
-                            opacity: isHovered ? 1 : 0.6,
-                          }}
-                        >
-                          <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
-                      </div>
-                    )}
-
-                    {/* Carousel image display - looped curved scroll below text */}
-                    {isCarouselCard && <CarouselImageDisplay />}
-                  </div>
-                </div>
-              );})}
-            </div>
+                  {/* Arrow — appears on hover (desktop only), RTL-aware */}
+                  <span
+                    className="shrink-0 hidden sm:block transition-all duration-200"
+                    style={{
+                      opacity: isHovered ? 1 : 0,
+                      transform: isHovered ? `translateX(${rtl ? -4 : 4}px)` : "translateX(0)",
+                      color: C.accent,
+                    }}
+                  >
+                    <svg width="15" height="15" viewBox="0 0 16 16" fill="none" style={{ transform: rtl ? "scaleX(-1)" : "none" }}>
+                      <path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+                    </svg>
+                  </span>
+                </button>
+              );
+            })}
           </div>
         </main>
 
-        {/* ─── Plans Section ───────────────────────────────── */}
-        <PlansSection onGetStarted={openSignUp} />
-
-        {/* ─── Footer ──────────────────────────────────────── */}
+        {/* Footer — one quiet line */}
         <footer
-          className="w-full px-5 sm:px-10 py-5 transition-all duration-700 delay-700"
-          style={{
-            opacity: mounted ? 1 : 0,
-            transform: mounted ? "translateY(0)" : "translateY(20px)",
-          }}
+          className="shrink-0 flex flex-col sm:flex-row items-center justify-between gap-1.5 pt-2 transition-all duration-500 delay-500"
+          style={{ opacity: mounted ? 1 : 0 }}
         >
-          <div className="max-w-6xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-3">
-            <p className="text-xs" style={{ color: "rgba(255,255,255,0.35)" }}>
-              WENOV8 AI Studio &middot; Powered by WENOV8
-            </p>
-            <div className="flex items-center gap-4">
-              {[
-                { label: "WENOV8", href: "/" },
-                { label: t("footer.privacy"), href: "/privacy-policy" },
-                { label: t("footer.terms"), href: "/terms-of-service" },
-                { label: "Support", href: "/support" },
-              ].map((link) => (
-                <a
-                  key={link.label}
-                  href={link.href}
-                  className="text-xs font-medium transition-colors hover:opacity-80"
-                  style={{ color: "rgba(255,255,255,0.45)" }}
-                >
-                  {link.label}
-                </a>
-              ))}
-            </div>
+          <p className="text-[11px]" style={{ color: "rgba(255,255,255,0.55)" }}>
+            &copy; {new Date().getFullYear()} WENOV8
+          </p>
+          <div className="flex items-center gap-4">
+            {[
+              { label: t("footer.privacy"), href: "/privacy-policy" },
+              { label: t("footer.terms"), href: "/terms-of-service" },
+              { label: "Support", href: "/support" },
+            ].map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                className="text-[11px] font-medium transition-colors hover:opacity-80"
+                style={{ color: "rgba(255,255,255,0.62)" }}
+              >
+                {link.label}
+              </a>
+            ))}
           </div>
         </footer>
       </div>
 
-      {/* ─── Direct Sign Out Button (for logged-in users) ─── */}
-      {isAuthenticated && (
-        <button
-          onClick={() => {
-            // Only clear auth-related localStorage keys, preserve video library
-            try {
-              Object.keys(localStorage).forEach((key) => {
-                if (key.startsWith("firebase") || key.startsWith("auth_") || key === "guestMode") {
-                  localStorage.removeItem(key);
-                }
-              });
-            } catch(e) {}
-            try { sessionStorage.clear(); } catch(e) {}
-            try {
-              document.cookie.split(";").forEach(function(c) {
-                document.cookie = c.replace(/^ +/, "").replace(/=.*/, "=;expires=" + new Date().toUTCString() + ";path=/");
-              });
-            } catch(e) {}
-            // Sign out is handled by the auth provider via UserProfilePanel
-            window.location.href = "/studio";
-          }}
-          className="fixed bottom-6 right-6 z-[70] flex items-center gap-2 px-5 py-3 rounded-2xl shadow-lg text-sm font-bold transition-all duration-200 hover:shadow-xl hover:scale-105 active:scale-95"
-          style={{
-            backgroundColor: "#DC2626",
-            color: "#FFFFFF",
-          }}
-          title={t("auth.signOut")}
-        >
-          <svg className="w-4 h-4" viewBox="0 0 20 20" fill="currentColor">
-            <path fillRule="evenodd" d="M3 4.25A2.25 2.25 0 015.25 2h5.5A2.25 2.25 0 0113 4.25v2a.75.75 0 01-1.5 0v-2a.75.75 0 00-.75-.75h-5.5a.75.75 0 00-.75.75v11.5c0 .414.336.75.75.75h5.5a.75.75 0 00.75-.75v-2a.75.75 0 011.5 0v2A2.25 2.25 0 0110.75 18h-5.5A2.25 2.25 0 013 15.75V4.25z" clipRule="evenodd" />
-            <path fillRule="evenodd" d="M19 10a.75.75 0 00-.75-.75H8.704l1.048-.943a.75.75 0 10-1.004-1.114l-2.5 2.25a.75.75 0 000 1.114l2.5 2.25a.75.75 0 101.004-1.114l-1.048-.943h9.546A.75.75 0 0019 10z" clipRule="evenodd" />
-          </svg>
-          Sign Out
-        </button>
-      )}
-
-      {/* ─── Auth Modal ───────────────────────────────────── */}
+      {/* ─── Auth Modal ───────────────────────────────────────── */}
       <AuthModal
         isOpen={showAuth}
         onClose={() => setShowAuth(false)}
         defaultMode={authMode}
       />
-
-      {/* ─── Global Styles ─────────────────────────────────── */}
-      <style jsx global>{`
-        @keyframes cardShimmer {
-          0% { transform: translateX(-100%); }
-          100% { transform: translateX(100%); }
-        }
-
-        @keyframes podcastWave {
-          0% {
-            transform: scale(0.8);
-            opacity: 0.8;
-          }
-          100% {
-            transform: scale(1.4);
-            opacity: 0;
-          }
-        }
-
-        @keyframes equalizerBar {
-          0% {
-            transform: scaleY(0.3);
-          }
-          100% {
-            transform: scaleY(1);
-          }
-        }
-
-        @keyframes pulse {
-          0%, 100% {
-            opacity: 1;
-            transform: scale(1);
-          }
-          50% {
-            opacity: 0.7;
-            transform: scale(0.95);
-          }
-        }
-      `}</style>
     </div>
   );
 }
