@@ -14,7 +14,7 @@ import { AboutPreview } from "@/components/site/sections/about-preview";
 import { FinalCta } from "@/components/site/sections/final-cta";
 
 export const metadata: Metadata = {
-  title: "WENOV8 | AI Video Production & Creative Marketing",
+  title: "WENOV8 | Video Production & Creative Marketing Studio",
   description: SITE.description,
   alternates: { canonical: "/" },
 };
@@ -32,7 +32,7 @@ function JsonLd() {
         url: SITE.url,
         email: SITE.email,
         description:
-          "WENOV8 LLC provides digital marketing and AI-assisted video production services to businesses and brands.",
+          "WENOV8 LLC provides video production and digital marketing services to businesses and brands.",
         address: {
           "@type": "PostalAddress",
           addressRegion: "Wyoming",

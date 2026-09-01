@@ -1,15 +1,13 @@
 "use client";
 
 import { CHAPTER_IDS } from "../scene/scene-state";
-import { PixelText } from "./pixel-text";
-
-/** Arcade player palette — each chapter gets its own high-score color. */
-const CHAPTER_COLORS = ["#00e5ff", "#ff2e88", "#ffd60a", "#8a5cff", "#00e5ff", "#ff2e88", "#ffd60a"];
 
 /**
  * ChapterNav — fixed pixel chapter indicator (desktop ≥lg).
- * Shows the 7 chapters of the journey; active chapter animates.
- * Click jumps to the section.
+ * Each chapter is a brand pixel; the active pixel grows, glows
+ * ember and blinks like a machine heartbeat. Click jumps to the
+ * section. (Dots instead of numbers — numbering lives only in
+ * "How It Works".)
  */
 export function ChapterNav({
   active,
@@ -25,7 +23,8 @@ export function ChapterNav({
     >
       <span
         aria-hidden
-        className="w8-pixel absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] text-[#6d6a8f] select-none"
+        className="w8-pixel absolute left-full -ml-0 top-1/2 -translate-y-1/2 -rotate-90 text-[8px] tracking-[0.3em] w8-muted-hi select-none"
+        style={{ color: "var(--w8-muted)" }}
       >
         JOURNEY
       </span>
@@ -37,24 +36,31 @@ export function ChapterNav({
             type="button"
             onClick={() => onJump?.(i)}
             data-cursor="open"
-            aria-label={`Chapter ${String(i + 1).padStart(2, "0")} — ${id}`}
+            aria-label={`Chapter — ${id.replace("-", " ")}`}
             aria-current={isActive ? "true" : undefined}
             className="group flex items-center gap-3 py-0.5"
           >
             <span
               className={`w8-pixel text-[9px] tracking-[0.14em] uppercase transition-all duration-300 ${
-                isActive
-                  ? "text-[#f4f3ee] opacity-100"
-                  : "text-[#a3a0c2] opacity-0 group-hover:opacity-100"
+                isActive ? "opacity-100" : "opacity-0 group-hover:opacity-100"
               }`}
+              style={{ color: "var(--w8-text)" }}
             >
               {id.replace("-", " ")}
             </span>
-            <PixelText
-              text={String(i + 1).padStart(2, "0")}
-              cell={isActive ? 3 : 2}
-              color={isActive ? CHAPTER_COLORS[i % CHAPTER_COLORS.length] : "#6d6a8f"}
-              className={isActive ? "w8-blink" : ""}
+            <span
+              aria-hidden
+              className={`block transition-all duration-300 ${
+                isActive ? "w8-blink" : ""
+              }`}
+              style={{
+                width: isActive ? 14 : 8,
+                height: isActive ? 14 : 8,
+                background: isActive ? "var(--w8-ember)" : "var(--w8-line-strong)",
+                boxShadow: isActive
+                  ? "0 0 14px 1px color-mix(in srgb, var(--w8-ember) 60%, transparent)"
+                  : "none",
+              }}
             />
           </button>
         );

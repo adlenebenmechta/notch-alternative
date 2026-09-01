@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { ArrowUpRight, Check } from "lucide-react";
 import { SiteHeader } from "@/components/site/header";
+import { PixelDot } from "@/components/site/pixel/pixel-dot";
 import { SiteFooter } from "@/components/site/footer";
 import { Reveal, RevealGroup, RevealItem } from "@/components/site/reveal";
 import { SERVICES } from "@/lib/site/services";
@@ -31,7 +32,7 @@ export default function ServicesPage() {
             className="absolute -top-32 left-1/3 w-[520px] h-[520px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
+                "radial-gradient(closest-side, var(--w8-accent-soft), transparent)",
             }}
           />
           <div className="w8-shell relative">
@@ -42,7 +43,7 @@ export default function ServicesPage() {
               </h1>
               <p className="w8-lead w8-muted-hi mt-6 max-w-2xl">
                 From concept to final creative, we help brands produce
-                high-quality marketing content using modern AI-powered
+                high-quality marketing content with modern, smart
                 production workflows.
               </p>
             </Reveal>
@@ -59,17 +60,20 @@ export default function ServicesPage() {
                     href={`/${s.slug}`}
                     className="w8-card-lo group flex flex-col h-full p-7 md:p-9"
                   >
-                    <p
-                      className="text-sm font-bold w8-accent-lo"
-                      style={{ fontFamily: "var(--w8-font-display)" }}
-                    >
-                      {String(i + 1).padStart(2, "0")}
-                    </p>
+                    <PixelDot
+                      color={
+                        i % 3 === 1
+                          ? "var(--w8-gold)"
+                          : i % 3 === 2
+                            ? "var(--w8-aqua)"
+                            : "var(--w8-ember)"
+                      }
+                    />
                     <h2 className="w8-h3 mt-4">{s.name}</h2>
                     <p className="w8-muted-lo text-sm w8-body mt-3 flex-1">
                       {s.card}
                     </p>
-                    <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[#0e0e10]">
+                    <span className="mt-6 inline-flex items-center gap-2 text-sm font-semibold text-[var(--w8-inv-text)]">
                       Explore service
                       <ArrowUpRight
                         size={15}

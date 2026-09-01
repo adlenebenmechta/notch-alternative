@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "../reveal";
 import { ConvergeCanvas } from "../pixel/converge-canvas";
-import { PixelText } from "../pixel/pixel-text";
+import { PixelDot } from "../pixel/pixel-dot";
 import { SITE } from "@/lib/site/config";
 
 /**
@@ -20,9 +20,13 @@ export function FinalCta() {
       className="relative w8-scrim min-h-[95svh] flex flex-col justify-center py-24 md:py-32"
     >
       <div className="w8-shell relative text-center">
-        <Reveal className="flex items-center justify-center gap-4 mb-8">
-          <PixelText text="07" cell={3} color="#ffd60a" className="w8-blink" />
-          <span className="h-px w-10 bg-[#00e5ff]/50" aria-hidden />
+        <Reveal className="flex items-center justify-center gap-3.5 mb-8">
+          <PixelDot blink />
+          <span
+            aria-hidden
+            className="h-px w-10"
+            style={{ background: "var(--w8-ember)", opacity: 0.5 }}
+          />
           <p className="w8-eyebrow w8-accent">Final Scene</p>
         </Reveal>
 
@@ -50,17 +54,17 @@ export function FinalCta() {
             </Link>
             <a
               href={`mailto:${SITE.email}`}
-              className="w8-link text-sm w8-muted-hi hover:text-[#f5f4ef] transition-colors"
+              className="w8-link text-sm w8-muted-hi transition-colors hover:text-[var(--w8-text)]"
               style={{ fontFamily: "var(--w8-font-display)" }}
             >
               {SITE.email}
             </a>
           </div>
           <p
-            className="mt-10 text-[10px] tracking-[0.3em] uppercase text-[#6d6d74]"
-            style={{ fontFamily: "var(--w8-font-display)" }}
+            className="mt-10 text-[10px] tracking-[0.3em] uppercase"
+            style={{ color: "var(--w8-muted)", fontFamily: "var(--w8-font-display)" }}
           >
-            WENOV8 LLC · AI-Powered Video &amp; Creative Marketing
+            WENOV8 LLC · Video Production &amp; Creative Marketing Studio
           </p>
         </Reveal>
       </div>

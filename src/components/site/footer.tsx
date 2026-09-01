@@ -36,7 +36,7 @@ export function SiteFooter() {
           <div className="col-span-2 md:col-span-4">
             <Wordmark className="text-2xl" />
             <p className="w8-muted-hi text-sm mt-4 max-w-xs leading-relaxed">
-              {SITE.tagline}. AI-powered creative production for modern brands.
+              Video production and creative marketing for modern brands — powered by a smart, AI-assisted workflow.
             </p>
             <a
               href={`mailto:${SITE.email}`}
@@ -50,12 +50,12 @@ export function SiteFooter() {
           <nav aria-label="Explore" className="md:col-span-2">
             <p className="w8-eyebrow w8-muted-hi mb-5">Explore</p>
             <ul className="space-y-3 text-sm">
-              <li><Link href="/" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">Home</Link></li>
-              <li><Link href="/work" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">Work</Link></li>
-              <li><Link href="/services" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">Services</Link></li>
-              <li><Link href="/studio" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">AI Studio</Link></li>
-              <li><Link href="/about" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">About</Link></li>
-              <li><Link href="/contact" className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors">Contact</Link></li>
+              <li><Link href="/" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">Home</Link></li>
+              <li><Link href="/work" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">Work</Link></li>
+              <li><Link href="/services" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">Services</Link></li>
+              <li><Link href="/studio" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">Studio</Link></li>
+              <li><Link href="/about" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">About</Link></li>
+              <li><Link href="/contact" className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors">Contact</Link></li>
             </ul>
           </nav>
 
@@ -67,7 +67,7 @@ export function SiteFooter() {
                 <li key={s.slug}>
                   <Link
                     href={`/${s.slug}`}
-                    className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors"
+                    className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors"
                   >
                     {s.name}
                   </Link>
@@ -84,7 +84,7 @@ export function SiteFooter() {
                 <li key={l.href}>
                   <Link
                     href={l.href}
-                    className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors"
+                    className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors"
                   >
                     {l.label}
                   </Link>
@@ -93,7 +93,7 @@ export function SiteFooter() {
               <li>
                 <Link
                   href="/support"
-                  className="w8-link w8-muted-hi hover:text-[#F5F4EF] transition-colors"
+                  className="w8-link w8-muted-hi hover:text-[var(--w8-text)] transition-colors"
                 >
                   Support
                 </Link>

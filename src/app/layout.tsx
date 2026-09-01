@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
+import { ThemeProvider } from "next-themes";
 import { Minecraft } from "@/fonts/fonts";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
@@ -26,7 +27,7 @@ const sora = Sora({
 export const metadata: Metadata = {
   metadataBase: new URL(SITE.url),
   title: {
-    default: "WENOV8 | AI Video Production & Creative Marketing",
+    default: "WENOV8 | Video Production & Creative Marketing Studio",
     template: "%s | WENOV8",
   },
   description: SITE.description,
@@ -35,19 +36,20 @@ export const metadata: Metadata = {
   creator: SITE.legalName,
   publisher: SITE.legalName,
   keywords: [
-    "AI video production",
-    "AI video ads",
+    "video production",
+    "video ads",
     "UGC-style ads",
     "product marketing videos",
+    "AI video production",
     "AI avatars",
     "creative marketing",
-    "AI creative studio",
+    "creative studio",
   ],
   alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     siteName: "WENOV8",
-    title: "WENOV8 | AI Video Production & Creative Marketing",
+    title: "WENOV8 | Video Production & Creative Marketing Studio",
     description: SITE.description,
     url: SITE.url,
     locale: "en_US",
@@ -56,13 +58,13 @@ export const metadata: Metadata = {
         url: "/og/og-default.jpg",
         width: 1200,
         height: 630,
-        alt: "WENOV8 — AI-Powered Video Content for Modern Brands",
+        alt: "WENOV8 — Video Production & Creative Marketing Studio",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "WENOV8 | AI Video Production & Creative Marketing",
+    title: "WENOV8 | Video Production & Creative Marketing Studio",
     description: SITE.description,
     images: ["/og/og-default.jpg"],
   },
@@ -74,7 +76,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#0e0b26",
+  themeColor: "#0a0812",
   width: "device-width",
   initialScale: 1,
 };
@@ -90,7 +92,14 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Minecraft.variable} antialiased bg-background text-foreground`}
       >
         <AuthProvider>
-          {children}
+          <ThemeProvider
+            attribute="data-w8-theme"
+            defaultTheme="dark"
+            enableSystem={false}
+            disableTransitionOnChange
+          >
+            {children}
+          </ThemeProvider>
         </AuthProvider>
         <Toaster />
       </body>

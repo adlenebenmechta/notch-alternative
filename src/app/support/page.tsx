@@ -4,17 +4,17 @@ import { useState } from "react";
 import { useAuth } from "@/providers/auth-provider";
 
 const COLORS = {
-  pink: "#FF2E88",
-  cyan: "#16B1DE",
-  lime: "#00E5FF",
+  pink: "#FF6B4A",
+  cyan: "#2DE1C2",
+  lime: "#FFC145",
   bg: "#0A0A0A",
   cardBg: "#111111",
   cardBorder: "#1E1E1E",
   inputBg: "#0F0F0F",
   text: "#F3F4F6",
   textMuted: "#9CA3AF",
-  lightPink: "rgba(228,97,173,0.08)",
-  lightCyan: "rgba(22,177,222,0.08)",
+  lightPink: "rgba(255,107,74,0.08)",
+  lightCyan: "rgba(45,225,194,0.08)",
 };
 
 const FAQS = [

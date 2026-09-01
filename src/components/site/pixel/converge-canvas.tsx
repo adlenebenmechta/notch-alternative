@@ -1,7 +1,9 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { useTheme } from "next-themes";
 import { pixelTextCells, pixelTextWidth } from "@/lib/site/pixel-font";
+import { cssVar } from "@/lib/site/theme-colors";
 
 /**
  * ConvergeCanvas — the signature WENOV8 pixel moment.
@@ -25,6 +27,7 @@ export function ConvergeCanvas({
 }) {
   const wrapRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const { resolvedTheme } = useTheme();
 
   useEffect(() => {
     const wrap = wrapRef.current;
@@ -38,6 +41,10 @@ export function ConvergeCanvas({
     let visible = false;
     let progress = 0;
 
+    // theme palette
+    const ink = cssVar("--w8-text", "#f2efe6");
+    const ember = cssVar("--w8-ember", "#ff6b4a");
+
     const resize = () => {
       const w = wrap.clientWidth;
       const h = height ?? Math.max(90, Math.min(200, w * 0.22));
@@ -49,6 +56,7 @@ export function ConvergeCanvas({
       ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     };
 
+    // theme palette
     // ── assemble targets from the bitmap font ──
     const cells = pixelTextCells(text);
     const tw = pixelTextWidth(text);
@@ -85,7 +93,7 @@ export function ConvergeCanvas({
           oy +
           (p.y0 * h + driftY + (p.ty * scale - p.y0 * h) * e);
         ctx.globalAlpha = 0.35 + 0.65 * e;
-        ctx.fillStyle = p.lime ? "#00e5ff" : "#f4f3ee";
+        ctx.fillStyle = p.lime ? ember : ink;
         ctx.fillRect(x, y, scale * 0.92, scale * 0.92);
       }
       ctx.globalAlpha = 1;
@@ -129,7 +137,7 @@ export function ConvergeCanvas({
       window.removeEventListener("resize", resize);
       window.removeEventListener("scroll", onScroll);
     };
-  }, [text, cell, height]);
+  }, [text, cell, height, resolvedTheme]);
 
   return (
     <div ref={wrapRef} className={`relative w-full ${className}`} aria-hidden>

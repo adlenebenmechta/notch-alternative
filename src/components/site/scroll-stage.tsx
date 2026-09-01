@@ -7,7 +7,8 @@ import { PixelIntro } from "./pixel/pixel-intro";
 import { PixelCursor } from "./pixel/pixel-cursor";
 import { ChapterNav } from "./pixel/chapter-nav";
 import { Atmosphere } from "./pixel/atmosphere";
-import { AtariWorld } from "./pixel/atari-world";
+import { VideoBackdrop } from "./pixel/video-backdrop";
+import { PixelDust } from "./pixel/pixel-dust";
 
 const smooth = (t: number) => {
   t = Math.min(1, Math.max(0, t));
@@ -16,10 +17,11 @@ const smooth = (t: number) => {
 
 /**
  * ScrollStage — orchestrates the pixel journey:
- * scroll → chapter detection → shared scene state (horizon hues),
- * chapter nav, pixel cursor, atmosphere + progress hairline.
- * The AtariWorld canvas paints the pixel universe behind everything;
- * all page content renders as normal, crawlable DOM above it.
+ * scroll → chapter detection → chapter nav, pixel cursor, atmosphere
+ * + progress hairline.
+ * The VideoBackdrop (retro astronaut film + pixel grid) and the
+ * PixelDust layer paint the universe behind everything; all page
+ * content renders as normal, crawlable DOM above it.
  */
 export function ScrollStage({ children }: { children: ReactNode }) {
   const [active, setActive] = useState(0);
@@ -87,9 +89,9 @@ export function ScrollStage({ children }: { children: ReactNode }) {
   return (
     <>
       <PixelIntro />
-      {/* base backdrop under the pixel world (canvas paints over it) */}
-      <div aria-hidden className="fixed inset-0 -z-10 w8-hero-fallback" />
-      <AtariWorld />
+      {/* the astronaut film + pixel grid + drifting pixel dust */}
+      <VideoBackdrop />
+      <PixelDust />
       <ChapterNav active={active} onJump={jump} />
       <PixelCursor />
       <Atmosphere />
@@ -110,7 +112,7 @@ function ProgressHairline() {
     <motion.div
       aria-hidden
       className="fixed top-0 left-0 right-0 h-[2px] z-[60] origin-left"
-      style={{ scaleX, background: "linear-gradient(to right, #8a5cff, #00e5ff, #ff2e88)" }}
+      style={{ scaleX, background: "linear-gradient(to right, var(--w8-aqua), var(--w8-gold), var(--w8-ember))" }}
     />
   );
 }

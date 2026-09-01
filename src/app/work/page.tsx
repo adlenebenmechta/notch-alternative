@@ -26,19 +26,19 @@ export default function WorkPage() {
             className="absolute -top-32 right-0 w-[480px] h-[480px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
+                "radial-gradient(closest-side, var(--w8-accent-soft), transparent)",
             }}
           />
           <div className="w8-shell relative">
             <Reveal>
               <p className="w8-eyebrow w8-accent mb-5">Selected Work</p>
               <h1 className="w8-h1 max-w-3xl">
-                Creative work, produced with AI.
+                Creative work, end to end.
               </h1>
               <p className="w8-lead w8-muted-hi mt-6 max-w-2xl">
                 A selection of creative work produced for brands, products,
                 and marketing campaigns — all created through the WENOV8
-                AI-assisted production workflow.
+                production workflow.
               </p>
             </Reveal>
           </div>

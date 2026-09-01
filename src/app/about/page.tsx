@@ -53,7 +53,7 @@ export default function AboutPage() {
             className="absolute -top-32 left-1/4 w-[520px] h-[520px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
+                "radial-gradient(closest-side, var(--w8-accent-soft), transparent)",
             }}
           />
           <div className="w8-shell relative">
@@ -69,7 +69,7 @@ export default function AboutPage() {
           <div className="w8-shell grid lg:grid-cols-12 gap-10 lg:gap-16">
             <Reveal className="lg:col-span-7">
               <div className="w8-body text-[15px] md:text-base space-y-6 max-w-2xl">
-                <p className="text-[#0e0e10] font-medium text-lg md:text-xl leading-relaxed">
+                <p className="text-[var(--w8-inv-text)] font-medium text-lg md:text-xl leading-relaxed">
                   WENOV8 LLC is a creative technology company focused on
                   AI-assisted video production and digital marketing.
                 </p>
@@ -90,15 +90,15 @@ export default function AboutPage() {
               <div className="w8-card-lo p-7 md:p-8">
                 <p className="w8-eyebrow w8-accent-lo mb-5">Company</p>
                 <dl className="space-y-4 text-sm">
-                  <div className="flex justify-between gap-4 pb-4 border-b border-[#0e0e10]/8">
+                  <div className="flex justify-between gap-4 pb-4 border-b border-[var(--w8-inv-line)]">
                     <dt className="w8-muted-lo">Legal name</dt>
                     <dd className="font-semibold text-right">{SITE.legalName}</dd>
                   </div>
-                  <div className="flex justify-between gap-4 pb-4 border-b border-[#0e0e10]/8">
+                  <div className="flex justify-between gap-4 pb-4 border-b border-[var(--w8-inv-line)]">
                     <dt className="w8-muted-lo">Based in</dt>
                     <dd className="font-semibold text-right">{SITE.location}</dd>
                   </div>
-                  <div className="flex justify-between gap-4 pb-4 border-b border-[#0e0e10]/8">
+                  <div className="flex justify-between gap-4 pb-4 border-b border-[var(--w8-inv-line)]">
                     <dt className="w8-muted-lo">Focus</dt>
                     <dd className="font-semibold text-right">
                       AI-assisted video & digital marketing

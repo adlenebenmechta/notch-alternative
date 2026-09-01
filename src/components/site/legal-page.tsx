@@ -73,7 +73,7 @@ export function LegalPage({
                 </section>
               ))}
 
-              <div className="pt-2 border-t border-white/10">
+              <div className="pt-2 border-t border-[var(--w8-line)]">
                 <p className="w8-muted-hi text-sm w8-body">
                   Questions about this document? Contact us at{" "}
                   <a

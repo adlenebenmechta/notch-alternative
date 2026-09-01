@@ -19,9 +19,9 @@ const STEPS = [
   },
   {
     n: "03",
-    title: "AI Production",
+    title: "Production",
     tag: "PRODUCTION",
-    text: "Our AI-assisted workflow produces the visual content.",
+    text: "Our production workflow produces the visual content — smart tools, real craft.",
   },
   {
     n: "04",
@@ -38,10 +38,11 @@ const STEPS = [
 ];
 
 /**
- * Chapter 04 — THE PROCESS.
- * A cinematic production pipeline: a scroll-linked pixel line draws
- * left→right (desktop) / top→bottom (mobile) through five storyboard
- * nodes. The visitor travels through the production line.
+ * Chapter 04 — HOW IT WORKS.
+ * The one section that keeps its numbers on purpose: a numbered
+ * production pipeline reads as a real production line. A
+ * scroll-linked pixel line draws left→right (desktop) / top→bottom
+ * (mobile) through five storyboard nodes.
  */
 export function ProcessSection() {
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -59,17 +60,17 @@ export function ProcessSection() {
       data-chapter="process"
       className="relative w8-scrim w8-section-pad"
     >
-      {/* ghost chapter number */}
-      <div
-        aria-hidden
-        className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
-      >
-        <PixelText text="04" cell={14} color="#ffd60a" />
-      </div>
-
       <div className="w8-shell relative">
         <div className="max-w-3xl">
-          <p className="w8-eyebrow w8-accent mb-4">How It Works</p>
+          <div className="flex items-center gap-3.5 mb-4">
+            <PixelText text="1-5" cell={2} color="var(--w8-ember)" />
+            <span
+              aria-hidden
+              className="h-px w-8"
+              style={{ background: "var(--w8-ember)", opacity: 0.45 }}
+            />
+            <p className="w8-eyebrow w8-accent">How It Works</p>
+          </div>
           <h2 className="w8-h2 text-balance">From idea to final frame.</h2>
           <p className="w8-lead w8-muted-hi mt-5">
             One pipeline — brief, storyboard, production, edit, delivery.
@@ -83,13 +84,14 @@ export function ProcessSection() {
             {/* rail */}
             <div
               aria-hidden
-              className="absolute left-0 right-0 top-[7px] h-[3px] bg-white/10"
+              className="absolute left-0 right-0 top-[7px] h-[3px]"
+              style={{ background: "var(--w8-line-strong)" }}
             >
               <motion.div
                 className="h-full origin-left"
                 style={{
                   scaleX: reduce ? 1 : lineScale,
-                  background: "linear-gradient(to right, #8a5cff, #00e5ff)",
+                  background: "linear-gradient(to right, var(--w8-aqua), var(--w8-ember))",
                 }}
               />
             </div>
@@ -111,18 +113,37 @@ export function ProcessSection() {
                   {/* pixel node */}
                   <span
                     aria-hidden
-                    className="block w-[15px] h-[15px] bg-[#0e0b26] border-2 border-[#00e5ff] mb-6"
-                    style={{ boxShadow: "0 0 0 4px rgba(10,10,11,0.9)" }}
+                    className="block w-[15px] h-[15px] mb-6"
+                    style={{
+                      background: "var(--w8-bg)",
+                      border: `2px solid ${i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}`,
+                      boxShadow: "0 0 0 4px var(--w8-bg)",
+                    }}
                   />
                   {/* storyboard panel */}
-                  <div className="border border-white/12 bg-[#0d0d10]/80 p-4 h-full">
+                  <div
+                    className="p-4 h-full w8-panel"
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <PixelText text={step.n} cell={2} color="#00e5ff" />
-                      <span className="text-[8px] tracking-[0.2em] text-white/40 font-bold">
+                      <PixelText
+                        text={step.n}
+                        cell={2}
+                        color={i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}
+                      />
+                      <span
+                        className="text-[8px] tracking-[0.2em] font-bold"
+                        style={{ color: "var(--w8-muted)" }}
+                      >
                         {step.tag}
                       </span>
                     </div>
-                    <h3 className="text-[15px] font-semibold text-[#f5f4ef]" style={{ fontFamily: "var(--w8-font-display)" }}>
+                    <h3
+                      className="text-[15px] font-semibold"
+                      style={{
+                        fontFamily: "var(--w8-font-display)",
+                        color: "var(--w8-text)",
+                      }}
+                    >
                       {step.title}
                     </h3>
                     <p className="w8-muted-hi text-[13px] w8-body mt-2.5">
@@ -138,13 +159,14 @@ export function ProcessSection() {
           <div className="md:hidden relative">
             <div
               aria-hidden
-              className="absolute left-[7px] top-2 bottom-2 w-[3px] bg-white/10"
+              className="absolute left-[7px] top-2 bottom-2 w-[3px]"
+              style={{ background: "var(--w8-line-strong)" }}
             >
               <motion.div
                 className="w-full h-full origin-top"
                 style={{
                   scaleY: reduce ? 1 : lineScaleY,
-                  background: "linear-gradient(to bottom, #8a5cff, #00e5ff)",
+                  background: "linear-gradient(to bottom, var(--w8-aqua), var(--w8-ember))",
                 }}
               />
             </div>
@@ -164,16 +186,33 @@ export function ProcessSection() {
                 >
                   <span
                     aria-hidden
-                    className="absolute left-0 top-1 block w-[15px] h-[15px] bg-[#0e0b26] border-2 border-[#00e5ff]"
+                    className="absolute left-0 top-1 block w-[15px] h-[15px]"
+                    style={{
+                      background: "var(--w8-bg)",
+                      border: `2px solid ${i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}`,
+                    }}
                   />
-                  <div className="border border-white/12 bg-[#0d0d10]/80 p-4">
+                  <div className="p-4 w8-panel">
                     <div className="flex items-center justify-between mb-2">
-                      <PixelText text={step.n} cell={2} color="#00e5ff" />
-                      <span className="text-[8px] tracking-[0.2em] text-white/40 font-bold">
+                      <PixelText
+                        text={step.n}
+                        cell={2}
+                        color={i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}
+                      />
+                      <span
+                        className="text-[8px] tracking-[0.2em] font-bold"
+                        style={{ color: "var(--w8-muted)" }}
+                      >
                         {step.tag}
                       </span>
                     </div>
-                    <h3 className="text-[15px] font-semibold text-[#f5f4ef]" style={{ fontFamily: "var(--w8-font-display)" }}>
+                    <h3
+                      className="text-[15px] font-semibold"
+                      style={{
+                        fontFamily: "var(--w8-font-display)",
+                        color: "var(--w8-text)",
+                      }}
+                    >
                       {step.title}
                     </h3>
                     <p className="w8-muted-hi text-[13px] w8-body mt-2">

@@ -23,7 +23,7 @@ export default function ContactPage() {
             className="absolute -top-32 right-1/4 w-[480px] h-[480px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
+                "radial-gradient(closest-side, var(--w8-accent-soft), transparent)",
             }}
           />
           <div className="w8-shell relative">
@@ -71,7 +71,7 @@ export default function ContactPage() {
                     ].map((step, i) => (
                       <li key={i} className="flex gap-3.5 text-sm">
                         <span
-                          className="flex items-center justify-center w-6 h-6 rounded-full bg-[#00E5FF]/12 text-[#00E5FF] text-xs font-bold shrink-0"
+                          className="flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold shrink-0" style={{ background: "var(--w8-accent-soft)", color: "var(--w8-ember)" }}
                           style={{ fontFamily: "var(--w8-font-display)" }}
                         >
                           {i + 1}

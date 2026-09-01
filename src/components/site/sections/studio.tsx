@@ -4,10 +4,10 @@ import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { Reveal, RevealGroup, RevealItem } from "../reveal";
 import { ConvergeCanvas } from "../pixel/converge-canvas";
-import { PixelText } from "../pixel/pixel-text";
+import { PixelDot } from "../pixel/pixel-dot";
 
 /**
- * Real capabilities of the in-house WENOV8 AI Studio (all of these tools
+ * Real capabilities of the in-house WENOV8 Studio (all of these tools
  * exist in the deployed platform — no invented features).
  */
 const STUDIO_TOOLS = [
@@ -20,10 +20,10 @@ const STUDIO_TOOLS = [
 ];
 
 /**
- * Chapter 05 — THE AI ENGINE / YOUR AI CREATIVE STUDIO.
+ * Chapter 05 — THE STUDIO / YOUR CREATIVE STUDIO.
  * The signature transition: pixel particles converge and assemble the
- * "AI STUDIO" wordmark (scroll-linked), echoing the 3D core behind.
- * Links straight into the real application at /studio.
+ * "STUDIO" wordmark (scroll-linked). Links straight into the real
+ * application at /studio.
  */
 export function StudioSection() {
   return (
@@ -32,27 +32,22 @@ export function StudioSection() {
       data-chapter="studio"
       className="relative w8-scrim w8-section-pad overflow-hidden"
     >
-      {/* ghost chapter number */}
-      <div
-        aria-hidden
-        className="pointer-events-none select-none absolute top-10 right-4 md:right-10 opacity-[0.13]"
-      >
-        <PixelText text="05" cell={14} color="#8a5cff" />
-      </div>
-
       <div className="w8-shell relative">
         {/* the convergence wordmark */}
-        <ConvergeCanvas text="AI STUDIO" cell={7} className="mb-12 md:mb-16" />
+        <ConvergeCanvas text="STUDIO" cell={7} className="mb-12 md:mb-16" />
 
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>
             <Reveal>
-              <p className="w8-eyebrow w8-accent mb-4">The AI Engine</p>
-              <h2 className="w8-h2 text-balance">Your AI Creative Studio</h2>
+              <div className="flex items-center gap-3.5 mb-4">
+                <PixelDot color="var(--w8-aqua)" />
+                <p className="w8-eyebrow w8-accent">The Studio</p>
+              </div>
+              <h2 className="w8-h2 text-balance">Your Creative Studio</h2>
               <p className="w8-lead w8-muted-hi mt-5">
-                Create, experiment, and produce AI-powered video content
-                with the WENOV8 creative platform — the same engine that
-                produces every piece of work on this page.
+                Create, experiment, and produce video content with the
+                WENOV8 platform — the same engine that produces every
+                piece of work on this page.
               </p>
             </Reveal>
 
@@ -63,7 +58,7 @@ export function StudioSection() {
                     <Check
                       size={15}
                       className="mt-0.5 shrink-0"
-                      style={{ color: "var(--w8-signal)" }}
+                      style={{ color: "var(--w8-aqua)" }}
                     />
                     <span className="w8-muted-hi">{tool}</span>
                   </li>
@@ -78,7 +73,7 @@ export function StudioSection() {
                   className="w8-btn w8-btn-primary"
                   data-cursor="open"
                 >
-                  Open AI Studio
+                  Open the Studio
                   <ArrowRight size={17} strokeWidth={2.2} />
                 </Link>
                 <Link href="/ai-avatar-video" className="w8-btn w8-btn-ghost-hi">
@@ -111,7 +106,8 @@ export function StudioSection() {
                 <RevealItem key={shot.src}>
                   <div
                     data-cursor="view"
-                    className="relative overflow-hidden aspect-[9/16] border border-white/10 hover:border-[#00e5ff]/40 transition-colors duration-500"
+                    className="relative overflow-hidden aspect-[9/16] w8-hover-ember-border transition-colors duration-500"
+                    style={{ border: "1px solid var(--w8-line)" }}
                   >
                     <img
                       src={shot.src}

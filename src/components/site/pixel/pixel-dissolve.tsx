@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import { cssVar } from "@/lib/site/theme-colors";
 
 /**
  * PixelDissolve — canvas overlay that plays a blocky pixel dissolve
@@ -63,7 +64,7 @@ export function PixelDissolve() {
           const ease = 1 - Math.pow(1 - p, 2);
           const s = b.s * (1 - ease);
           if (s <= 0.4) continue;
-          ctx.fillStyle = "#0e0b26";
+          ctx.fillStyle = cssVar("--w8-bg-2", "#131022");
           ctx.fillRect(b.x + (b.s - s) / 2, b.y + (b.s - s) / 2, s, s);
         }
         if (alive) {
@@ -73,7 +74,7 @@ export function PixelDissolve() {
         }
       };
       // initial fill so the poster is hidden until the reveal starts
-      ctx.fillStyle = "#0e0b26";
+      ctx.fillStyle = cssVar("--w8-bg-2", "#131022");
       ctx.fillRect(0, 0, parent.clientWidth, parent.clientHeight);
       raf = requestAnimationFrame(draw);
     };

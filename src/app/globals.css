@@ -122,29 +122,88 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WENOV8 — Public marketing site design system
+   WENOV8 — Public marketing site design system · "Signal Ember"
    Scoped tokens (w8-*) used only by /src/components/site/**
+   Two beautiful modes — ember-dark (default) + paper-light.
+   Three vibrant brand hues: Ember / Gold / Aqua. Nothing else.
    ═══════════════════════════════════════════════════════════════════════════ */
 
-:root {
-  /* WENOV8 arcade palette — deep space indigo + vibrant arcade hues */
-  --w8-ink: #0e0b26;
-  --w8-ink-2: #171243;
-  --w8-ink-3: #201a5e;
-  --w8-bone: #f4f3ee;
-  --w8-paper: #ffffff;
-  --w8-signal: #00e5ff;      /* Arcade Cyan — primary signal */
-  --w8-signal-deep: #d6218c; /* Deep Magenta — accessible on light */
-  --w8-magenta: #ff2e88;     /* Neon Magenta — secondary accent */
-  --w8-sun: #ffd60a;         /* Arcade Yellow — highlight */
-  --w8-nova: #8a5cff;        /* Nova Purple — support */
-  --w8-text-hi: #f5f4ef;
-  --w8-text-lo: #0e0e10;
-  --w8-muted-hi: #a3a0c2;
-  --w8-muted-lo: #6d6a8f;
-  --w8-line-hi: rgba(255, 255, 255, 0.1);
-  --w8-line-lo: rgba(14, 11, 38, 0.1);
+:root,
+html[data-w8-theme="dark"] {
+  /* surfaces */
+  --w8-bg: #0a0812;        /* deep space */
+  --w8-bg-2: #131022;      /* raised panel */
+  --w8-bg-3: #1b1730;      /* top surface */
+  --w8-bg-deep: #060410;   /* deepest */
+  --w8-text: #f2efe6;      /* warm bone */
+  --w8-muted: #a7a095;     /* warm gray */
+  --w8-line: rgba(242, 239, 230, 0.1);
+  --w8-line-strong: rgba(242, 239, 230, 0.22);
+
+  /* the vibrant trio */
+  --w8-ember: #ff6b4a;
+  --w8-gold: #ffc145;
+  --w8-aqua: #2de1c2;
+  --w8-accent: var(--w8-ember);
+  --w8-accent-soft: rgba(255, 107, 74, 0.14);
+  --w8-accent-inv: #e03a14;  /* deep ember for light inverse surfaces */
+  --w8-on-accent: #2b0a02;
+
+  /* inverse (contrast) section — bone paper */
+  --w8-inv-bg: #f6f3eb;
+  --w8-inv-bg-2: #ffffff;
+  --w8-inv-text: #1b1611;
+  --w8-inv-muted: #6e675a;
+  --w8-inv-line: rgba(27, 22, 17, 0.12);
+
+  /* backdrop video treatment */
+  --w8-video-opacity: 0.55;
+  --w8-video-filter: saturate(1.05) contrast(1.02);
+  --w8-veil-0: rgba(10, 8, 18, 0.88);
+  --w8-veil-1: rgba(10, 8, 18, 0.4);
+  --w8-veil-2: rgba(10, 8, 18, 0.66);
+  --w8-scrim-bg: rgba(10, 8, 18, 0.5);
+  --w8-grid-line: rgba(242, 239, 230, 0.03);
 }
+
+html[data-w8-theme="light"] {
+  --w8-bg: #f6f3eb;        /* warm paper */
+  --w8-bg-2: #ffffff;      /* card */
+  --w8-bg-3: #ede8dc;      /* sunken */
+  --w8-bg-deep: #e9e3d4;
+  --w8-text: #1b1611;      /* warm ink */
+  --w8-muted: #6e675a;
+  --w8-line: rgba(27, 22, 17, 0.13);
+  --w8-line-strong: rgba(27, 22, 17, 0.28);
+
+  /* the trio, deepened for paper (AA contrast) */
+  --w8-ember: #e03a14;
+  --w8-gold: #a87600;
+  --w8-aqua: #0c8f7b;
+  --w8-accent: var(--w8-ember);
+  --w8-accent-soft: rgba(224, 58, 20, 0.1);
+  --w8-accent-inv: #ff6b4a;  /* bright ember for dark inverse surfaces */
+  --w8-on-accent: #fff5f1;
+
+  /* inverse section — the dark-mode look, used for contrast on light */
+  --w8-inv-bg: #0a0812;
+  --w8-inv-bg-2: #131022;
+  --w8-inv-text: #f2efe6;
+  --w8-inv-muted: #a7a095;
+  --w8-inv-line: rgba(242, 239, 230, 0.1);
+
+  --w8-video-opacity: 0.16;
+  --w8-video-filter: saturate(0.75) contrast(0.9) brightness(1.04);
+  --w8-veil-0: rgba(246, 243, 235, 0.9);
+  --w8-veil-1: rgba(246, 243, 235, 0.55);
+  --w8-veil-2: rgba(246, 243, 235, 0.82);
+  --w8-scrim-bg: rgba(246, 243, 235, 0.5);
+  --w8-grid-line: rgba(27, 22, 17, 0.035);
+}
+
+/* body canvas behind every page (theme-aware) */
+html[data-w8-theme="dark"] body { background: #0a0812; }
+html[data-w8-theme="light"] body { background: #f6f3eb; }
 
 /* Font tokens must live on <body>: they reference the next/font variables
    (--font-sora, --font-geist-sans) which are scoped to <body> — custom
@@ -179,12 +238,11 @@ body {
   .w8-section-pad { padding-block: 9rem; }
 }
 
-/* ── scrim: keeps text readable over the 3D scene ──────────────────────── */
-/* NOTE: also sets the light text color — sections using the scrim are dark. */
+/* ── scrim: keeps text readable over the video backdrop ─────────────────── */
 .w8-scrim {
   position: relative;
-  background: rgba(14, 11, 38, 0.52);
-  color: var(--w8-text-hi);
+  background: var(--w8-scrim-bg);
+  color: var(--w8-text);
 }
 .w8-scrim::before {
   content: "";
@@ -193,22 +251,32 @@ body {
   pointer-events: none;
   background: linear-gradient(
     to bottom,
-    var(--w8-ink),
-    rgba(14, 11, 38, 0.42) 16%,
-    rgba(14, 11, 38, 0.42) 84%,
-    var(--w8-ink)
+    var(--w8-veil-0),
+    var(--w8-veil-1) 16%,
+    var(--w8-veil-1) 84%,
+    var(--w8-veil-2)
   );
 }
 .w8-scrim > * { position: relative; }
 
-.w8-dark { background: var(--w8-ink); color: var(--w8-text-hi); }
-.w8-darker { background: #090620; color: var(--w8-text-hi); }
-.w8-light { background: var(--w8-bone); color: var(--w8-text-lo); }
-.w8-paper { background: var(--w8-paper); color: var(--w8-text-lo); }
+/* ── base + inverse surfaces ─────────────────────────────────────────────── */
+.w8-dark { background: var(--w8-bg); color: var(--w8-text); }
+.w8-darker { background: var(--w8-bg-deep); color: var(--w8-text); }
+.w8-light { background: var(--w8-inv-bg); color: var(--w8-inv-text); }
+.w8-paper { background: var(--w8-inv-bg-2); color: var(--w8-inv-text); }
+
+/* muted/text helpers flip inside inverse sections automatically */
+.w8-muted-hi { color: var(--w8-muted); }
+.w8-muted-lo { color: var(--w8-muted); }
+.w8-text-hi { color: var(--w8-text); }
+.w8-text-lo { color: var(--w8-text); }
+.w8-light .w8-muted-hi,
+.w8-light .w8-muted-lo { color: var(--w8-inv-muted); }
+.w8-light .w8-text-hi,
+.w8-light .w8-text-lo { color: var(--w8-inv-text); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
-/* Eyebrows use the Minecraft pixel font — the machine's label maker.
-   NOTE: resolved at usage point because --font-minecraft lives on <body>. */
+/* Eyebrows use the pixel font — the machine's label maker. */
 .w8-eyebrow {
   font-family: var(--font-minecraft), "Minecraft", "Segoe UI", ui-monospace, monospace;
   font-size: 0.75rem;
@@ -255,10 +323,10 @@ body {
 .w8-body { line-height: 1.7; }
 
 /* ── accents ─────────────────────────────────────────────────────────────── */
-.w8-accent { color: var(--w8-signal); }
-.w8-accent-lo { color: var(--w8-signal-deep); }
-.w8-muted-hi { color: var(--w8-muted-hi); }
-.w8-muted-lo { color: var(--w8-muted-lo); }
+.w8-accent { color: var(--w8-accent); }
+.w8-accent-lo { color: var(--w8-accent); }
+.w8-gold { color: var(--w8-gold); }
+.w8-aqua { color: var(--w8-aqua); }
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
 .w8-btn {
@@ -272,7 +340,7 @@ body {
   letter-spacing: -0.01em;
   border-radius: 9999px;
   padding: 0.9rem 1.9rem;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, color 0.3s, border-color 0.3s, opacity 0.3s;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, color 0.3s, border-color 0.3s, opacity 0.3s, box-shadow 0.3s;
   will-change: transform;
   cursor: pointer;
   text-align: center;
@@ -281,57 +349,108 @@ body {
 .w8-btn:active { transform: scale(0.98); }
 
 .w8-btn-primary {
-  background: var(--w8-signal);
-  color: var(--w8-ink);
+  background: var(--w8-ember);
+  color: var(--w8-on-accent);
+  box-shadow: 0 10px 30px -12px rgba(224, 58, 20, 0.55);
 }
-.w8-btn-primary:hover { transform: translateY(-2px); background: #6ff0ff; }
+.w8-btn-primary:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.08);
+}
 
 .w8-btn-invert {
-  background: var(--w8-text-hi);
-  color: var(--w8-ink);
+  background: var(--w8-text);
+  color: var(--w8-bg);
 }
-.w8-btn-invert:hover { transform: translateY(-2px); background: #ffffff; }
+.w8-btn-invert:hover { transform: translateY(-2px); filter: brightness(1.05); }
 
 .w8-btn-ink {
-  background: var(--w8-ink);
-  color: var(--w8-text-hi);
+  background: var(--w8-inv-text);
+  color: var(--w8-inv-bg);
 }
-.w8-btn-ink:hover { transform: translateY(-2px); background: #221b5e; }
+.w8-btn-ink:hover { transform: translateY(-2px); filter: brightness(1.08); }
 
 .w8-btn-ghost-hi {
-  border: 1px solid var(--w8-line-hi);
-  color: var(--w8-text-hi);
+  border: 1px solid var(--w8-line-strong);
+  color: var(--w8-text);
   background: transparent;
 }
-.w8-btn-ghost-hi:hover { transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.35); background: rgba(255, 255, 255, 0.04); }
+.w8-btn-ghost-hi:hover {
+  transform: translateY(-2px);
+  border-color: var(--w8-accent);
+  background: var(--w8-accent-soft);
+}
 
 .w8-btn-ghost-lo {
-  border: 1px solid var(--w8-line-lo);
-  color: var(--w8-text-lo);
+  border: 1px solid var(--w8-line-strong);
+  color: var(--w8-text);
   background: transparent;
 }
-.w8-btn-ghost-lo:hover { transform: translateY(-2px); border-color: rgba(14, 11, 38, 0.35); background: rgba(14, 11, 38, 0.03); }
+.w8-btn-ghost-lo:hover {
+  transform: translateY(-2px);
+  border-color: var(--w8-accent);
+  background: var(--w8-accent-soft);
+}
+
+/* ghost buttons inside inverse (light-in-dark) sections */
+.w8-light .w8-btn-ghost-hi,
+.w8-light .w8-btn-ghost-lo {
+  border-color: var(--w8-inv-line);
+  color: var(--w8-inv-text);
+}
+.w8-light .w8-btn-ghost-hi:hover,
+.w8-light .w8-btn-ghost-lo:hover {
+  border-color: var(--w8-ember);
+  color: var(--w8-inv-text);
+}
 
 /* ── cards ───────────────────────────────────────────────────────────────── */
 .w8-card-hi {
-  background: var(--w8-ink-2);
-  border: 1px solid var(--w8-line-hi);
+  background: color-mix(in srgb, var(--w8-bg-2) 88%, transparent);
+  border: 1px solid var(--w8-line);
   border-radius: 1.25rem;
   transition: border-color 0.35s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.35s;
 }
-.w8-card-hi:hover { border-color: rgba(0, 229, 255, 0.4); transform: translateY(-4px); }
+.w8-card-hi:hover { border-color: color-mix(in srgb, var(--w8-ember) 45%, transparent); transform: translateY(-4px); }
 
 .w8-card-lo {
-  background: var(--w8-paper);
-  border: 1px solid var(--w8-line-lo);
+  background: var(--w8-bg-2);
+  border: 1px solid var(--w8-line);
   border-radius: 1.25rem;
   transition: border-color 0.35s, transform 0.45s cubic-bezier(0.22, 1, 0.36, 1), box-shadow 0.35s;
 }
-.w8-card-lo:hover { border-color: rgba(14, 11, 38, 0.22); transform: translateY(-4px); box-shadow: 0 24px 48px -24px rgba(14, 11, 38, 0.18); }
+.w8-card-lo:hover {
+  border-color: color-mix(in srgb, var(--w8-ember) 40%, transparent);
+  transform: translateY(-4px);
+  box-shadow: 0 24px 48px -24px rgba(27, 22, 17, 0.22);
+}
+
+/* ── pixel corner brackets — refined pixel signature on hover ───────────── */
+.w8-pixel-corners { position: relative; }
+.w8-pixel-corners::before,
+.w8-pixel-corners::after {
+  content: "";
+  position: absolute;
+  width: 14px;
+  height: 14px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.35s;
+  background:
+    linear-gradient(var(--w8-ember), var(--w8-ember)) no-repeat top left / 14px 4px,
+    linear-gradient(var(--w8-ember), var(--w8-ember)) no-repeat top left / 4px 14px;
+}
+.w8-pixel-corners::after {
+  background:
+    linear-gradient(var(--w8-ember), var(--w8-ember)) no-repeat bottom right / 14px 4px,
+    linear-gradient(var(--w8-ember), var(--w8-ember)) no-repeat bottom right / 4px 14px;
+}
+.w8-pixel-corners:hover::before,
+.w8-pixel-corners:hover::after { opacity: 1; }
 
 /* ── hairline rules ──────────────────────────────────────────────────────── */
-.w8-rule-hi { border-top: 1px solid var(--w8-line-hi); }
-.w8-rule-lo { border-top: 1px solid var(--w8-line-lo); }
+.w8-rule-hi { border-top: 1px solid var(--w8-line); }
+.w8-rule-lo { border-top: 1px solid var(--w8-inv-line); }
 
 /* ── link underline motion ───────────────────────────────────────────────── */
 .w8-link {
@@ -391,14 +510,14 @@ body {
 /* ── focus visibility ────────────────────────────────────────────────────── */
 .w8-btn:focus-visible,
 .w8-link:focus-visible {
-  outline: 2px solid var(--w8-signal);
+  outline: 2px solid var(--w8-ember);
   outline-offset: 3px;
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
    WENOV8 — route transitions
    template.tsx remounts per navigation: the veil masks the swap and the
-   light-blue scanline sweeps once. Content fades in beneath.
+   ember scanline sweeps once. Content fades in beneath.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 @keyframes w8-page-in {
@@ -418,7 +537,7 @@ body {
   inset: 0;
   z-index: 90;
   pointer-events: none;
-  background: #090620;
+  background: var(--w8-bg);
   animation: w8-veil-out 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -432,7 +551,7 @@ body {
   right: 0;
   top: 0;
   height: 2px;
-  background: linear-gradient(to right, transparent, var(--w8-signal), transparent);
+  background: linear-gradient(to right, transparent, var(--w8-ember), transparent);
   animation: w8-veil-sweep 0.6s cubic-bezier(0.22, 1, 0.36, 1) forwards;
 }
 
@@ -467,33 +586,32 @@ body.w8-pixel-cursor [data-cursor] {
   .w8-blink { animation: none; }
 }
 
-/* intro overlay fade-out */
+/* intro overlay fade-out (timed to the W8 → TRY WENOV8 boot) */
 @keyframes w8-intro-out {
   to { opacity: 0; visibility: hidden; }
 }
 .w8-intro-fade {
-  animation: w8-intro-out 0.45s ease 2.15s forwards;
+  animation: w8-intro-out 0.5s ease 2.6s forwards;
 }
 @media (prefers-reduced-motion: reduce) {
   .w8-intro-fade { animation: none; }
 }
 
-/* hero fallback: brief gradient behind the pixel world before the
-   canvas mounts (content paints instantly, canvas follows within ~60ms) */
+/* hero fallback behind the video while it loads */
 .w8-hero-fallback {
-  background: linear-gradient(to bottom, #0b0920 0%, #15103a 55%, #221a5e 82%, #0e0b26 100%);
+  background: var(--w8-bg);
 }
 
 /* ── atmosphere: scanlines + animated grain ─────────────────────────────── */
 .w8-scanlines {
   background: repeating-linear-gradient(
     0deg,
-    rgba(255, 255, 255, 0.026) 0px,
-    rgba(255, 255, 255, 0.026) 1px,
+    var(--w8-grid-line) 0px,
+    var(--w8-grid-line) 1px,
     transparent 1px,
     transparent 3px
   );
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .w8-grain-anim {
@@ -511,12 +629,108 @@ body.w8-pixel-cursor [data-cursor] {
   .w8-grain-anim { animation: none; }
 }
 
+/* ── video backdrop: astronaut film + pixel grid veil ────────────────────── */
+.w8-video-wrap {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  background: var(--w8-bg);
+  pointer-events: none;
+}
+.w8-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: var(--w8-video-opacity);
+  filter: var(--w8-video-filter);
+  transform: scale(1.04); /* hide edge artefacts on loop */
+}
+/* soft vertical veil: strong at top/bottom where copy lives, airy in the middle */
+.w8-video-veil {
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(120% 90% at 50% 40%, transparent 40%, var(--w8-veil-2) 100%),
+    linear-gradient(
+      to bottom,
+      var(--w8-veil-0) 0%,
+      var(--w8-veil-1) 26%,
+      var(--w8-veil-1) 72%,
+      var(--w8-veil-0) 100%
+    );
+}
+/* the pixel grid — the refined pixel signature over the film */
+.w8-video-grid {
+  position: absolute;
+  inset: -46px; /* bleed so the drift never shows an edge */
+  background-image:
+    linear-gradient(var(--w8-grid-line) 1px, transparent 1px),
+    linear-gradient(90deg, var(--w8-grid-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  animation: w8-grid-drift 64s linear infinite;
+}
+@keyframes w8-grid-drift {
+  from { background-position: 0 0, 0 0; }
+  to { background-position: 0 46px, 46px 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-video-grid { animation: none; }
+}
+
+/* ── pixel dot (replaces chapter numbering) ──────────────────────────────── */
+.w8-dot {
+  display: inline-block;
+  width: 0.6rem;
+  height: 0.6rem;
+  background: var(--w8-ember);
+}
+.w8-dot-lg {
+  display: inline-block;
+  width: 0.85rem;
+  height: 0.85rem;
+  background: var(--w8-ember);
+}
+
 /* crisp pixel rendering for canvas labels */
 canvas { image-rendering: auto; }
 .w8-shell canvas { image-rendering: pixelated; }
 
 /* selection */
 ::selection {
-  background: var(--w8-signal);
-  color: var(--w8-ink);
+  background: var(--w8-ember);
+  color: var(--w8-on-accent);
+}
+
+/* ── panel helpers (used by service rows, storyboard panels) ─────────────── */
+.w8-panel {
+  background: color-mix(in srgb, var(--w8-bg-2) 80%, transparent);
+  border: 1px solid var(--w8-line);
+}
+.w8-panel-solid {
+  background: var(--w8-bg-2);
+  border: 1px solid var(--w8-line);
+}
+.w8-hover-ember-border:hover {
+  border-color: color-mix(in srgb, var(--w8-ember) 45%, transparent);
+}
+.w8-hover-row:hover {
+  background: var(--w8-accent-soft);
+}
+
+/* ── cards inside inverse sections (w8-light / w8-paper) ────────────────────
+   The inverse surface flips per theme: bone-in-dark-mode, ink-in-light-mode.
+   Cards inside it must flip WITH it. */
+.w8-light .w8-card-lo,
+.w8-paper .w8-card-lo {
+  background: var(--w8-inv-bg-2);
+  border-color: var(--w8-inv-line);
+  color: var(--w8-inv-text);
+}
+/* deep ember for small accent text on light-inverse surfaces */
+.w8-light .w8-accent-lo,
+.w8-paper .w8-accent-lo {
+  color: var(--w8-accent-inv);
 }

@@ -1,16 +1,13 @@
 import Link from "next/link";
 
 /**
- * Typographic WENOV8 wordmark — "8" in signal light-blue.
- * Always sets an explicit text color so the mark is readable on any
- * surface (the header floats transparent over the dark hero).
- * `onLight` swaps to the accessible deep variant.
+ * Typographic WENOV8 wordmark — "8" in ember.
+ * Token-driven colors: bone-on-space in dark mode, ink-on-paper in
+ * light mode. The mark is always readable on any surface.
  */
 export function Wordmark({
-  onLight = false,
   className = "",
 }: {
-  onLight?: boolean;
   className?: string;
 }) {
   return (
@@ -18,27 +15,19 @@ export function Wordmark({
       className={`font-semibold tracking-tight ${className}`}
       style={{
         fontFamily: "var(--w8-font-display)",
-        color: onLight ? "var(--w8-text-lo)" : "var(--w8-text-hi)",
+        color: "var(--w8-text)",
       }}
     >
       WENOV
-      <span
-        style={{
-          color: onLight ? "var(--w8-signal-deep)" : "var(--w8-signal)",
-        }}
-      >
-        8
-      </span>
+      <span style={{ color: "var(--w8-ember)" }}>8</span>
     </span>
   );
 }
 
-/** Clickable logo lockup — mark + wordmark. */
+/** Clickable logo lockup — W8 mark + wordmark. */
 export function LogoLink({
-  onLight = false,
   href = "/",
 }: {
-  onLight?: boolean;
   href?: string;
 }) {
   return (
@@ -49,16 +38,17 @@ export function LogoLink({
     >
       <span
         aria-hidden
-        className="flex items-center justify-center w-9 h-9 rounded-lg font-black text-[15px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
+        className="flex items-center justify-center w-9 h-9 font-black text-[15px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
         style={{
-          background: "var(--w8-signal)",
-          color: "var(--w8-ink)",
+          background: "var(--w8-ember)",
+          color: "var(--w8-on-accent)",
           fontFamily: "var(--w8-font-display)",
+          borderRadius: "0.5rem",
         }}
       >
         W8
       </span>
-      <Wordmark onLight={onLight} className="text-lg" />
+      <Wordmark className="text-lg" />
     </Link>
   );
 }

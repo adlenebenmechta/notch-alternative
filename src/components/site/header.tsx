@@ -3,13 +3,43 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, ArrowUpRight } from "lucide-react";
+import { Menu, X, ArrowUpRight, Sun, Moon } from "lucide-react";
+import { useTheme } from "next-themes";
 import { useAuth } from "@/providers/auth-provider";
 import { MAIN_NAV } from "@/lib/site/config";
 import { LogoLink } from "./wordmark";
 
 /**
- * Site header — transparent over dark hero, solid ink on scroll.
+ * ThemeToggle — flips the site between ember-dark and paper-light.
+ * Both modes are first-class brand surfaces. Rendered after mount
+ * to avoid a hydration mismatch on the icon.
+ */
+function ThemeToggle() {
+  const { resolvedTheme, setTheme } = useTheme();
+  const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
+
+  if (!mounted) {
+    return <span className="inline-block w-11 h-11" aria-hidden />;
+  }
+
+  const isDark = resolvedTheme !== "light";
+  return (
+    <button
+      type="button"
+      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
+      title={isDark ? "Light mode" : "Dark mode"}
+      onClick={() => setTheme(isDark ? "light" : "dark")}
+      className="w8-pixel flex items-center justify-center w-11 h-11 transition-colors"
+      style={{ color: "var(--w8-muted)" }}
+    >
+      {isDark ? <Sun size={19} /> : <Moon size={19} />}
+    </button>
+  );
+}
+
+/**
+ * Site header — transparent over the hero, solid surface on scroll.
  * Shows "Open Studio" instead of "Get a Quote" primary CTA when
  * the visitor is authenticated (checks the existing Firebase session).
  */
@@ -37,11 +67,15 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 transition-all duration-500 ${
-        scrolled
-          ? "bg-[#090620]/90 backdrop-blur-md border-b border-white/10"
-          : "bg-transparent border-b border-transparent"
-      }`}
+      className="fixed top-0 left-0 right-0 z-50 transition-all duration-500"
+      style={{
+        background: scrolled
+          ? "color-mix(in srgb, var(--w8-bg) 88%, transparent)"
+          : "transparent",
+        borderBottom: `1px solid ${scrolled ? "var(--w8-line)" : "transparent"}`,
+        backdropFilter: scrolled ? "blur(12px)" : "none",
+        WebkitBackdropFilter: scrolled ? "blur(12px)" : "none",
+      }}
     >
       <div className="w8-shell flex items-center justify-between h-16 md:h-[76px]">
         <LogoLink />
@@ -56,10 +90,15 @@ export function SiteHeader() {
               <Link
                 key={item.href}
                 href={item.href}
-                className={`w8-link text-sm transition-colors ${
-                  active ? "text-[#F5F4EF]" : "text-[#a3a0c2] hover:text-[#F5F4EF]"
-                }`}
-                style={{ fontFamily: "var(--w8-font-display)" }}
+                className={`w8-link text-sm transition-colors`}
+                style={{
+                  color: active ? "var(--w8-text)" : "var(--w8-muted)",
+                  fontFamily: "var(--w8-font-display)",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--w8-text)")}
+                onMouseLeave={(e) =>
+                  (e.currentTarget.style.color = active ? "var(--w8-text)" : "var(--w8-muted)")
+                }
               >
                 {item.label}
               </Link>
@@ -67,7 +106,8 @@ export function SiteHeader() {
           })}
         </nav>
 
-        <div className="hidden lg:flex items-center gap-3">
+        <div className="hidden lg:flex items-center gap-2">
+          <ThemeToggle />
           {!loading && user ? (
             <Link href="/studio" className="w8-btn w8-btn-primary !py-2.5 !px-6">
               Open Studio
@@ -77,10 +117,15 @@ export function SiteHeader() {
             <>
               <Link
                 href="/studio"
-                className="w8-link text-sm text-[#a3a0c2] hover:text-[#F5F4EF] transition-colors"
-                style={{ fontFamily: "var(--w8-font-display)" }}
+                className="w8-link text-sm hidden xl:inline transition-colors"
+                style={{
+                  color: "var(--w8-muted)",
+                  fontFamily: "var(--w8-font-display)",
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.color = "var(--w8-text)")}
+                onMouseLeave={(e) => (e.currentTarget.style.color = "var(--w8-muted)")}
               >
-                AI Studio
+                Studio
               </Link>
               <Link href="/contact" className="w8-btn w8-btn-primary !py-2.5 !px-6">
                 Get a Quote
@@ -89,23 +134,30 @@ export function SiteHeader() {
           )}
         </div>
 
-        {/* mobile toggle */}
-        <button
-          type="button"
-          aria-label={open ? "Close menu" : "Open menu"}
-          aria-expanded={open}
-          onClick={() => setOpen((v) => !v)}
-          className="lg:hidden flex items-center justify-center w-11 h-11 -mr-2 text-[#F5F4EF]"
-        >
-          {open ? <X size={22} /> : <Menu size={22} />}
-        </button>
+        {/* mobile: theme toggle + menu toggle */}
+        <div className="lg:hidden flex items-center">
+          <ThemeToggle />
+          <button
+            type="button"
+            aria-label={open ? "Close menu" : "Open menu"}
+            aria-expanded={open}
+            onClick={() => setOpen((v) => !v)}
+            className="flex items-center justify-center w-11 h-11 -mr-2"
+            style={{ color: "var(--w8-text)" }}
+          >
+            {open ? <X size={22} /> : <Menu size={22} />}
+          </button>
+        </div>
       </div>
 
       {/* mobile overlay menu */}
       <div
-        className={`lg:hidden fixed inset-0 top-0 pt-20 bg-[#090620] transition-all duration-500 lg:transition-none ${
-          open ? "opacity-100 visible" : "opacity-0 invisible"
-        }`}
+        className="lg:hidden fixed inset-0 top-0 pt-20 transition-all duration-500 lg:transition-none"
+        style={{
+          background: "var(--w8-bg)",
+          visibility: open ? "visible" : "hidden",
+          opacity: open ? 1 : 0,
+        }}
         aria-hidden={!open}
       >
         <nav
@@ -116,14 +168,16 @@ export function SiteHeader() {
             <Link
               key={item.href}
               href={item.href}
-              className="flex items-center justify-between py-4 border-b border-white/10 text-[#F5F4EF] text-2xl"
+              className="flex items-center justify-between py-4 border-b text-2xl"
               style={{
                 fontFamily: "var(--w8-font-display)",
+                color: "var(--w8-text)",
+                borderColor: "var(--w8-line)",
                 transitionDelay: `${i * 40}ms`,
               }}
             >
               {item.label}
-              <ArrowUpRight size={20} className="text-[#6d6d74]" />
+              <ArrowUpRight size={20} style={{ color: "var(--w8-muted)" }} />
             </Link>
           ))}
           <div className="flex flex-col gap-3 pt-8">

@@ -68,7 +68,7 @@ export function ServicePageTemplate({ service }: { service: Service }) {
             className="absolute -top-32 right-0 w-[480px] h-[480px] rounded-full"
             style={{
               background:
-                "radial-gradient(closest-side, rgba(125,211,252,0.06), transparent)",
+                "radial-gradient(closest-side, var(--w8-accent-soft), transparent)",
             }}
           />
           <div className="w8-shell relative">
@@ -77,7 +77,7 @@ export function ServicePageTemplate({ service }: { service: Service }) {
                 <Link href="/services" className="w8-link">
                   Services
                 </Link>
-                <span className="mx-2 text-[#6d6d74]">/</span>
+                <span className="mx-2 text-[var(--w8-muted)]">/</span>
                 {service.name}
               </p>
               <h1 className="w8-h1 max-w-3xl">{service.h1}</h1>
@@ -104,7 +104,7 @@ export function ServicePageTemplate({ service }: { service: Service }) {
               <p className="w8-eyebrow w8-accent-lo mb-4">Overview</p>
               <div className="w8-body w8-muted-lo space-y-5 text-[15px] md:text-base">
                 {service.overview.map((p, i) => (
-                  <p key={i} className={i === 0 ? "text-[#0e0e10] font-medium" : ""}>
+                  <p key={i} className={i === 0 ? "text-[var(--w8-inv-text)] font-medium" : ""}>
                     {p}
                   </p>
                 ))}
@@ -202,7 +202,7 @@ export function ServicePageTemplate({ service }: { service: Service }) {
                       </span>
                       <span
                         aria-hidden
-                        className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full border border-[#0e0e10]/10 text-[#0e0e10] transition-transform duration-300 group-open:rotate-45"
+                        className="shrink-0 flex items-center justify-center w-8 h-8 rounded-full border border-[var(--w8-inv-line)] text-[var(--w8-inv-text)] transition-transform duration-300 group-open:rotate-45"
                       >
                         +
                       </span>
