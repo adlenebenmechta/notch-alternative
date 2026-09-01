@@ -122,121 +122,71 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WENOV8 — Public marketing site design system · "Chrome Bloom" (Y2K)
+   WENOV8 — Public marketing site design system · "Sunlit Y2K"
    Scoped tokens (w8-*) used only by /src/components/site/**
-   Two modes — chrome-dark (default) + pearl-light.
-   The vibrant Y2K trio: Bloom Pink / Ultra Violet / Ion Cyan.
-   ═══════════════════════════════════════════════════════════════════════════ */
+   Single bright theme — no dark mode. Solid, confident colors
+   (no violet gradients): Bloom Pink / Sun Gold / Ion Cyan.
+   ═════════════════════════════════════════════════════════════════════════ */
 
-:root,
-html[data-w8-theme="dark"] {
-  /* surfaces — midnight violet */
-  --w8-bg: #08061c;        /* deep space violet */
-  --w8-bg-2: #100b2e;      /* raised panel */
-  --w8-bg-3: #171038;      /* top surface */
-  --w8-bg-deep: #040310;   /* deepest */
-  --w8-text: #f5f3ff;      /* moon white */
-  --w8-muted: #a9a4c6;     /* lavender gray */
-  --w8-line: rgba(245, 243, 255, 0.1);
-  --w8-line-strong: rgba(245, 243, 255, 0.24);
+:root {
+  /* surfaces — bright pearl */
+  --w8-bg: #f7f5fb;        /* pearl canvas */
+  --w8-bg-2: #ffffff;      /* card */
+  --w8-bg-3: #ecebf3;      /* sunken */
+  --w8-bg-deep: #e7e5ef;
+  --w8-text: #1b1726;      /* ink */
+  --w8-muted: #5d5870;
+  --w8-line: rgba(27, 23, 38, 0.13);
+  --w8-line-strong: rgba(27, 23, 38, 0.3);
 
-  /* the vibrant Y2K trio */
-  --w8-ember: #ff4da6;     /* bloom pink */
-  --w8-gold: #9d6bff;      /* ultra violet */
-  --w8-aqua: #3fe0ff;      /* ion cyan */
+  /* the bright solid trio — no violet, no gradients */
+  --w8-ember: #d61f86;     /* bloom pink — primary */
+  --w8-gold: #a87400;      /* sun gold — warm secondary */
+  --w8-aqua: #0a7fa3;      /* ion cyan — cool secondary */
   --w8-accent: var(--w8-ember);
-  --w8-accent-soft: rgba(255, 77, 166, 0.14);
-  --w8-accent-inv: #d61f86;  /* deep pink for light inverse surfaces */
+  --w8-accent-soft: rgba(214, 31, 134, 0.09);
+  --w8-accent-inv: #d61f86;
   --w8-on-accent: #ffffff;
 
-  /* signature gradients */
-  --w8-grad-brand: linear-gradient(135deg, #ff4da6 0%, #9d6bff 55%, #3fe0ff 130%);
-  --w8-grad-btn: linear-gradient(135deg, #ff4da6 0%, #9d6bff 100%);
+  /* solid brand colors (kept as tokens for compatibility) */
+  --w8-grad-brand: var(--w8-ember);
+  --w8-grad-btn: var(--w8-ember);
 
-  /* inverse (contrast) section — pearl chrome */
-  --w8-inv-bg: #f4f2fe;
-  --w8-inv-bg-2: #ffffff;
-  --w8-inv-text: #191228;
-  --w8-inv-muted: #6b6588;
-  --w8-inv-line: rgba(25, 18, 40, 0.12);
+  /* inverse (contrast) section — white panel on pearl */
+  --w8-inv-bg: #ffffff;
+  --w8-inv-bg-2: #f1eff6;
+  --w8-inv-text: #1b1726;
+  --w8-inv-muted: #5d5870;
+  --w8-inv-line: rgba(27, 23, 38, 0.12);
 
-  /* Y2K backdrop treatment */
-  --w8-aurora-op: 1;
-  --w8-glow-1: rgba(255, 77, 166, 0.16);
-  --w8-glow-2: rgba(157, 107, 255, 0.15);
-  --w8-glow-3: rgba(63, 224, 255, 0.1);
-  --w8-orb-op: 1;
-  --w8-star-color: rgba(255, 255, 255, 0.85);
-  --w8-star-glow: rgba(63, 224, 255, 0.8);
+  /* Y2K backdrop — whisper-soft ambient glows */
+  --w8-aurora-op: 0.55;
+  --w8-glow-1: rgba(214, 31, 134, 0.08);
+  --w8-glow-2: rgba(255, 183, 77, 0.09);
+  --w8-glow-3: rgba(63, 224, 255, 0.07);
+  --w8-orb-op: 0.8;
+  --w8-star-color: rgba(168, 116, 0, 0.5);
+  --w8-star-glow: rgba(214, 31, 134, 0.4);
 
   /* veils / scrim (section readability) */
   --w8-video-opacity: 0;
   --w8-video-filter: none;
-  --w8-veil-0: rgba(8, 6, 28, 0.82);
-  --w8-veil-1: rgba(8, 6, 28, 0.35);
-  --w8-veil-2: rgba(8, 6, 28, 0.6);
-  --w8-scrim-bg: rgba(8, 6, 28, 0.42);
-  --w8-grid-line: rgba(245, 243, 255, 0.03);
+  --w8-veil-0: rgba(247, 245, 251, 0.88);
+  --w8-veil-1: rgba(247, 245, 251, 0.5);
+  --w8-veil-2: rgba(247, 245, 251, 0.8);
+  --w8-scrim-bg: rgba(247, 245, 251, 0.5);
+  --w8-grid-line: rgba(27, 23, 38, 0.04);
 }
 
-html[data-w8-theme="light"] {
-  --w8-bg: #f4f2fe;        /* pearl chrome */
-  --w8-bg-2: #ffffff;      /* card */
-  --w8-bg-3: #eae6fa;      /* sunken */
-  --w8-bg-deep: #e6e1f6;
-  --w8-text: #1a1528;      /* ink violet */
-  --w8-muted: #625b80;
-  --w8-line: rgba(26, 21, 40, 0.13);
-  --w8-line-strong: rgba(26, 21, 40, 0.28);
-
-  /* the trio, deepened for pearl (AA contrast) */
-  --w8-ember: #d61f86;
-  --w8-gold: #7a3fe0;
-  --w8-aqua: #0789ae;
-  --w8-accent: var(--w8-ember);
-  --w8-accent-soft: rgba(214, 31, 134, 0.1);
-  --w8-accent-inv: #ff4da6;  /* bright pink for dark inverse surfaces */
-  --w8-on-accent: #ffffff;
-
-  /* signature gradients */
-  --w8-grad-brand: linear-gradient(135deg, #d61f86 0%, #7a3fe0 55%, #0789ae 130%);
-  --w8-grad-btn: linear-gradient(135deg, #d61f86 0%, #7a3fe0 100%);
-
-  /* inverse section — the dark-mode look, used for contrast on light */
-  --w8-inv-bg: #08061c;
-  --w8-inv-bg-2: #100b2e;
-  --w8-inv-text: #f5f3ff;
-  --w8-inv-muted: #a9a4c6;
-  --w8-inv-line: rgba(245, 243, 255, 0.1);
-
-  /* Y2K backdrop — pastel aurora on pearl */
-  --w8-aurora-op: 0.9;
-  --w8-glow-1: rgba(255, 77, 166, 0.13);
-  --w8-glow-2: rgba(157, 107, 255, 0.12);
-  --w8-glow-3: rgba(63, 224, 255, 0.1);
-  --w8-orb-op: 0.85;
-  --w8-star-color: rgba(122, 63, 224, 0.7);
-  --w8-star-glow: rgba(214, 31, 134, 0.55);
-
-  --w8-video-opacity: 0;
-  --w8-video-filter: none;
-  --w8-veil-0: rgba(244, 242, 254, 0.86);
-  --w8-veil-1: rgba(244, 242, 254, 0.5);
-  --w8-veil-2: rgba(244, 242, 254, 0.78);
-  --w8-scrim-bg: rgba(244, 242, 254, 0.45);
-  --w8-grid-line: rgba(26, 21, 40, 0.035);
-}
-
-/* body canvas behind every page (theme-aware) */
-html[data-w8-theme="dark"] body { background: #08061c; }
-html[data-w8-theme="light"] body { background: #f4f2fe; }
+/* body canvas behind every page — light only */
+body { background: #f7f5fb; }
 
 /* Font tokens must live on <body>: they reference the next/font variables
-   (--font-cyber, --font-kabisat, --font-sora, --font-geist-sans) which are
+   (--font-cyber, --font-game, --font-sora, --font-geist-sans) which are
    scoped to <body> — custom properties resolve var() at their definition
    scope, so defining these on :root would silently fall back to system
    fonts. Display = Sora (clean, professional, always legible); the Y2K
-   faces (Cyberwave / Kabisat) are reserved for short decorative accents. */
+   faces (Cyberwave / Game Paused) are reserved for short decorative accents. */
 body {
   --w8-font-display: var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
@@ -304,21 +254,19 @@ body {
 .w8-light .w8-text-lo { color: var(--w8-inv-text); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
-/* Y2K type pairing — Cyberwave 2000 (display) + Kabisat ItalicTall (labels). */
+/* Y2K type pairing — Cyberwave 2000 (display) + Game Paused (labels). */
 .w8-eyebrow {
-  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
-  font-size: 0.95rem;
+  font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
+  font-size: 0.85rem;
   font-weight: 400;
-  font-style: italic;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 
 /* Utility: label font for micro-copy (REC, ON AIR, footnotes…). */
 .w8-pixel {
-  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
-  font-style: italic;
-  letter-spacing: 0.1em;
+  font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
+  letter-spacing: 0.14em;
 }
 
 .w8-h1 {
@@ -367,11 +315,11 @@ body {
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
-  font-style: italic;
+  font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
   font-weight: 400;
-  font-size: 1rem;
-  letter-spacing: 0.09em;
+  font-size: 0.95rem;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
   border-radius: 9999px;
   padding: 0.9rem 1.9rem;
   transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, color 0.3s, border-color 0.3s, opacity 0.3s, box-shadow 0.3s, filter 0.3s;
@@ -402,12 +350,12 @@ body {
 .w8-btn-primary {
   background: var(--w8-grad-btn);
   color: var(--w8-on-accent);
-  box-shadow: 0 10px 30px -12px rgba(255, 77, 166, 0.55);
+  box-shadow: 0 8px 22px -10px rgba(214, 31, 134, 0.45);
 }
 .w8-btn-primary:hover {
   transform: translateY(-2px);
-  filter: brightness(1.08);
-  box-shadow: 0 14px 36px -12px rgba(157, 107, 255, 0.6);
+  filter: brightness(1.06);
+  box-shadow: 0 12px 28px -10px rgba(214, 31, 134, 0.5);
 }
 
 .w8-btn-invert {
@@ -772,10 +720,10 @@ body.w8-pixel-cursor [data-cursor] {
   border-radius: 50%;
   opacity: var(--w8-orb-op);
   background:
-    radial-gradient(circle at 33% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.32) 16%, rgba(196, 205, 255, 0.14) 34%, rgba(110, 100, 220, 0.1) 55%, transparent 72%);
+    radial-gradient(circle at 33% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 16%, rgba(178, 224, 246, 0.22) 34%, rgba(10, 127, 163, 0.07) 55%, transparent 72%);
   box-shadow:
-    inset -6px -10px 18px rgba(157, 107, 255, 0.22),
-    inset 3px 5px 10px rgba(255, 255, 255, 0.3);
+    inset -6px -10px 18px rgba(10, 127, 163, 0.14),
+    inset 3px 5px 10px rgba(255, 255, 255, 0.55);
   will-change: transform;
 }
 .w8-orb-a { animation: w8-float-a 13s ease-in-out infinite alternate; }
@@ -801,11 +749,11 @@ body.w8-pixel-cursor [data-cursor] {
   opacity: var(--w8-orb-op);
   background: conic-gradient(
     from 210deg,
-    rgba(255, 77, 166, 0.32),
-    rgba(157, 107, 255, 0.26),
-    rgba(63, 224, 255, 0.3),
-    rgba(255, 209, 102, 0.18),
-    rgba(255, 77, 166, 0.32)
+    rgba(214, 31, 134, 0.26),
+    rgba(255, 183, 77, 0.2),
+    rgba(63, 224, 255, 0.24),
+    rgba(168, 116, 0, 0.16),
+    rgba(214, 31, 134, 0.26)
   );
   -webkit-mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
   mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
@@ -844,49 +792,12 @@ body.w8-pixel-cursor [data-cursor] {
   .w8-star { opacity: 0.6; }
 }
 
-/* ── chrome text — liquid-metal Y2K display type ────────────────────────── */
+/* ── brand display type — solid ink Y2K statement (no gradient) ─────────── */
 .w8-chrome-text {
   font-family: var(--font-cyber), var(--w8-font-display);
   font-weight: 400;
   letter-spacing: 0.03em;
-  background: linear-gradient(
-    100deg,
-    #ffffff 0%,
-    #cfd6ff 18%,
-    #ffffff 34%,
-    #aab3ff 52%,
-    #ffffff 68%,
-    #cfd6ff 84%,
-    #ffffff 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-  animation: w8-chrome-flow 9s linear infinite;
-}
-html[data-w8-theme="light"] .w8-chrome-text {
-  background: linear-gradient(
-    100deg,
-    #4a4466 0%,
-    #9d6bff 18%,
-    #3a3350 34%,
-    #d61f86 52%,
-    #4a4466 68%,
-    #7a3fe0 84%,
-    #4a4466 100%
-  );
-  background-size: 220% 100%;
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
-}
-@keyframes w8-chrome-flow {
-  from { background-position: 0% 0; }
-  to { background-position: -220% 0; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .w8-chrome-text { animation: none; }
+  color: var(--w8-text);
 }
 
 /* big chrome wordmark (STUDIO / WENOV8 statements) */
@@ -905,10 +816,7 @@ html[data-w8-theme="light"] .w8-chrome-text {
   font-family: var(--font-cyber), var(--w8-font-display);
   font-weight: 400;
   letter-spacing: 0.05em;
-  background: var(--w8-grad-brand);
-  -webkit-background-clip: text;
-  background-clip: text;
-  color: transparent;
+  color: var(--w8-ember);
 }
 
 /* ── gloss image reveal — replaces pixel dissolve ───────────────────────── */
@@ -962,7 +870,7 @@ html[data-w8-theme="light"] .w8-chrome-text {
   height: 0.6rem;
   border-radius: 9999px;
   background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
-  box-shadow: 0 0 10px rgba(255, 77, 166, 0.45);
+  box-shadow: 0 0 10px rgba(214, 31, 134, 0.35);
 }
 .w8-dot-lg {
   display: inline-block;
@@ -970,7 +878,7 @@ html[data-w8-theme="light"] .w8-chrome-text {
   height: 0.85rem;
   border-radius: 9999px;
   background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
-  box-shadow: 0 0 12px rgba(255, 77, 166, 0.5);
+  box-shadow: 0 0 12px rgba(214, 31, 134, 0.4);
 }
 
 

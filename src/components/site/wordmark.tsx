@@ -2,8 +2,8 @@ import Link from "next/link";
 
 /**
  * Typographic WENOV8 wordmark — "8" in ember.
- * Token-driven colors: bone-on-space in dark mode, ink-on-paper in
- * light mode. The mark is always readable on any surface.
+ * Token-driven colors: ink-on-pearl. The mark is always
+ * readable on any surface.
  */
 export function Wordmark({
   className = "",
@@ -15,9 +15,8 @@ export function Wordmark({
       className={className}
       style={{
         fontFamily:
-          "var(--font-kabisat), var(--font-geist-sans), sans-serif",
-        fontStyle: "italic",
-        letterSpacing: "0.05em",
+          "var(--font-game), var(--font-geist-sans), sans-serif",
+        letterSpacing: "0.08em",
         color: "var(--w8-text)",
       }}
     >
@@ -43,11 +42,11 @@ export function LogoLink({
         aria-hidden
         className="flex items-center justify-center w-9 h-9 text-[13px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
         style={{
-          background: "var(--w8-grad-btn)",
+          background: "var(--w8-ember)",
           color: "#ffffff",
           fontFamily: "var(--font-cyber), var(--w8-font-display)",
           borderRadius: "0.65rem",
-          boxShadow: "0 6px 18px -6px rgba(255, 77, 166, 0.5)",
+          boxShadow: "0 6px 18px -6px rgba(214, 31, 134, 0.4)",
         }}
       >
         W8

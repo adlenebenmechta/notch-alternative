@@ -6,7 +6,7 @@ import { useEffect, useRef, useState } from "react";
  * Y2KCursor — desktop-only custom cursor with a chrome soul.
  * Normal: a glossy chrome ring + small pink dot.
  * Over [data-cursor] targets: the ring expands, gains the brand
- * gradient glow and shows an italic Kabisat label
+ * glow and shows a Game Paused pixel label
  * (VIEW / EXPLORE / OPEN). Disabled on touch + reduced-motion.
  */
 
@@ -82,10 +82,10 @@ export function Y2KCursor() {
         style={{
           border: "1.5px solid",
           borderColor: label ? "var(--w8-ember)" : "var(--w8-line-strong)",
-          background: label ? "var(--w8-accent-soft)" : "rgba(255,255,255,0.04)",
+          background: label ? "var(--w8-accent-soft)" : "rgba(27, 23, 38, 0.05)",
           boxShadow: label
-            ? "0 0 22px -2px rgba(255, 77, 166, 0.55), inset 0 0 12px rgba(255,255,255,0.18)"
-            : "inset 0 2px 6px rgba(255,255,255,0.22), inset 0 -3px 8px rgba(157,107,255,0.25)",
+            ? "0 0 22px -2px rgba(214, 31, 134, 0.45), inset 0 0 12px rgba(255,255,255,0.35)"
+            : "inset 0 2px 6px rgba(255,255,255,0.6), inset 0 -3px 8px rgba(10,127,163,0.25)",
           backdropFilter: "blur(2px)",
         }}
       >
@@ -104,7 +104,7 @@ export function Y2KCursor() {
         className="fixed top-0 left-0 w-1.5 h-1.5 rounded-full"
         style={{
           background: "var(--w8-ember)",
-          boxShadow: "0 0 8px rgba(255, 77, 166, 0.8)",
+          boxShadow: "0 0 8px rgba(214, 31, 134, 0.6)",
         }}
       />
     </div>

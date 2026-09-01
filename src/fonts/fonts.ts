@@ -13,11 +13,12 @@ export const Cyberwave2000 = localFont({
 });
 
 /**
- * Kabisat Demo ItalicTall — the Y2K label font (user-supplied).
- * Tall condensed italic: eyebrows, nav, buttons, micro-copy.
+ * Game Paused DEMO — the Y2K label font (user-supplied).
+ * Chunky retro-game pixel face: eyebrows, nav accents, buttons,
+ * micro-copy. Used uppercase with generous tracking.
  */
-export const Kabisat = localFont({
-  src: "./Kabisat-Demo-ItalicTall.ttf",
-  variable: "--font-kabisat",
+export const GamePaused = localFont({
+  src: "./GamePausedDEMO.otf",
+  variable: "--font-game",
   display: "swap",
 });

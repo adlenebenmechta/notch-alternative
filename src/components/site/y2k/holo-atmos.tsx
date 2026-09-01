@@ -3,8 +3,8 @@
 /**
  * HoloAtmos — fixed holographic atmosphere overlay.
  * A whisper of iridescent sheen + a soft vignette that keeps
- * copy edges readable. Restrained by design: sheen at ~4%,
- * vignette 45%. Replaces the CRT scanlines + grain layer.
+ * copy edges readable. Restrained by design: sheen at ~2%,
+ * vignette 14% on the bright pearl canvas.
  */
 export function HoloAtmos() {
   return (
@@ -14,7 +14,7 @@ export function HoloAtmos() {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(115deg, transparent 18%, rgba(255, 77, 166, 0.028) 36%, rgba(157, 107, 255, 0.04) 50%, rgba(63, 224, 255, 0.028) 64%, transparent 82%)",
+            "linear-gradient(115deg, transparent 18%, rgba(214, 31, 134, 0.018) 36%, rgba(255, 183, 77, 0.022) 50%, rgba(63, 224, 255, 0.018) 64%, transparent 82%)",
         }}
       />
       {/* soft vignette */}
@@ -22,7 +22,7 @@ export function HoloAtmos() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(4, 3, 16, 0.45) 100%)",
+            "radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(27, 23, 38, 0.14) 100%)",
         }}
       />
     </div>

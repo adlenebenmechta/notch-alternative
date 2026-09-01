@@ -3,10 +3,10 @@
 import { useEffect, useState } from "react";
 
 /**
- * Y2KIntro — the WENOV8 chrome boot reveal.
+ * Y2KIntro — the WENOV8 boot reveal.
  *
- * "W8" rises in liquid chrome (Cyberwave 2000, gradient sweep),
- * then the invitation fades in beneath it in Kabisat italic:
+ * "W8" rises in solid ink (Cyberwave 2000),
+ * then the invitation fades in beneath it in Game Paused:
  * "TRY WENOV8". ~3s total, click-to-skip, skipped for
  * reduced-motion. Pure DOM/CSS — no canvas.
  */
@@ -44,8 +44,7 @@ export function Y2KIntro() {
         style={{
           fontSize: "clamp(4.5rem, 16vw, 11rem)",
           lineHeight: 1,
-          animation:
-            "w8-intro-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1) both, w8-chrome-flow 9s linear infinite",
+          animation: "w8-intro-pop 0.9s cubic-bezier(0.22, 1, 0.36, 1) both",
         }}
       >
         W8

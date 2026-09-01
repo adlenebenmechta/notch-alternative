@@ -1,7 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
-import { ThemeProvider } from "next-themes";
-import { Cyberwave2000, Kabisat } from "@/fonts/fonts";
+import { Cyberwave2000, GamePaused } from "@/fonts/fonts";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -89,18 +88,9 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Cyberwave2000.variable} ${Kabisat.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Cyberwave2000.variable} ${GamePaused.variable} antialiased bg-background text-foreground`}
       >
-        <AuthProvider>
-          <ThemeProvider
-            attribute="data-w8-theme"
-            defaultTheme="dark"
-            enableSystem={false}
-            disableTransitionOnChange
-          >
-            {children}
-          </ThemeProvider>
-        </AuthProvider>
+        <AuthProvider>{children}</AuthProvider>
         <Toaster />
       </body>
     </html>

@@ -31,7 +31,7 @@ export function WordmarkDisplay({
       <span
         className="w8-wordmark w8-chrome-text"
         style={{
-          filter: "drop-shadow(0 10px 44px rgba(157, 107, 255, 0.32))",
+          filter: "drop-shadow(0 10px 44px rgba(214, 31, 134, 0.18))",
         }}
       >
         {text}

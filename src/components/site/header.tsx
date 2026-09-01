@@ -3,40 +3,10 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useState } from "react";
-import { Menu, X, ArrowUpRight, Sun, Moon } from "lucide-react";
-import { useTheme } from "next-themes";
+import { Menu, X, ArrowUpRight } from "lucide-react";
 import { useAuth } from "@/providers/auth-provider";
 import { MAIN_NAV } from "@/lib/site/config";
 import { LogoLink } from "./wordmark";
-
-/**
- * ThemeToggle — flips the site between ember-dark and paper-light.
- * Both modes are first-class brand surfaces. Rendered after mount
- * to avoid a hydration mismatch on the icon.
- */
-function ThemeToggle() {
-  const { resolvedTheme, setTheme } = useTheme();
-  const [mounted, setMounted] = useState(false);
-  useEffect(() => setMounted(true), []);
-
-  if (!mounted) {
-    return <span className="inline-block w-11 h-11" aria-hidden />;
-  }
-
-  const isDark = resolvedTheme !== "light";
-  return (
-    <button
-      type="button"
-      aria-label={isDark ? "Switch to light mode" : "Switch to dark mode"}
-      title={isDark ? "Light mode" : "Dark mode"}
-      onClick={() => setTheme(isDark ? "light" : "dark")}
-      className="w8-pixel flex items-center justify-center w-11 h-11 transition-colors"
-      style={{ color: "var(--w8-muted)" }}
-    >
-      {isDark ? <Sun size={19} /> : <Moon size={19} />}
-    </button>
-  );
-}
 
 /**
  * Site header — always visible. On the homepage the opening brand
@@ -46,6 +16,7 @@ function ThemeToggle() {
  * Every other page keeps the transparent-over-hero look until scroll.
  * Shows "Open Studio" instead of "Get a Quote" primary CTA when
  * the visitor is authenticated (checks the existing Firebase session).
+ * The site is light-only (single bright theme — no dark mode).
  */
 export function SiteHeader() {
   const [scrolled, setScrolled] = useState(false);
@@ -121,7 +92,6 @@ export function SiteHeader() {
         </nav>
 
         <div className="hidden lg:flex items-center gap-2">
-          <ThemeToggle />
           {!loading && user ? (
             <Link href="/studio" className="w8-btn w8-btn-primary !py-2.5 !px-6">
               Open Studio
@@ -152,9 +122,8 @@ export function SiteHeader() {
           )}
         </div>
 
-        {/* mobile: theme toggle + menu toggle */}
+        {/* mobile: menu toggle */}
         <div className="lg:hidden flex items-center">
-          <ThemeToggle />
           <button
             type="button"
             aria-label={open ? "Close menu" : "Open menu"}
