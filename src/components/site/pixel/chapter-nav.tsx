@@ -3,10 +3,10 @@
 import { CHAPTER_IDS } from "../scene/scene-state";
 
 /**
- * ChapterNav — fixed pixel chapter indicator (desktop ≥lg).
- * Each chapter is a brand pixel; the active pixel grows, glows
- * ember and blinks like a machine heartbeat. Click jumps to the
- * section. (Dots instead of numbers — numbering lives only in
+ * ChapterNav — fixed Y2K chapter indicator (desktop ≥lg).
+ * Each chapter is a chrome orb; the active orb grows, glows
+ * pink and pulses like a heartbeat. Click jumps to the section.
+ * (Orbs instead of numbers — numbering lives only in
  * "How It Works".)
  */
 export function ChapterNav({
@@ -50,15 +50,17 @@ export function ChapterNav({
             </span>
             <span
               aria-hidden
-              className={`block transition-all duration-300 ${
+              className={`block rounded-full transition-all duration-300 ${
                 isActive ? "w8-blink" : ""
               }`}
               style={{
                 width: isActive ? 14 : 8,
                 height: isActive ? 14 : 8,
-                background: isActive ? "var(--w8-ember)" : "var(--w8-line-strong)",
+                background: isActive
+                  ? "radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%)"
+                  : "var(--w8-line-strong)",
                 boxShadow: isActive
-                  ? "0 0 14px 1px color-mix(in srgb, var(--w8-ember) 60%, transparent)"
+                  ? "0 0 14px 1px rgba(255, 77, 166, 0.6)"
                   : "none",
               }}
             />

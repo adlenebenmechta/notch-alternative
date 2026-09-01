@@ -3,12 +3,11 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { motion, useScroll, useSpring } from "framer-motion";
 import { sceneState, CHAPTER_IDS } from "./scene/scene-state";
-import { PixelIntro } from "./pixel/pixel-intro";
-import { PixelCursor } from "./pixel/pixel-cursor";
+import { Y2KIntro } from "./y2k/y2k-intro";
+import { Y2KCursor } from "./y2k/y2k-cursor";
 import { ChapterNav } from "./pixel/chapter-nav";
-import { Atmosphere } from "./pixel/atmosphere";
-import { VideoBackdrop } from "./pixel/video-backdrop";
-import { PixelDust } from "./pixel/pixel-dust";
+import { HoloAtmos } from "./y2k/holo-atmos";
+import { Y2KBackdrop } from "./y2k/y2k-backdrop";
 
 const smooth = (t: number) => {
   t = Math.min(1, Math.max(0, t));
@@ -16,12 +15,12 @@ const smooth = (t: number) => {
 };
 
 /**
- * ScrollStage — orchestrates the pixel journey:
- * scroll → chapter detection → chapter nav, pixel cursor, atmosphere
- * + progress hairline.
- * The VideoBackdrop (retro astronaut film + pixel grid) and the
- * PixelDust layer paint the universe behind everything; all page
- * content renders as normal, crawlable DOM above it.
+ * ScrollStage — orchestrates the Y2K chrome journey:
+ * scroll → chapter detection → chapter nav, chrome cursor, holo
+ * atmosphere + progress hairline.
+ * The Y2KBackdrop (aurora mesh + chrome orbs + sparkles) paints the
+ * universe behind everything; all page content renders as normal,
+ * crawlable DOM above it.
  *
  * While the opening brand film fills the screen (heroLive), the
  * floating chrome — chapter nav, atmosphere, progress hairline —
@@ -101,17 +100,16 @@ export function ScrollStage({ children }: { children: ReactNode }) {
 
   return (
     <>
-      <PixelIntro />
-      {/* the astronaut film + pixel grid + drifting pixel dust */}
-      <VideoBackdrop />
-      <PixelDust />
+      <Y2KIntro />
+      {/* the aurora mesh + chrome orbs + sparkles */}
+      <Y2KBackdrop />
       {/* chrome fades out while the opening film fills the screen */}
       <Fade when={!heroLive} interactive>
         <ChapterNav active={active} onJump={jump} />
       </Fade>
-      <PixelCursor />
+      <Y2KCursor />
       <Fade when={!heroLive}>
-        <Atmosphere />
+        <HoloAtmos />
         <ProgressHairline />
       </Fade>
       <div className="relative z-10">{children}</div>

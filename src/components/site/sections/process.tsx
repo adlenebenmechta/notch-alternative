@@ -2,7 +2,6 @@
 
 import { useRef } from "react";
 import { motion, useScroll, useTransform, useReducedMotion } from "framer-motion";
-import { PixelText } from "../pixel/pixel-text";
 
 const STEPS = [
   {
@@ -63,7 +62,12 @@ export function ProcessSection() {
       <div className="w8-shell relative">
         <div className="max-w-3xl">
           <div className="flex items-center gap-3.5 mb-4">
-            <PixelText text="1-5" cell={2} color="var(--w8-ember)" />
+            <span
+              className="w8-num text-[15px]"
+              style={{ color: "var(--w8-ember)" }}
+            >
+              1-5
+            </span>
             <span
               aria-hidden
               className="h-px w-8"
@@ -125,22 +129,23 @@ export function ProcessSection() {
                     className="p-4 h-full w8-panel"
                   >
                     <div className="flex items-center justify-between mb-3">
-                      <PixelText
-                        text={step.n}
-                        cell={2}
-                        color={i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}
-                      />
                       <span
-                        className="text-[8px] tracking-[0.2em] font-bold"
+                        className="w8-num text-[17px]"
+                        style={{ color: i % 2 ? "var(--w8-gold)" : "var(--w8-ember)" }}
+                      >
+                        {step.n}
+                      </span>
+                      <span
+                        className="w8-pixel text-[10px] tracking-[0.2em]"
                         style={{ color: "var(--w8-muted)" }}
                       >
                         {step.tag}
                       </span>
                     </div>
                     <h3
-                      className="text-[15px] font-semibold"
+                      className="text-[15px]"
                       style={{
-                        fontFamily: "var(--w8-font-display)",
+                        fontFamily: "var(--font-cyber), var(--w8-font-display)",
                         color: "var(--w8-text)",
                       }}
                     >
@@ -194,22 +199,23 @@ export function ProcessSection() {
                   />
                   <div className="p-4 w8-panel">
                     <div className="flex items-center justify-between mb-2">
-                      <PixelText
-                        text={step.n}
-                        cell={2}
-                        color={i % 2 ? "var(--w8-gold)" : "var(--w8-ember)"}
-                      />
                       <span
-                        className="text-[8px] tracking-[0.2em] font-bold"
+                        className="w8-num text-[17px]"
+                        style={{ color: i % 2 ? "var(--w8-gold)" : "var(--w8-ember)" }}
+                      >
+                        {step.n}
+                      </span>
+                      <span
+                        className="w8-pixel text-[10px] tracking-[0.2em]"
                         style={{ color: "var(--w8-muted)" }}
                       >
                         {step.tag}
                       </span>
                     </div>
                     <h3
-                      className="text-[15px] font-semibold"
+                      className="text-[15px]"
                       style={{
-                        fontFamily: "var(--w8-font-display)",
+                        fontFamily: "var(--font-cyber), var(--w8-font-display)",
                         color: "var(--w8-text)",
                       }}
                     >

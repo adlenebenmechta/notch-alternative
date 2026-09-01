@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight } from "lucide-react";
 import { Reveal } from "../reveal";
-import { ConvergeCanvas } from "../pixel/converge-canvas";
+import { WordmarkDisplay } from "../y2k/wordmark-display";
 import { PixelDot } from "../pixel/pixel-dot";
 import { SITE } from "@/lib/site/config";
 
@@ -39,8 +39,8 @@ export function FinalCta() {
           we&apos;ll take it from brief to final frame.
         </p>
 
-        {/* particles gather into the WENOV8 mark */}
-        <ConvergeCanvas text="WENOV8" cell={9} className="mt-14 md:mt-20" />
+        {/* the chrome WENOV8 mark */}
+        <WordmarkDisplay text="WENOV8" className="mt-14 md:mt-20" />
 
         <Reveal delay={0.1} className="mt-12 md:mt-16">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">

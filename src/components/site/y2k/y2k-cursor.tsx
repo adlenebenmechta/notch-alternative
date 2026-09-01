@@ -3,9 +3,10 @@
 import { useEffect, useRef, useState } from "react";
 
 /**
- * PixelCursor — desktop-only custom cursor with a pixel soul.
- * Normal: 10px lime-outlined square + center dot.
- * Over [data-cursor] targets: expands and shows a pixel label
+ * Y2KCursor — desktop-only custom cursor with a chrome soul.
+ * Normal: a glossy chrome ring + small pink dot.
+ * Over [data-cursor] targets: the ring expands, gains the brand
+ * gradient glow and shows an italic Kabisat label
  * (VIEW / EXPLORE / OPEN). Disabled on touch + reduced-motion.
  */
 
@@ -15,9 +16,9 @@ const LABELS: Record<string, string> = {
   open: "OPEN",
 };
 
-export function PixelCursor() {
+export function Y2KCursor() {
   const dot = useRef<HTMLDivElement>(null);
-  const box = useRef<HTMLDivElement>(null);
+  const ring = useRef<HTMLDivElement>(null);
   const [label, setLabel] = useState<string | null>(null);
   const [enabled, setEnabled] = useState(false);
 
@@ -46,14 +47,14 @@ export function PixelCursor() {
     };
 
     const loop = () => {
-      x += (mx - x) * 0.38;
-      y += (my - y) * 0.38;
+      x += (mx - x) * 0.34;
+      y += (my - y) * 0.34;
       if (dot.current) {
-        dot.current.style.transform = `translate3d(${mx - 2}px, ${my - 2}px, 0)`;
+        dot.current.style.transform = `translate3d(${mx - 3}px, ${my - 3}px, 0)`;
       }
-      if (box.current) {
-        const s = label ? 1.7 : 1;
-        box.current.style.transform = `translate3d(${x - 14}px, ${y - 14}px, 0) scale(${s})`;
+      if (ring.current) {
+        const s = label ? 1.65 : 1;
+        ring.current.style.transform = `translate3d(${x - 17}px, ${y - 17}px, 0) scale(${s})`;
       }
       raf = requestAnimationFrame(loop);
     };
@@ -74,29 +75,37 @@ export function PixelCursor() {
 
   return (
     <div aria-hidden className="fixed inset-0 z-[90] pointer-events-none hidden md:block">
-      {/* trailing square */}
+      {/* trailing chrome ring */}
       <div
-        ref={box}
-        className="fixed top-0 left-0 w-7 h-7 border transition-colors duration-200"
+        ref={ring}
+        className="fixed top-0 left-0 w-[34px] h-[34px] rounded-full transition-colors duration-200"
         style={{
+          border: "1.5px solid",
           borderColor: label ? "var(--w8-ember)" : "var(--w8-line-strong)",
-          background: label ? "var(--w8-accent-soft)" : "transparent",
+          background: label ? "var(--w8-accent-soft)" : "rgba(255,255,255,0.04)",
+          boxShadow: label
+            ? "0 0 22px -2px rgba(255, 77, 166, 0.55), inset 0 0 12px rgba(255,255,255,0.18)"
+            : "inset 0 2px 6px rgba(255,255,255,0.22), inset 0 -3px 8px rgba(157,107,255,0.25)",
+          backdropFilter: "blur(2px)",
         }}
       >
         {label && (
           <span
-            className="w8-pixel absolute left-1/2 -translate-x-1/2 top-[34px] text-[9px] tracking-[0.14em] whitespace-nowrap"
+            className="w8-pixel absolute left-1/2 -translate-x-1/2 top-[40px] text-[10px] tracking-[0.16em] whitespace-nowrap"
             style={{ color: "var(--w8-ember)" }}
           >
             {label}
           </span>
         )}
       </div>
-      {/* exact pointer dot */}
+      {/* exact pointer dot — a tiny brand orb */}
       <div
         ref={dot}
-        className="fixed top-0 left-0 w-1 h-1"
-        style={{ background: "var(--w8-ember)" }}
+        className="fixed top-0 left-0 w-1.5 h-1.5 rounded-full"
+        style={{
+          background: "var(--w8-ember)",
+          boxShadow: "0 0 8px rgba(255, 77, 166, 0.8)",
+        }}
       />
     </div>
   );

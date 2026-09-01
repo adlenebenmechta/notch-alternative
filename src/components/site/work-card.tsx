@@ -3,7 +3,6 @@
 import { useRef, useState } from "react";
 import { Play, ArrowUpRight } from "lucide-react";
 import type { PortfolioItem } from "@/lib/site/portfolio";
-import { PixelDissolve } from "./pixel/pixel-dissolve";
 
 /**
  * Portfolio tile — poster image by default, video preview on hover/tap.
@@ -56,8 +55,11 @@ export function WorkCard({
         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-[1.04]"
       />
 
-      {/* pixel dissolve entrance */}
-      <PixelDissolve />
+      {/* Y2K gloss sweep on hover */}
+      <span
+        aria-hidden
+        className="pointer-events-none absolute inset-y-0 -left-1/3 w-1/3 -skew-x-12 bg-gradient-to-r from-transparent via-white/25 to-transparent opacity-0 transition-all duration-700 ease-out group-hover:left-[110%] group-hover:opacity-100"
+      />
 
       {/* video layer (only for video items) */}
       {item.kind === "video" && (
@@ -82,13 +84,13 @@ export function WorkCard({
       <div className="absolute inset-x-0 bottom-0 p-4 sm:p-5 flex items-end justify-between gap-3">
         <div className="min-w-0">
           <p
-            className="text-[10px] sm:text-[11px] font-semibold uppercase tracking-[0.18em] text-[var(--w8-ember)] mb-1.5"
+            className="w8-pixel text-[11px] sm:text-[12px] uppercase tracking-[0.18em] text-[var(--w8-ember)] mb-1.5"
           >
             {item.category}
           </p>
           <p
             className="text-sm sm:text-base font-semibold text-white leading-snug truncate"
-            style={{ fontFamily: "var(--w8-font-display)" }}
+            style={{ fontFamily: "var(--font-cyber), var(--w8-font-display)" }}
           >
             {item.title}
           </p>

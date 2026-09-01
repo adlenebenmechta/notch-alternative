@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { ArrowRight, Check } from "lucide-react";
 import { Reveal, RevealGroup, RevealItem } from "../reveal";
-import { ConvergeCanvas } from "../pixel/converge-canvas";
+import { WordmarkDisplay } from "../y2k/wordmark-display";
 import { PixelDot } from "../pixel/pixel-dot";
 
 /**
@@ -33,8 +33,8 @@ export function StudioSection() {
       className="relative w8-scrim w8-section-pad overflow-hidden"
     >
       <div className="w8-shell relative">
-        {/* the convergence wordmark */}
-        <ConvergeCanvas text="STUDIO" cell={7} className="mb-12 md:mb-16" />
+        {/* the chrome wordmark */}
+        <WordmarkDisplay text="STUDIO" className="mb-12 md:mb-16" />
 
         <div className="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
           <div>

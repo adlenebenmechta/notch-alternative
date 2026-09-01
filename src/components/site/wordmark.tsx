@@ -12,9 +12,12 @@ export function Wordmark({
 }) {
   return (
     <span
-      className={`font-semibold tracking-tight ${className}`}
+      className={className}
       style={{
-        fontFamily: "var(--w8-font-display)",
+        fontFamily:
+          "var(--font-kabisat), var(--font-geist-sans), sans-serif",
+        fontStyle: "italic",
+        letterSpacing: "0.05em",
         color: "var(--w8-text)",
       }}
     >
@@ -38,12 +41,13 @@ export function LogoLink({
     >
       <span
         aria-hidden
-        className="flex items-center justify-center w-9 h-9 font-black text-[15px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
+        className="flex items-center justify-center w-9 h-9 text-[13px] leading-none transition-transform duration-500 group-hover:rotate-[8deg]"
         style={{
-          background: "var(--w8-ember)",
-          color: "var(--w8-on-accent)",
-          fontFamily: "var(--w8-font-display)",
-          borderRadius: "0.5rem",
+          background: "var(--w8-grad-btn)",
+          color: "#ffffff",
+          fontFamily: "var(--font-cyber), var(--w8-font-display)",
+          borderRadius: "0.65rem",
+          boxShadow: "0 6px 18px -6px rgba(255, 77, 166, 0.5)",
         }}
       >
         W8

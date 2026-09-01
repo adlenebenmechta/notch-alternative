@@ -1,13 +1,11 @@
 /**
- * PixelDot — the WENOV8 section marker.
+ * PixelDot — the WENOV8 section marker, Y2K edition.
  *
- * A single crisp brand pixel (plus an optional hairline) that marks
- * each section. Replaces the old chapter numbering everywhere except
- * "How It Works", which keeps its storyboard numbers on purpose —
- * a numbered process reads as a real production line.
- *
- * Pure CSS (theme-aware via tokens) — zero canvas cost.
+ * A single glossy chrome orb (plus an optional hairline) that marks
+ * each section. Pure CSS (theme-aware via tokens) — zero canvas cost.
+ * The name keeps its place in the imports; the soul is chrome now.
  */
+
 export function PixelDot({
   size = "md",
   color = "var(--w8-ember)",
@@ -24,15 +22,17 @@ export function PixelDot({
   return (
     <span
       aria-hidden
-      className={`inline-block shrink-0 ${dim} ${blink ? "w8-blink" : ""} ${className}`}
-      style={{ background: color }}
+      className={`inline-block shrink-0 rounded-full ${dim} ${blink ? "w8-blink" : ""} ${className}`}
+      style={{
+        background: `radial-gradient(circle at 32% 30%, #ffffff 0%, ${color} 62%)`,
+        boxShadow: `0 0 10px ${color}`,
+      }}
     />
   );
 }
 
 /**
- * PixelDotLockup — the heading marker: pixel + hairline + eyebrow.
- * The refined replacement for "01 / THE CREATIVE MACHINE" markers.
+ * PixelDotLockup — the heading marker: orb + hairline + eyebrow.
  */
 export function PixelDotLockup({
   eyebrow,

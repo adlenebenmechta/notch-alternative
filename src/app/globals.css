@@ -122,95 +122,122 @@
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WENOV8 — Public marketing site design system · "Signal Ember"
+   WENOV8 — Public marketing site design system · "Chrome Bloom" (Y2K)
    Scoped tokens (w8-*) used only by /src/components/site/**
-   Two beautiful modes — ember-dark (default) + paper-light.
-   Three vibrant brand hues: Ember / Gold / Aqua. Nothing else.
+   Two modes — chrome-dark (default) + pearl-light.
+   The vibrant Y2K trio: Bloom Pink / Ultra Violet / Ion Cyan.
    ═══════════════════════════════════════════════════════════════════════════ */
 
 :root,
 html[data-w8-theme="dark"] {
-  /* surfaces */
-  --w8-bg: #0a0812;        /* deep space */
-  --w8-bg-2: #131022;      /* raised panel */
-  --w8-bg-3: #1b1730;      /* top surface */
-  --w8-bg-deep: #060410;   /* deepest */
-  --w8-text: #f2efe6;      /* warm bone */
-  --w8-muted: #a7a095;     /* warm gray */
-  --w8-line: rgba(242, 239, 230, 0.1);
-  --w8-line-strong: rgba(242, 239, 230, 0.22);
+  /* surfaces — midnight violet */
+  --w8-bg: #08061c;        /* deep space violet */
+  --w8-bg-2: #100b2e;      /* raised panel */
+  --w8-bg-3: #171038;      /* top surface */
+  --w8-bg-deep: #040310;   /* deepest */
+  --w8-text: #f5f3ff;      /* moon white */
+  --w8-muted: #a9a4c6;     /* lavender gray */
+  --w8-line: rgba(245, 243, 255, 0.1);
+  --w8-line-strong: rgba(245, 243, 255, 0.24);
 
-  /* the vibrant trio */
-  --w8-ember: #ff6b4a;
-  --w8-gold: #ffc145;
-  --w8-aqua: #2de1c2;
+  /* the vibrant Y2K trio */
+  --w8-ember: #ff4da6;     /* bloom pink */
+  --w8-gold: #9d6bff;      /* ultra violet */
+  --w8-aqua: #3fe0ff;      /* ion cyan */
   --w8-accent: var(--w8-ember);
-  --w8-accent-soft: rgba(255, 107, 74, 0.14);
-  --w8-accent-inv: #e03a14;  /* deep ember for light inverse surfaces */
-  --w8-on-accent: #2b0a02;
+  --w8-accent-soft: rgba(255, 77, 166, 0.14);
+  --w8-accent-inv: #d61f86;  /* deep pink for light inverse surfaces */
+  --w8-on-accent: #ffffff;
 
-  /* inverse (contrast) section — bone paper */
-  --w8-inv-bg: #f6f3eb;
+  /* signature gradients */
+  --w8-grad-brand: linear-gradient(135deg, #ff4da6 0%, #9d6bff 55%, #3fe0ff 130%);
+  --w8-grad-btn: linear-gradient(135deg, #ff4da6 0%, #9d6bff 100%);
+
+  /* inverse (contrast) section — pearl chrome */
+  --w8-inv-bg: #f4f2fe;
   --w8-inv-bg-2: #ffffff;
-  --w8-inv-text: #1b1611;
-  --w8-inv-muted: #6e675a;
-  --w8-inv-line: rgba(27, 22, 17, 0.12);
+  --w8-inv-text: #191228;
+  --w8-inv-muted: #6b6588;
+  --w8-inv-line: rgba(25, 18, 40, 0.12);
 
-  /* backdrop video treatment */
-  --w8-video-opacity: 0.55;
-  --w8-video-filter: saturate(1.05) contrast(1.02);
-  --w8-veil-0: rgba(10, 8, 18, 0.88);
-  --w8-veil-1: rgba(10, 8, 18, 0.4);
-  --w8-veil-2: rgba(10, 8, 18, 0.66);
-  --w8-scrim-bg: rgba(10, 8, 18, 0.5);
-  --w8-grid-line: rgba(242, 239, 230, 0.03);
+  /* Y2K backdrop treatment */
+  --w8-aurora-op: 1;
+  --w8-glow-1: rgba(255, 77, 166, 0.16);
+  --w8-glow-2: rgba(157, 107, 255, 0.15);
+  --w8-glow-3: rgba(63, 224, 255, 0.1);
+  --w8-orb-op: 1;
+  --w8-star-color: rgba(255, 255, 255, 0.85);
+  --w8-star-glow: rgba(63, 224, 255, 0.8);
+
+  /* veils / scrim (section readability) */
+  --w8-video-opacity: 0;
+  --w8-video-filter: none;
+  --w8-veil-0: rgba(8, 6, 28, 0.82);
+  --w8-veil-1: rgba(8, 6, 28, 0.35);
+  --w8-veil-2: rgba(8, 6, 28, 0.6);
+  --w8-scrim-bg: rgba(8, 6, 28, 0.42);
+  --w8-grid-line: rgba(245, 243, 255, 0.03);
 }
 
 html[data-w8-theme="light"] {
-  --w8-bg: #f6f3eb;        /* warm paper */
+  --w8-bg: #f4f2fe;        /* pearl chrome */
   --w8-bg-2: #ffffff;      /* card */
-  --w8-bg-3: #ede8dc;      /* sunken */
-  --w8-bg-deep: #e9e3d4;
-  --w8-text: #1b1611;      /* warm ink */
-  --w8-muted: #6e675a;
-  --w8-line: rgba(27, 22, 17, 0.13);
-  --w8-line-strong: rgba(27, 22, 17, 0.28);
+  --w8-bg-3: #eae6fa;      /* sunken */
+  --w8-bg-deep: #e6e1f6;
+  --w8-text: #1a1528;      /* ink violet */
+  --w8-muted: #625b80;
+  --w8-line: rgba(26, 21, 40, 0.13);
+  --w8-line-strong: rgba(26, 21, 40, 0.28);
 
-  /* the trio, deepened for paper (AA contrast) */
-  --w8-ember: #e03a14;
-  --w8-gold: #a87600;
-  --w8-aqua: #0c8f7b;
+  /* the trio, deepened for pearl (AA contrast) */
+  --w8-ember: #d61f86;
+  --w8-gold: #7a3fe0;
+  --w8-aqua: #0789ae;
   --w8-accent: var(--w8-ember);
-  --w8-accent-soft: rgba(224, 58, 20, 0.1);
-  --w8-accent-inv: #ff6b4a;  /* bright ember for dark inverse surfaces */
-  --w8-on-accent: #fff5f1;
+  --w8-accent-soft: rgba(214, 31, 134, 0.1);
+  --w8-accent-inv: #ff4da6;  /* bright pink for dark inverse surfaces */
+  --w8-on-accent: #ffffff;
+
+  /* signature gradients */
+  --w8-grad-brand: linear-gradient(135deg, #d61f86 0%, #7a3fe0 55%, #0789ae 130%);
+  --w8-grad-btn: linear-gradient(135deg, #d61f86 0%, #7a3fe0 100%);
 
   /* inverse section — the dark-mode look, used for contrast on light */
-  --w8-inv-bg: #0a0812;
-  --w8-inv-bg-2: #131022;
-  --w8-inv-text: #f2efe6;
-  --w8-inv-muted: #a7a095;
-  --w8-inv-line: rgba(242, 239, 230, 0.1);
+  --w8-inv-bg: #08061c;
+  --w8-inv-bg-2: #100b2e;
+  --w8-inv-text: #f5f3ff;
+  --w8-inv-muted: #a9a4c6;
+  --w8-inv-line: rgba(245, 243, 255, 0.1);
 
-  --w8-video-opacity: 0.16;
-  --w8-video-filter: saturate(0.75) contrast(0.9) brightness(1.04);
-  --w8-veil-0: rgba(246, 243, 235, 0.9);
-  --w8-veil-1: rgba(246, 243, 235, 0.55);
-  --w8-veil-2: rgba(246, 243, 235, 0.82);
-  --w8-scrim-bg: rgba(246, 243, 235, 0.5);
-  --w8-grid-line: rgba(27, 22, 17, 0.035);
+  /* Y2K backdrop — pastel aurora on pearl */
+  --w8-aurora-op: 0.9;
+  --w8-glow-1: rgba(255, 77, 166, 0.13);
+  --w8-glow-2: rgba(157, 107, 255, 0.12);
+  --w8-glow-3: rgba(63, 224, 255, 0.1);
+  --w8-orb-op: 0.85;
+  --w8-star-color: rgba(122, 63, 224, 0.7);
+  --w8-star-glow: rgba(214, 31, 134, 0.55);
+
+  --w8-video-opacity: 0;
+  --w8-video-filter: none;
+  --w8-veil-0: rgba(244, 242, 254, 0.86);
+  --w8-veil-1: rgba(244, 242, 254, 0.5);
+  --w8-veil-2: rgba(244, 242, 254, 0.78);
+  --w8-scrim-bg: rgba(244, 242, 254, 0.45);
+  --w8-grid-line: rgba(26, 21, 40, 0.035);
 }
 
 /* body canvas behind every page (theme-aware) */
-html[data-w8-theme="dark"] body { background: #0a0812; }
-html[data-w8-theme="light"] body { background: #f6f3eb; }
+html[data-w8-theme="dark"] body { background: #08061c; }
+html[data-w8-theme="light"] body { background: #f4f2fe; }
 
 /* Font tokens must live on <body>: they reference the next/font variables
-   (--font-sora, --font-geist-sans) which are scoped to <body> — custom
-   properties resolve var() at their definition scope, so defining these
-   on :root would silently fall back to system fonts. */
+   (--font-cyber, --font-kabisat, --font-sora, --font-geist-sans) which are
+   scoped to <body> — custom properties resolve var() at their definition
+   scope, so defining these on :root would silently fall back to system
+   fonts. Display = Cyberwave 2000 (Y2K); body text stays Geist/Sora. */
 body {
-  --w8-font-display: var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
+  --w8-font-display: var(--font-cyber), var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
 
 /* ── layout shell ────────────────────────────────────────────────────────── */
@@ -276,43 +303,47 @@ body {
 .w8-light .w8-text-lo { color: var(--w8-inv-text); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
-/* Eyebrows use the pixel font — the machine's label maker. */
+/* Y2K type pairing — Cyberwave 2000 (display) + Kabisat ItalicTall (labels). */
 .w8-eyebrow {
-  font-family: var(--font-pixel), "Jersey 10", "Segoe UI", ui-monospace, monospace;
-  font-size: 0.875rem;
+  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
+  font-size: 0.95rem;
   font-weight: 400;
-  letter-spacing: 0.16em;
+  font-style: italic;
+  letter-spacing: 0.14em;
   text-transform: uppercase;
 }
 
-/* Utility: pixel font for selected micro-copy (REC, ON AIR, footnotes…). */
+/* Utility: label font for micro-copy (REC, ON AIR, footnotes…). */
 .w8-pixel {
-  font-family: var(--font-pixel), "Jersey 10", "Segoe UI", ui-monospace, monospace;
+  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
+  font-style: italic;
   letter-spacing: 0.1em;
 }
 
 .w8-h1 {
   font-family: var(--w8-font-display);
-  font-weight: 700;
-  letter-spacing: -0.03em;
-  line-height: 1.02;
-  font-size: clamp(2.6rem, 6.2vw, 4.9rem);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.06;
+  font-size: clamp(2.1rem, 5.4vw, 4.1rem);
+  text-wrap: balance;
 }
 
 .w8-h2 {
   font-family: var(--w8-font-display);
-  font-weight: 700;
-  letter-spacing: -0.025em;
-  line-height: 1.06;
-  font-size: clamp(1.9rem, 4vw, 3.1rem);
+  font-weight: 400;
+  letter-spacing: 0.01em;
+  line-height: 1.1;
+  font-size: clamp(1.55rem, 3.6vw, 2.7rem);
+  text-wrap: balance;
 }
 
 .w8-h3 {
   font-family: var(--w8-font-display);
-  font-weight: 600;
-  letter-spacing: -0.015em;
-  line-height: 1.15;
-  font-size: clamp(1.15rem, 2vw, 1.45rem);
+  font-weight: 400;
+  letter-spacing: 0.02em;
+  line-height: 1.2;
+  font-size: clamp(1.02rem, 1.8vw, 1.3rem);
 }
 
 .w8-lead {
@@ -330,32 +361,52 @@ body {
 
 /* ── buttons ─────────────────────────────────────────────────────────────── */
 .w8-btn {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 0.55rem;
-  font-family: var(--w8-font-display);
-  font-weight: 600;
-  font-size: 0.9375rem;
-  letter-spacing: -0.01em;
+  font-family: var(--font-kabisat), "Kabisat Demo ItalicTall", var(--font-geist-sans), sans-serif;
+  font-style: italic;
+  font-weight: 400;
+  font-size: 1rem;
+  letter-spacing: 0.09em;
   border-radius: 9999px;
   padding: 0.9rem 1.9rem;
-  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, color 0.3s, border-color 0.3s, opacity 0.3s, box-shadow 0.3s;
+  transition: transform 0.35s cubic-bezier(0.22, 1, 0.36, 1), background-color 0.3s, color 0.3s, border-color 0.3s, opacity 0.3s, box-shadow 0.3s, filter 0.3s;
   will-change: transform;
   cursor: pointer;
   text-align: center;
   min-height: 48px;
+  overflow: hidden;
 }
 .w8-btn:active { transform: scale(0.98); }
 
+/* Y2K gloss sweep — a light beam crosses the pill on hover */
+.w8-btn::after {
+  content: "";
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -60%;
+  width: 45%;
+  border-radius: inherit;
+  background: linear-gradient(105deg, transparent, rgba(255, 255, 255, 0.32), transparent);
+  transform: skewX(-18deg);
+  transition: left 0.75s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.w8-btn:hover::after { left: 115%; }
+
 .w8-btn-primary {
-  background: var(--w8-ember);
+  background: var(--w8-grad-btn);
   color: var(--w8-on-accent);
-  box-shadow: 0 10px 30px -12px rgba(224, 58, 20, 0.55);
+  box-shadow: 0 10px 30px -12px rgba(255, 77, 166, 0.55);
 }
 .w8-btn-primary:hover {
   transform: translateY(-2px);
   filter: brightness(1.08);
+  box-shadow: 0 14px 36px -12px rgba(157, 107, 255, 0.6);
 }
 
 .w8-btn-invert {
@@ -416,20 +467,25 @@ body {
   width: 46px;
   height: 46px;
   border-radius: 9999px;
-  background: rgba(6, 4, 16, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.22);
+  background: rgba(6, 4, 20, 0.42);
+  border: 1px solid rgba(255, 255, 255, 0.28);
   color: #ffffff;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
-  box-shadow: 0 8px 24px -12px rgba(6, 4, 16, 0.6);
-  transition: background-color 0.3s, border-color 0.3s;
+  box-shadow:
+    0 8px 24px -12px rgba(6, 4, 20, 0.6),
+    0 0 22px -4px rgba(255, 77, 166, 0.35);
+  transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
   z-index: 5;
   /* subtle inviting bob — keeps the film clean, just a hint of motion */
   animation: w8-cue-bob 2.4s ease-in-out infinite;
 }
 .w8-scroll-cue:hover {
-  background: rgba(6, 4, 16, 0.62);
-  border-color: rgba(255, 255, 255, 0.4);
+  background: rgba(6, 4, 20, 0.62);
+  border-color: rgba(255, 77, 166, 0.6);
+  box-shadow:
+    0 8px 24px -12px rgba(6, 4, 20, 0.6),
+    0 0 30px -2px rgba(255, 77, 166, 0.55);
 }
 @keyframes w8-cue-bob {
   0%,
@@ -475,7 +531,7 @@ section[id],
   box-shadow: 0 24px 48px -24px rgba(27, 22, 17, 0.22);
 }
 
-/* ── pixel corner brackets — refined pixel signature on hover ───────────── */
+/* ── pixel corner brackets — Y2K accent brackets on hover ────────────────── */
 .w8-pixel-corners { position: relative; }
 .w8-pixel-corners::before,
 .w8-pixel-corners::after {
@@ -613,7 +669,7 @@ section[id],
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WENOV8 — cinematic pixel layer (homepage experience)
+   WENOV8 — Y2K chrome layer (homepage experience)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 /* pixel cursor: hide native cursor on the marketing homepage (desktop) */
@@ -624,19 +680,19 @@ body.w8-pixel-cursor [data-cursor] {
   cursor: none !important;
 }
 
-/* active pixel elements blink like a machine heartbeat */
+/* active Y2K elements pulse like a heartbeat */
 @keyframes w8-blink {
-  0%, 55% { opacity: 1; }
-  56%, 100% { opacity: 0.45; }
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
 }
 .w8-blink {
-  animation: w8-blink 1.6s steps(1, end) infinite;
+  animation: w8-blink 1.8s ease-in-out infinite;
 }
 @media (prefers-reduced-motion: reduce) {
   .w8-blink { animation: none; }
 }
 
-/* intro overlay fade-out (timed to the W8 → TRY WENOV8 boot) */
+/* intro overlay fade-out (timed to the chrome W8 → TRY WENOV8 reveal) */
 @keyframes w8-intro-out {
   to { opacity: 0; visibility: hidden; }
 }
@@ -652,35 +708,8 @@ body.w8-pixel-cursor [data-cursor] {
   background: var(--w8-bg);
 }
 
-/* ── atmosphere: scanlines + animated grain ─────────────────────────────── */
-.w8-scanlines {
-  background: repeating-linear-gradient(
-    0deg,
-    var(--w8-grid-line) 0px,
-    var(--w8-grid-line) 1px,
-    transparent 1px,
-    transparent 3px
-  );
-  opacity: 0.8;
-}
-
-.w8-grain-anim {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3CfeComponentTransfer%3E%3CfeFuncA type='table' tableValues='0 0.05'/%3E%3C/feComponentTransfer%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
-  animation: w8-grain 0.9s steps(4, end) infinite;
-}
-@keyframes w8-grain {
-  0% { background-position: 0 0; }
-  25% { background-position: -40px 60px; }
-  50% { background-position: 60px -40px; }
-  75% { background-position: -60px -60px; }
-  100% { background-position: 40px 40px; }
-}
-@media (prefers-reduced-motion: reduce) {
-  .w8-grain-anim { animation: none; }
-}
-
-/* ── video backdrop: astronaut film + pixel grid veil ────────────────────── */
-.w8-video-wrap {
+/* ── Y2K backdrop: aurora mesh + chrome orbs + sparkles ─────────────────── */
+.w8-y2k-wrap {
   position: fixed;
   inset: 0;
   z-index: 0;
@@ -688,65 +717,262 @@ body.w8-pixel-cursor [data-cursor] {
   background: var(--w8-bg);
   pointer-events: none;
 }
-.w8-video {
+
+/* aurora blobs — the liquid Y2K sky */
+.w8-aurora {
   position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  opacity: var(--w8-video-opacity);
-  filter: var(--w8-video-filter);
-  transform: scale(1.04); /* hide edge artefacts on loop */
+  border-radius: 50%;
+  opacity: var(--w8-aurora-op);
+  will-change: transform;
 }
-/* soft vertical veil: strong at top/bottom where copy lives, airy in the middle */
-.w8-video-veil {
-  position: absolute;
-  inset: 0;
-  background:
-    radial-gradient(120% 90% at 50% 40%, transparent 40%, var(--w8-veil-2) 100%),
-    linear-gradient(
-      to bottom,
-      var(--w8-veil-0) 0%,
-      var(--w8-veil-1) 26%,
-      var(--w8-veil-1) 72%,
-      var(--w8-veil-0) 100%
-    );
+.w8-aurora-1 {
+  width: 55vw;
+  height: 55vw;
+  top: -18vw;
+  left: -12vw;
+  background: radial-gradient(circle, var(--w8-glow-1) 0%, transparent 65%);
+  filter: blur(70px);
+  animation: w8-aurora-drift-a 46s ease-in-out infinite alternate;
 }
-/* the pixel grid — the refined pixel signature over the film */
-.w8-video-grid {
-  position: absolute;
-  inset: -46px; /* bleed so the drift never shows an edge */
-  background-image:
-    linear-gradient(var(--w8-grid-line) 1px, transparent 1px),
-    linear-gradient(90deg, var(--w8-grid-line) 1px, transparent 1px);
-  background-size: 46px 46px;
-  animation: w8-grid-drift 64s linear infinite;
+.w8-aurora-2 {
+  width: 48vw;
+  height: 48vw;
+  top: 22vh;
+  right: -16vw;
+  background: radial-gradient(circle, var(--w8-glow-2) 0%, transparent 65%);
+  filter: blur(70px);
+  animation: w8-aurora-drift-b 58s ease-in-out infinite alternate;
 }
-@keyframes w8-grid-drift {
-  from { background-position: 0 0, 0 0; }
-  to { background-position: 0 46px, 46px 0; }
+.w8-aurora-3 {
+  width: 62vw;
+  height: 62vw;
+  bottom: -26vw;
+  left: 18vw;
+  background: radial-gradient(circle, var(--w8-glow-3) 0%, transparent 68%);
+  filter: blur(80px);
+  animation: w8-aurora-drift-c 72s ease-in-out infinite alternate;
 }
-@media (prefers-reduced-motion: reduce) {
-  .w8-video-grid { animation: none; }
+@keyframes w8-aurora-drift-a {
+  from { transform: translate3d(0, 0, 0) scale(1); }
+  to { transform: translate3d(7vw, 5vh, 0) scale(1.18); }
+}
+@keyframes w8-aurora-drift-b {
+  from { transform: translate3d(0, 0, 0) scale(1.1); }
+  to { transform: translate3d(-8vw, -6vh, 0) scale(0.94); }
+}
+@keyframes w8-aurora-drift-c {
+  from { transform: translate3d(0, 0, 0) scale(0.96); }
+  to { transform: translate3d(6vw, -8vh, 0) scale(1.15); }
 }
 
-/* ── pixel dot (replaces chapter numbering) ──────────────────────────────── */
+/* chrome orbs — glossy Y2K bubbles */
+.w8-orb {
+  position: absolute;
+  border-radius: 50%;
+  opacity: var(--w8-orb-op);
+  background:
+    radial-gradient(circle at 33% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.32) 16%, rgba(196, 205, 255, 0.14) 34%, rgba(110, 100, 220, 0.1) 55%, transparent 72%);
+  box-shadow:
+    inset -6px -10px 18px rgba(157, 107, 255, 0.22),
+    inset 3px 5px 10px rgba(255, 255, 255, 0.3);
+  will-change: transform;
+}
+.w8-orb-a { animation: w8-float-a 13s ease-in-out infinite alternate; }
+.w8-orb-b { animation: w8-float-b 17s ease-in-out infinite alternate; }
+.w8-orb-c { animation: w8-float-c 21s ease-in-out infinite alternate; }
+@keyframes w8-float-a {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(2.4vw, -3.2vh, 0) rotate(9deg); }
+}
+@keyframes w8-float-b {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(-2vw, 2.6vh, 0) rotate(-8deg); }
+}
+@keyframes w8-float-c {
+  from { transform: translate3d(0, 0, 0) rotate(0deg); }
+  to { transform: translate3d(1.6vw, 2vh, 0) rotate(7deg); }
+}
+
+/* iridescent bubble ring */
+.w8-bubble-ring {
+  position: absolute;
+  border-radius: 50%;
+  opacity: var(--w8-orb-op);
+  background: conic-gradient(
+    from 210deg,
+    rgba(255, 77, 166, 0.32),
+    rgba(157, 107, 255, 0.26),
+    rgba(63, 224, 255, 0.3),
+    rgba(255, 209, 102, 0.18),
+    rgba(255, 77, 166, 0.32)
+  );
+  -webkit-mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
+  mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
+  filter: blur(1px);
+  animation: w8-spin-slow 40s linear infinite;
+}
+@keyframes w8-spin-slow {
+  to { transform: rotate(360deg); }
+}
+
+/* 4-point sparkle stars */
+.w8-star {
+  position: absolute;
+  background: var(--w8-star-color);
+  clip-path: polygon(
+    50% 0%, 61% 39%, 100% 50%, 61% 61%,
+    50% 100%, 39% 61%, 0% 50%, 39% 39%
+  );
+  animation: w8-twinkle var(--w8-star-dur, 3.2s) ease-in-out infinite;
+  animation-delay: var(--w8-star-dly, 0s);
+}
+@keyframes w8-twinkle {
+  0%, 100% { opacity: 0.12; transform: scale(0.55) rotate(0deg); }
+  50% { opacity: 1; transform: scale(1) rotate(18deg); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .w8-aurora-1,
+  .w8-aurora-2,
+  .w8-aurora-3,
+  .w8-orb-a,
+  .w8-orb-b,
+  .w8-orb-c,
+  .w8-bubble-ring,
+  .w8-star { animation: none; }
+  .w8-star { opacity: 0.6; }
+}
+
+/* ── chrome text — liquid-metal Y2K display type ────────────────────────── */
+.w8-chrome-text {
+  font-family: var(--font-cyber), var(--w8-font-display);
+  font-weight: 400;
+  letter-spacing: 0.03em;
+  background: linear-gradient(
+    100deg,
+    #ffffff 0%,
+    #cfd6ff 18%,
+    #ffffff 34%,
+    #aab3ff 52%,
+    #ffffff 68%,
+    #cfd6ff 84%,
+    #ffffff 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  animation: w8-chrome-flow 9s linear infinite;
+}
+html[data-w8-theme="light"] .w8-chrome-text {
+  background: linear-gradient(
+    100deg,
+    #4a4466 0%,
+    #9d6bff 18%,
+    #3a3350 34%,
+    #d61f86 52%,
+    #4a4466 68%,
+    #7a3fe0 84%,
+    #4a4466 100%
+  );
+  background-size: 220% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+@keyframes w8-chrome-flow {
+  from { background-position: 0% 0; }
+  to { background-position: -220% 0; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-chrome-text { animation: none; }
+}
+
+/* big chrome wordmark (STUDIO / WENOV8 statements) */
+.w8-wordmark {
+  font-family: var(--font-cyber), var(--w8-font-display);
+  font-weight: 400;
+  line-height: 1;
+  letter-spacing: 0.04em;
+  font-size: clamp(2.6rem, 9vw, 7rem);
+  text-align: center;
+  user-select: none;
+}
+
+/* Y2K numeral — process numbers & tiny labels */
+.w8-num {
+  font-family: var(--font-cyber), var(--w8-font-display);
+  font-weight: 400;
+  letter-spacing: 0.05em;
+  background: var(--w8-grad-brand);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+/* ── gloss image reveal — replaces pixel dissolve ───────────────────────── */
+.w8-gloss-reveal {
+  position: relative;
+  overflow: hidden;
+}
+.w8-gloss-reveal img {
+  opacity: 0;
+  transform: scale(1.07);
+  filter: blur(10px);
+  transition: opacity 0.9s cubic-bezier(0.22, 1, 0.36, 1),
+    transform 1.1s cubic-bezier(0.22, 1, 0.36, 1),
+    filter 0.9s cubic-bezier(0.22, 1, 0.36, 1);
+}
+.w8-gloss-reveal.is-in img {
+  opacity: 1;
+  transform: scale(1);
+  filter: blur(0);
+}
+/* one-shot diagonal sheen sweep when the image lands */
+.w8-gloss-reveal::after {
+  content: "";
+  position: absolute;
+  top: -20%;
+  bottom: -20%;
+  left: -45%;
+  width: 38%;
+  background: linear-gradient(100deg, transparent, rgba(255, 255, 255, 0.34), transparent);
+  transform: skewX(-18deg) translateX(-140%);
+  transition: transform 1.1s cubic-bezier(0.22, 1, 0.36, 1);
+  pointer-events: none;
+}
+.w8-gloss-reveal.is-in::after {
+  transform: skewX(-18deg) translateX(420%);
+}
+@media (prefers-reduced-motion: reduce) {
+  .w8-gloss-reveal img {
+    opacity: 1;
+    transform: none;
+    filter: none;
+    transition: none;
+  }
+  .w8-gloss-reveal::after { display: none; }
+}
+
+/* ── orb dot (chapter markers, replaces square pixels) ──────────────────── */
 .w8-dot {
   display: inline-block;
   width: 0.6rem;
   height: 0.6rem;
-  background: var(--w8-ember);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
+  box-shadow: 0 0 10px rgba(255, 77, 166, 0.45);
 }
 .w8-dot-lg {
   display: inline-block;
   width: 0.85rem;
   height: 0.85rem;
-  background: var(--w8-ember);
+  border-radius: 9999px;
+  background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
+  box-shadow: 0 0 12px rgba(255, 77, 166, 0.5);
 }
 
-/* crisp pixel rendering for canvas labels */
-canvas { image-rendering: auto; }
-.w8-shell canvas { image-rendering: pixelated; }
+
 
 /* selection */
 ::selection {
