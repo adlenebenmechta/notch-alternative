@@ -278,17 +278,17 @@ body {
 /* ── typography ──────────────────────────────────────────────────────────── */
 /* Eyebrows use the pixel font — the machine's label maker. */
 .w8-eyebrow {
-  font-family: var(--font-minecraft), "Minecraft", "Segoe UI", ui-monospace, monospace;
-  font-size: 0.75rem;
+  font-family: var(--font-pixel), "Jersey 10", "Segoe UI", ui-monospace, monospace;
+  font-size: 0.875rem;
   font-weight: 400;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.16em;
   text-transform: uppercase;
 }
 
 /* Utility: pixel font for selected micro-copy (REC, ON AIR, footnotes…). */
 .w8-pixel {
-  font-family: var(--font-minecraft), "Minecraft", "Segoe UI", ui-monospace, monospace;
-  letter-spacing: 0.08em;
+  font-family: var(--font-pixel), "Jersey 10", "Segoe UI", ui-monospace, monospace;
+  letter-spacing: 0.1em;
 }
 
 .w8-h1 {
