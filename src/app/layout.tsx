@@ -4,6 +4,8 @@ import { GamePaused, Unbounded } from "@/fonts/fonts";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/providers/auth-provider";
+import { Y2KTransition } from "@/components/site/y2k/y2k-transition";
+import { Y2KClickSpark } from "@/components/site/y2k/y2k-click-spark";
 import { SITE } from "@/lib/site/config";
 
 const geistSans = Geist({
@@ -91,6 +93,8 @@ export default function RootLayout({
         className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Unbounded.variable} ${GamePaused.variable} antialiased bg-background text-foreground`}
       >
         <AuthProvider>{children}</AuthProvider>
+        <Y2KTransition />
+        <Y2KClickSpark />
         <Toaster />
       </body>
     </html>
