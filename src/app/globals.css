@@ -182,13 +182,13 @@
 body { background: #ffffff; }
 
 /* Font tokens must live on <body>: they reference the next/font variables
-   (--font-brewok, --font-game, --font-sora, --font-geist-sans) which are
+   (--font-unbounded, --font-game, --font-sora, --font-geist-sans) which are
    scoped to <body> — custom properties resolve var() at their definition
    scope, so defining these on :root would silently fall back to system
-   fonts. Display = Brewok (bold brand voice); Sora/Geist carry body copy,
-   Game Paused carries labels and buttons. */
+   fonts. Display = Unbounded (wide Y2K brand voice); Sora/Geist carry body
+   copy, Game Paused carries labels and buttons. */
 body {
-  --w8-font-display: var(--font-brewok), var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
+  --w8-font-display: var(--font-unbounded), var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
 
 /* ── layout shell ────────────────────────────────────────────────────────── */
@@ -254,7 +254,7 @@ body {
 .w8-light .w8-text-lo { color: var(--w8-inv-text); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
-/* Brand type pairing — Brewok (display) + Game Paused (labels). */
+/* Brand type pairing — Unbounded (display, wide & airy) + Game Paused (labels). */
 .w8-eyebrow {
   font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
   font-size: 0.85rem;
@@ -271,28 +271,28 @@ body {
 
 .w8-h1 {
   font-family: var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0;
-  line-height: 1.12;
-  font-size: clamp(1.9rem, 3.9vw, 2.9rem);
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  line-height: 1.18;
+  font-size: clamp(1.7rem, 3.4vw, 2.45rem);
   text-wrap: balance;
 }
 
 .w8-h2 {
   font-family: var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0;
-  line-height: 1.16;
-  font-size: clamp(1.4rem, 2.7vw, 2.05rem);
+  font-weight: 500;
+  letter-spacing: 0.005em;
+  line-height: 1.2;
+  font-size: clamp(1.25rem, 2.4vw, 1.75rem);
   text-wrap: balance;
 }
 
 .w8-h3 {
   font-family: var(--w8-font-display);
   font-weight: 400;
-  letter-spacing: 0;
-  line-height: 1.25;
-  font-size: clamp(1rem, 1.4vw, 1.15rem);
+  letter-spacing: 0.01em;
+  line-height: 1.3;
+  font-size: clamp(0.95rem, 1.25vw, 1.05rem);
 }
 
 .w8-lead {
@@ -562,6 +562,19 @@ section[id],
 .w8-rail::-webkit-scrollbar { display: none; }
 .w8-rail > * { scroll-snap-align: start; flex: 0 0 auto; }
 
+/* On md+ the grid utilities (md:grid-cols-*) take over from the mobile
+   rail. Unlayered custom CSS beats Tailwind's @layer utilities, so the
+   switch must be spelled out explicitly here — otherwise .w8-rail's
+   display:flex wins and the grid collapses to 0-width items. */
+@media (min-width: 768px) {
+  .w8-rail {
+    display: grid;
+    overflow-x: visible;
+    scroll-snap-type: none;
+  }
+  .w8-rail > * { flex: auto; }
+}
+
 /* ── focus visibility ────────────────────────────────────────────────────── */
 .w8-btn:focus-visible,
 .w8-link:focus-visible {
@@ -794,28 +807,28 @@ body.w8-pixel-cursor [data-cursor] {
 
 /* ── brand display type — solid ink Y2K statement (no gradient) ─────────── */
 .w8-chrome-text {
-  font-family: var(--font-brewok), var(--w8-font-display);
+  font-family: var(--font-unbounded), var(--w8-font-display);
   font-weight: 400;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.01em;
   color: var(--w8-text);
 }
 
 /* big chrome wordmark (STUDIO / WENOV8 statements) */
 .w8-wordmark {
-  font-family: var(--font-brewok), var(--w8-font-display);
-  font-weight: 400;
-  line-height: 1;
-  letter-spacing: 0.04em;
-  font-size: clamp(2rem, 6vw, 4.6rem);
+  font-family: var(--font-unbounded), var(--w8-font-display);
+  font-weight: 600;
+  line-height: 1.04;
+  letter-spacing: 0.02em;
+  font-size: clamp(1.8rem, 5.2vw, 3.9rem);
   text-align: center;
   user-select: none;
 }
 
 /* Y2K numeral — process numbers & tiny labels */
 .w8-num {
-  font-family: var(--font-brewok), var(--w8-font-display);
-  font-weight: 400;
-  letter-spacing: 0.05em;
+  font-family: var(--font-unbounded), var(--w8-font-display);
+  font-weight: 500;
+  letter-spacing: 0.02em;
   color: var(--w8-ember);
 }
 
@@ -918,4 +931,143 @@ body.w8-pixel-cursor [data-cursor] {
 .w8-light .w8-accent-lo,
 .w8-paper .w8-accent-lo {
   color: var(--w8-accent-inv);
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   CREATIVE MOTION LAYER — Y2K signature animations
+   marquee ticker · 3D card tilt · CTA orbit ring · wordmark letter stagger
+   All slow, elegant, and fully disabled under prefers-reduced-motion.
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* ── 1 · marquee ticker — the Y2K scrolling strip ───────────────────────── */
+.w8-marquee {
+  overflow: hidden;
+  padding-block: 0.9rem;
+  background: var(--w8-inv-bg-2);
+  border-block: 1px solid color-mix(in srgb, var(--w8-ember) 22%, transparent);
+  user-select: none;
+}
+.w8-marquee-track {
+  display: flex;
+  width: max-content;
+  animation: w8-marquee-scroll 30s linear infinite;
+}
+.w8-marquee-track:hover { animation-play-state: paused; }
+.w8-marquee-group {
+  display: flex;
+  align-items: center;
+  gap: 3rem;
+  padding-right: 3rem;
+}
+.w8-marquee-item {
+  font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
+  font-size: 0.95rem;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--w8-ember);
+  display: inline-flex;
+  align-items: center;
+  gap: 3rem;
+}
+.w8-marquee-item .w8-marquee-star {
+  font-size: 0.8rem;
+  color: color-mix(in srgb, var(--w8-ember) 55%, transparent);
+}
+.w8-marquee-item:nth-child(even) { color: var(--w8-inv-text); }
+@keyframes w8-marquee-scroll {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+
+/* ── 2 · 3D tilt — work cards lift and lean toward the cursor ───────────── */
+.w8-tilt {
+  transition: transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+    box-shadow 0.45s cubic-bezier(0.22, 1, 0.36, 1);
+  will-change: transform;
+}
+@media (hover: hover) {
+  .w8-tilt:hover {
+    transform: perspective(1100px) rotateX(3.5deg) rotateY(-5deg)
+      translateY(-8px) scale(1.025);
+    box-shadow: 0 30px 60px -24px rgba(194, 65, 12, 0.38),
+      0 12px 28px -14px rgba(33, 20, 5, 0.22);
+  }
+  .w8-tilt:active {
+    transform: perspective(1100px) rotateX(1deg) rotateY(-2deg)
+      translateY(-3px) scale(1.01);
+    transition-duration: 0.15s;
+  }
+}
+
+/* ── 3 · CTA orbit ring — dashed ring + star circling the main button ───── */
+.w8-orbit-wrap {
+  position: relative;
+  display: inline-flex;
+  isolation: isolate;
+}
+.w8-orbit-wrap::before {
+  content: "";
+  position: absolute;
+  inset: -13px -19px;
+  border-radius: 999px;
+  border: 2px dashed color-mix(in srgb, var(--w8-ember) 58%, transparent);
+  animation: w8-orbit-spin 16s linear infinite;
+  pointer-events: none;
+}
+.w8-orbit-wrap::after {
+  content: "✦";
+  position: absolute;
+  top: -19px;
+  left: 50%;
+  translate: -50% 0;
+  font-size: 10px;
+  color: var(--w8-ember);
+  animation: w8-orbit-spin 16s linear infinite reverse;
+  pointer-events: none;
+}
+@keyframes w8-orbit-spin {
+  to { transform: rotate(360deg); }
+}
+
+/* ── 4 · wordmark letter stagger — letters rise one by one ─────────────── */
+.w8-wordmark-letters {
+  display: inline-flex;
+  overflow: hidden;
+}
+.w8-wordmark-letters .w8-wl {
+  display: inline-block;
+  opacity: 0;
+  transform: translateY(0.55em) rotate(4deg);
+  animation: w8-wl-in 0.75s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+@keyframes w8-wl-in {
+  to { opacity: 1; transform: translateY(0) rotate(0deg); }
+}
+/* soft glow pulse behind the finished wordmark */
+.w8-wl-glow {
+  animation: w8-wl-breathe 6s ease-in-out infinite 1.6s;
+}
+@keyframes w8-wl-breathe {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0.62; }
+}
+
+/* ── reduced motion: everything settles instantly ───────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+  .w8-marquee-track { animation: none; }
+  .w8-tilt, .w8-tilt:hover, .w8-tilt:active {
+    transform: none;
+    box-shadow: none;
+    transition: none;
+  }
+  .w8-orbit-wrap::before,
+  .w8-orbit-wrap::after { animation: none; }
+  .w8-orbit-wrap::after { display: none; }
+  .w8-wordmark-letters .w8-wl {
+    opacity: 1;
+    transform: none;
+    animation: none;
+  }
+  .w8-wl-glow { animation: none; }
 }

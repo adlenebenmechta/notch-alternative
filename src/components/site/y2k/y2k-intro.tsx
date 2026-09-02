@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 /**
  * Y2KIntro — the WENOV8 boot reveal.
  *
- * "W8" rises in solid ink (Brewok),
+ * "W8" rises in solid ink (Unbounded),
  * then the invitation fades in beneath it in Game Paused:
  * "TRY WENOV8". ~3s total, click-to-skip, skipped for
  * reduced-motion. Pure DOM/CSS — no canvas.

@@ -44,7 +44,7 @@ export function LogoLink({
         style={{
           background: "var(--w8-ember)",
           color: "#ffffff",
-          fontFamily: "var(--font-brewok), var(--w8-font-display)",
+          fontFamily: "var(--font-unbounded), var(--w8-font-display)",
           borderRadius: "0.65rem",
           boxShadow: "0 6px 18px -6px rgba(194, 65, 12, 0.45)",
         }}

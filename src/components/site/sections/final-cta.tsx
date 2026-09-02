@@ -44,14 +44,16 @@ export function FinalCta() {
 
         <Reveal delay={0.1} className="mt-12 md:mt-16">
           <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-            <Link
-              href="/contact"
-              className="w8-btn w8-btn-primary"
-              data-cursor="open"
-            >
-              Get a Quote
-              <ArrowRight size={17} strokeWidth={2.2} />
-            </Link>
+            <span className="w8-orbit-wrap">
+              <Link
+                href="/contact"
+                className="w8-btn w8-btn-primary"
+                data-cursor="open"
+              >
+                Get a Quote
+                <ArrowRight size={17} strokeWidth={2.2} />
+              </Link>
+            </span>
             <a
               href={`mailto:${SITE.email}`}
               className="w8-link text-sm w8-muted-hi transition-colors hover:text-[var(--w8-text)]"

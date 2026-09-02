@@ -4,6 +4,7 @@ import { SiteHeader } from "@/components/site/header";
 import { SiteFooter } from "@/components/site/footer";
 import { ScrollStage } from "@/components/site/scroll-stage";
 import { Hero } from "@/components/site/sections/hero";
+import { MarqueeTicker } from "@/components/site/y2k/marquee-ticker";
 import { SelectedWork } from "@/components/site/sections/work";
 import { ServicesSection } from "@/components/site/sections/services";
 import { WhySection } from "@/components/site/sections/why";
@@ -73,6 +74,7 @@ export default function HomePage() {
       <ScrollStage>
         <main>
           <Hero />
+          <MarqueeTicker />
           <SelectedWork />
           <ServicesSection />
           <WhySection />

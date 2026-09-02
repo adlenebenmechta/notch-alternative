@@ -43,7 +43,7 @@ export function WorkCard({
       onMouseLeave={stop}
       onFocus={start}
       onBlur={stop}
-      className={`group relative overflow-hidden rounded-2xl bg-[#0d0d12] text-left w-full ${aspectClass} ${className}`}
+      className={`group relative overflow-hidden rounded-2xl bg-[#0d0d12] text-left w-full ${aspectClass} w8-tilt ${className}`}
       aria-label={`${item.title} — ${item.category}. Play preview.`}
     >
       {/* poster */}

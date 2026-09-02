@@ -3,13 +3,15 @@ export const Etna = localFont({ src: "./Etna-Regular.otf", variable: "--font-etn
 export const SugoProDisplay = localFont({ src: "./SugoProDisplay-Regular.ttf", variable: "--font-sugo" });
 
 /**
- * Brewok — the WENOV8 primary display font (user-supplied).
- * Bold distressed display face: headlines, wordmarks, W8 marks,
- * big numerals. The hero voice of the brand.
+ * Unbounded — the WENOV8 primary display font (Google Fonts, OFL).
+ * Wide geometric Y2K revival face, variable 200–900. Headlines,
+ * wordmarks, W8 marks, big numerals. The hero voice of the brand:
+ * airy sidebearings (no cramped letters), elegant at light weights.
  */
-export const Brewok = localFont({
-  src: "./Brewok.otf",
-  variable: "--font-brewok",
+export const Unbounded = localFont({
+  src: "./Unbounded-Variable.ttf",
+  variable: "--font-unbounded",
+  weight: "200 900",
   display: "swap",
 });
 

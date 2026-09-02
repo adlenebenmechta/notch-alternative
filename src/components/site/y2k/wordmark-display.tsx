@@ -1,10 +1,14 @@
+"use client";
+
+import { useReducedMotion } from "framer-motion";
+
 /**
  * WordmarkDisplay — the big Y2K chrome statement.
  *
- * A word (STUDIO / WENOV8) rendered in Brewok with the
- * liquid-chrome gradient flowing across it and a soft brand glow
- * behind. Replaces the pixel-converge canvas: same scale and
- * role in the layout, pure CSS, zero canvas cost.
+ * The word (STUDIO / WENOV8) rendered in Unbounded, one letter at a
+ * time: each glyph rises into place with a slight rotation, then the
+ * brand glow behind breathes softly. Pure CSS stagger — zero canvas
+ * cost, settles instantly under reduced motion.
  */
 export function WordmarkDisplay({
   text,
@@ -13,6 +17,8 @@ export function WordmarkDisplay({
   text: string;
   className?: string;
 }) {
+  const reduce = useReducedMotion();
+
   return (
     <div
       className={`relative flex items-center justify-center ${className}`}
@@ -21,7 +27,7 @@ export function WordmarkDisplay({
     >
       {/* soft brand glow behind the word */}
       <div
-        className="absolute inset-0 -z-10"
+        className="absolute inset-0 -z-10 w8-wl-glow"
         style={{
           background:
             "radial-gradient(60% 90% at 50% 50%, var(--w8-accent-soft) 0%, transparent 72%)",
@@ -34,7 +40,21 @@ export function WordmarkDisplay({
           filter: "drop-shadow(0 10px 44px rgba(232, 89, 12, 0.2))",
         }}
       >
-        {text}
+        {reduce ? (
+          text
+        ) : (
+          <span className="w8-wordmark-letters">
+            {Array.from(text).map((ch, i) => (
+              <span
+                key={i}
+                className="w8-wl"
+                style={{ animationDelay: `${i * 0.07}s` }}
+              >
+                {ch === " " ? "\u00A0" : ch}
+              </span>
+            ))}
+          </span>
+        )}
       </span>
     </div>
   );
