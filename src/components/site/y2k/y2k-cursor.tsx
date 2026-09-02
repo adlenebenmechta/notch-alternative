@@ -84,8 +84,8 @@ export function Y2KCursor() {
           borderColor: label ? "var(--w8-ember)" : "var(--w8-line-strong)",
           background: label ? "var(--w8-accent-soft)" : "rgba(27, 23, 38, 0.05)",
           boxShadow: label
-            ? "0 0 22px -2px rgba(214, 31, 134, 0.45), inset 0 0 12px rgba(255,255,255,0.35)"
-            : "inset 0 2px 6px rgba(255,255,255,0.6), inset 0 -3px 8px rgba(10,127,163,0.25)",
+            ? "0 0 22px -2px rgba(232, 89, 12, 0.45), inset 0 0 12px rgba(255,255,255,0.35)"
+            : "inset 0 2px 6px rgba(255,255,255,0.65), inset 0 -3px 8px rgba(232,89,12,0.22)",
           backdropFilter: "blur(2px)",
         }}
       >
@@ -104,7 +104,7 @@ export function Y2KCursor() {
         className="fixed top-0 left-0 w-1.5 h-1.5 rounded-full"
         style={{
           background: "var(--w8-ember)",
-          boxShadow: "0 0 8px rgba(214, 31, 134, 0.6)",
+          boxShadow: "0 0 8px rgba(232, 89, 12, 0.6)",
         }}
       />
     </div>

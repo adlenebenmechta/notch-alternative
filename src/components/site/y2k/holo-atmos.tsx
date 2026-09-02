@@ -14,7 +14,7 @@ export function HoloAtmos() {
         className="absolute inset-0"
         style={{
           background:
-            "linear-gradient(115deg, transparent 18%, rgba(214, 31, 134, 0.018) 36%, rgba(255, 183, 77, 0.022) 50%, rgba(63, 224, 255, 0.018) 64%, transparent 82%)",
+            "linear-gradient(115deg, transparent 18%, rgba(232, 89, 12, 0.02) 36%, rgba(255, 183, 77, 0.024) 50%, rgba(245, 158, 11, 0.02) 64%, transparent 82%)",
         }}
       />
       {/* soft vignette */}
@@ -22,7 +22,7 @@ export function HoloAtmos() {
         className="absolute inset-0"
         style={{
           background:
-            "radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(27, 23, 38, 0.14) 100%)",
+            "radial-gradient(125% 95% at 50% 42%, transparent 58%, rgba(33, 20, 5, 0.12) 100%)",
         }}
       />
     </div>

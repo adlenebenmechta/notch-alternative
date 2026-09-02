@@ -1,7 +1,7 @@
 /**
  * WordmarkDisplay — the big Y2K chrome statement.
  *
- * A word (STUDIO / WENOV8) rendered in Cyberwave 2000 with the
+ * A word (STUDIO / WENOV8) rendered in Brewok with the
  * liquid-chrome gradient flowing across it and a soft brand glow
  * behind. Replaces the pixel-converge canvas: same scale and
  * role in the layout, pure CSS, zero canvas cost.
@@ -31,7 +31,7 @@ export function WordmarkDisplay({
       <span
         className="w8-wordmark w8-chrome-text"
         style={{
-          filter: "drop-shadow(0 10px 44px rgba(214, 31, 134, 0.18))",
+          filter: "drop-shadow(0 10px 44px rgba(232, 89, 12, 0.2))",
         }}
       >
         {text}

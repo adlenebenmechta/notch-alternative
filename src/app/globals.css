@@ -124,71 +124,71 @@
 /* ═══════════════════════════════════════════════════════════════════════════
    WENOV8 — Public marketing site design system · "Sunlit Y2K"
    Scoped tokens (w8-*) used only by /src/components/site/**
-   Single bright theme — no dark mode. Solid, confident colors
-   (no violet gradients): Bloom Pink / Sun Gold / Ion Cyan.
-   ═════════════════════════════════════════════════════════════════════════ */
+   Single bright theme — no dark mode. Orange & white identity:
+   Brand Orange on a white canvas with amber accents. Solid, no gradients.
+   ═══════════════════════════════════════════════════════════════════════ */
 
 :root {
-  /* surfaces — bright pearl */
-  --w8-bg: #f7f5fb;        /* pearl canvas */
+  /* surfaces — white canvas */
+  --w8-bg: #ffffff;        /* white canvas */
   --w8-bg-2: #ffffff;      /* card */
-  --w8-bg-3: #ecebf3;      /* sunken */
-  --w8-bg-deep: #e7e5ef;
-  --w8-text: #1b1726;      /* ink */
-  --w8-muted: #5d5870;
-  --w8-line: rgba(27, 23, 38, 0.13);
-  --w8-line-strong: rgba(27, 23, 38, 0.3);
+  --w8-bg-3: #fff3e8;      /* sunken warm cream */
+  --w8-bg-deep: #ffe8d6;
+  --w8-text: #211405;      /* warm ink */
+  --w8-muted: #7c6a58;     /* warm gray */
+  --w8-line: rgba(33, 20, 5, 0.12);
+  --w8-line-strong: rgba(33, 20, 5, 0.3);
 
-  /* the bright solid trio — no violet, no gradients */
-  --w8-ember: #d61f86;     /* bloom pink — primary */
-  --w8-gold: #a87400;      /* sun gold — warm secondary */
-  --w8-aqua: #0a7fa3;      /* ion cyan — cool secondary */
+  /* the orange family — solid, no gradients */
+  --w8-ember: #c2410c;     /* brand orange (AA on white) — primary */
+  --w8-gold: #e8590c;      /* vivid orange — bright accent */
+  --w8-aqua: #f59e0b;      /* amber — warm highlight */
   --w8-accent: var(--w8-ember);
-  --w8-accent-soft: rgba(214, 31, 134, 0.09);
-  --w8-accent-inv: #d61f86;
+  --w8-accent-soft: rgba(232, 89, 12, 0.08);
+  --w8-accent-inv: #e8590c;
   --w8-on-accent: #ffffff;
 
   /* solid brand colors (kept as tokens for compatibility) */
   --w8-grad-brand: var(--w8-ember);
   --w8-grad-btn: var(--w8-ember);
 
-  /* inverse (contrast) section — white panel on pearl */
-  --w8-inv-bg: #ffffff;
-  --w8-inv-bg-2: #f1eff6;
-  --w8-inv-text: #1b1726;
-  --w8-inv-muted: #5d5870;
-  --w8-inv-line: rgba(27, 23, 38, 0.12);
+  /* inverse (contrast) section — warm cream panel */
+  --w8-inv-bg: #fff6ee;
+  --w8-inv-bg-2: #ffffff;
+  --w8-inv-text: #211405;
+  --w8-inv-muted: #7c6a58;
+  --w8-inv-line: rgba(33, 20, 5, 0.12);
 
-  /* Y2K backdrop — whisper-soft ambient glows */
+  /* Y2K backdrop — whisper-soft orange/amber glows */
   --w8-aurora-op: 0.55;
-  --w8-glow-1: rgba(214, 31, 134, 0.08);
-  --w8-glow-2: rgba(255, 183, 77, 0.09);
-  --w8-glow-3: rgba(63, 224, 255, 0.07);
+  --w8-glow-1: rgba(232, 89, 12, 0.08);
+  --w8-glow-2: rgba(245, 158, 11, 0.09);
+  --w8-glow-3: rgba(255, 183, 77, 0.07);
   --w8-orb-op: 0.8;
-  --w8-star-color: rgba(168, 116, 0, 0.5);
-  --w8-star-glow: rgba(214, 31, 134, 0.4);
+  --w8-star-color: rgba(232, 89, 12, 0.45);
+  --w8-star-glow: rgba(194, 65, 12, 0.35);
 
   /* veils / scrim (section readability) */
   --w8-video-opacity: 0;
   --w8-video-filter: none;
-  --w8-veil-0: rgba(247, 245, 251, 0.88);
-  --w8-veil-1: rgba(247, 245, 251, 0.5);
-  --w8-veil-2: rgba(247, 245, 251, 0.8);
-  --w8-scrim-bg: rgba(247, 245, 251, 0.5);
-  --w8-grid-line: rgba(27, 23, 38, 0.04);
+  --w8-veil-0: rgba(255, 255, 255, 0.9);
+  --w8-veil-1: rgba(255, 255, 255, 0.5);
+  --w8-veil-2: rgba(255, 255, 255, 0.82);
+  --w8-scrim-bg: rgba(255, 255, 255, 0.5);
+  --w8-grid-line: rgba(33, 20, 5, 0.04);
 }
 
-/* body canvas behind every page — light only */
-body { background: #f7f5fb; }
+/* body canvas behind every page — white only */
+body { background: #ffffff; }
 
 /* Font tokens must live on <body>: they reference the next/font variables
-   (--font-cyber, --font-game, --font-sora, --font-geist-sans) which are
+   (--font-brewok, --font-game, --font-sora, --font-geist-sans) which are
    scoped to <body> — custom properties resolve var() at their definition
    scope, so defining these on :root would silently fall back to system
-   fonts. Display = Sora (clean, professional, always legible); the Y2K
-   faces (Cyberwave / Game Paused) are reserved for short decorative accents. */
+   fonts. Display = Brewok (bold brand voice); Sora/Geist carry body copy,
+   Game Paused carries labels and buttons. */
 body {
-  --w8-font-display: var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
+  --w8-font-display: var(--font-brewok), var(--font-sora), var(--font-geist-sans), system-ui, sans-serif;
 }
 
 /* ── layout shell ────────────────────────────────────────────────────────── */
@@ -254,7 +254,7 @@ body {
 .w8-light .w8-text-lo { color: var(--w8-inv-text); }
 
 /* ── typography ──────────────────────────────────────────────────────────── */
-/* Y2K type pairing — Cyberwave 2000 (display) + Game Paused (labels). */
+/* Brand type pairing — Brewok (display) + Game Paused (labels). */
 .w8-eyebrow {
   font-family: var(--font-game), "Game Paused DEMO", var(--font-geist-sans), sans-serif;
   font-size: 0.85rem;
@@ -271,8 +271,8 @@ body {
 
 .w8-h1 {
   font-family: var(--w8-font-display);
-  font-weight: 700;
-  letter-spacing: -0.02em;
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 1.12;
   font-size: clamp(1.9rem, 3.9vw, 2.9rem);
   text-wrap: balance;
@@ -280,8 +280,8 @@ body {
 
 .w8-h2 {
   font-family: var(--w8-font-display);
-  font-weight: 700;
-  letter-spacing: -0.015em;
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 1.16;
   font-size: clamp(1.4rem, 2.7vw, 2.05rem);
   text-wrap: balance;
@@ -289,8 +289,8 @@ body {
 
 .w8-h3 {
   font-family: var(--w8-font-display);
-  font-weight: 600;
-  letter-spacing: -0.01em;
+  font-weight: 400;
+  letter-spacing: 0;
   line-height: 1.25;
   font-size: clamp(1rem, 1.4vw, 1.15rem);
 }
@@ -350,12 +350,12 @@ body {
 .w8-btn-primary {
   background: var(--w8-grad-btn);
   color: var(--w8-on-accent);
-  box-shadow: 0 8px 22px -10px rgba(214, 31, 134, 0.45);
+  box-shadow: 0 8px 22px -10px rgba(194, 65, 12, 0.4);
 }
 .w8-btn-primary:hover {
   transform: translateY(-2px);
   filter: brightness(1.06);
-  box-shadow: 0 12px 28px -10px rgba(214, 31, 134, 0.5);
+  box-shadow: 0 12px 28px -10px rgba(194, 65, 12, 0.45);
 }
 
 .w8-btn-invert {
@@ -416,25 +416,25 @@ body {
   width: 46px;
   height: 46px;
   border-radius: 9999px;
-  background: rgba(6, 4, 20, 0.42);
-  border: 1px solid rgba(255, 255, 255, 0.28);
+  background: rgba(194, 65, 12, 0.55);
+  border: 1px solid rgba(255, 255, 255, 0.55);
   color: #ffffff;
   backdrop-filter: blur(8px);
   -webkit-backdrop-filter: blur(8px);
   box-shadow:
-    0 8px 24px -12px rgba(6, 4, 20, 0.6),
-    0 0 22px -4px rgba(255, 77, 166, 0.35);
+    0 8px 24px -12px rgba(33, 20, 5, 0.45),
+    0 0 22px -4px rgba(255, 145, 77, 0.45);
   transition: background-color 0.3s, border-color 0.3s, box-shadow 0.3s;
   z-index: 5;
   /* subtle inviting bob — keeps the film clean, just a hint of motion */
   animation: w8-cue-bob 2.4s ease-in-out infinite;
 }
 .w8-scroll-cue:hover {
-  background: rgba(6, 4, 20, 0.62);
-  border-color: rgba(255, 77, 166, 0.6);
+  background: rgba(194, 65, 12, 0.78);
+  border-color: rgba(255, 255, 255, 0.8);
   box-shadow:
-    0 8px 24px -12px rgba(6, 4, 20, 0.6),
-    0 0 30px -2px rgba(255, 77, 166, 0.55);
+    0 8px 24px -12px rgba(33, 20, 5, 0.45),
+    0 0 30px -2px rgba(255, 145, 77, 0.6);
 }
 @keyframes w8-cue-bob {
   0%,
@@ -720,9 +720,9 @@ body.w8-pixel-cursor [data-cursor] {
   border-radius: 50%;
   opacity: var(--w8-orb-op);
   background:
-    radial-gradient(circle at 33% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.55) 16%, rgba(178, 224, 246, 0.22) 34%, rgba(10, 127, 163, 0.07) 55%, transparent 72%);
+    radial-gradient(circle at 33% 28%, rgba(255, 255, 255, 0.95) 0%, rgba(255, 255, 255, 0.6) 16%, rgba(255, 214, 165, 0.25) 34%, rgba(232, 89, 12, 0.06) 55%, transparent 72%);
   box-shadow:
-    inset -6px -10px 18px rgba(10, 127, 163, 0.14),
+    inset -6px -10px 18px rgba(232, 89, 12, 0.12),
     inset 3px 5px 10px rgba(255, 255, 255, 0.55);
   will-change: transform;
 }
@@ -749,11 +749,11 @@ body.w8-pixel-cursor [data-cursor] {
   opacity: var(--w8-orb-op);
   background: conic-gradient(
     from 210deg,
-    rgba(214, 31, 134, 0.26),
+    rgba(194, 65, 12, 0.22),
     rgba(255, 183, 77, 0.2),
-    rgba(63, 224, 255, 0.24),
-    rgba(168, 116, 0, 0.16),
-    rgba(214, 31, 134, 0.26)
+    rgba(245, 158, 11, 0.2),
+    rgba(255, 183, 77, 0.16),
+    rgba(194, 65, 12, 0.22)
   );
   -webkit-mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
   mask: radial-gradient(circle, transparent 58%, #000 62%, #000 74%, transparent 78%);
@@ -794,7 +794,7 @@ body.w8-pixel-cursor [data-cursor] {
 
 /* ── brand display type — solid ink Y2K statement (no gradient) ─────────── */
 .w8-chrome-text {
-  font-family: var(--font-cyber), var(--w8-font-display);
+  font-family: var(--font-brewok), var(--w8-font-display);
   font-weight: 400;
   letter-spacing: 0.03em;
   color: var(--w8-text);
@@ -802,7 +802,7 @@ body.w8-pixel-cursor [data-cursor] {
 
 /* big chrome wordmark (STUDIO / WENOV8 statements) */
 .w8-wordmark {
-  font-family: var(--font-cyber), var(--w8-font-display);
+  font-family: var(--font-brewok), var(--w8-font-display);
   font-weight: 400;
   line-height: 1;
   letter-spacing: 0.04em;
@@ -813,7 +813,7 @@ body.w8-pixel-cursor [data-cursor] {
 
 /* Y2K numeral — process numbers & tiny labels */
 .w8-num {
-  font-family: var(--font-cyber), var(--w8-font-display);
+  font-family: var(--font-brewok), var(--w8-font-display);
   font-weight: 400;
   letter-spacing: 0.05em;
   color: var(--w8-ember);
@@ -870,7 +870,7 @@ body.w8-pixel-cursor [data-cursor] {
   height: 0.6rem;
   border-radius: 9999px;
   background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
-  box-shadow: 0 0 10px rgba(214, 31, 134, 0.35);
+  box-shadow: 0 0 10px rgba(232, 89, 12, 0.35);
 }
 .w8-dot-lg {
   display: inline-block;
@@ -878,7 +878,7 @@ body.w8-pixel-cursor [data-cursor] {
   height: 0.85rem;
   border-radius: 9999px;
   background: radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%);
-  box-shadow: 0 0 12px rgba(214, 31, 134, 0.4);
+  box-shadow: 0 0 12px rgba(232, 89, 12, 0.4);
 }
 
 

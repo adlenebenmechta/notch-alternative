@@ -60,7 +60,7 @@ export function ChapterNav({
                   ? "radial-gradient(circle at 32% 30%, #ffffff 0%, var(--w8-ember) 60%)"
                   : "var(--w8-line-strong)",
                 boxShadow: isActive
-                  ? "0 0 14px 1px rgba(214, 31, 134, 0.45)"
+                  ? "0 0 14px 1px rgba(232, 89, 12, 0.45)"
                   : "none",
               }}
             />

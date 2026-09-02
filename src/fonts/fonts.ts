@@ -3,12 +3,13 @@ export const Etna = localFont({ src: "./Etna-Regular.otf", variable: "--font-etn
 export const SugoProDisplay = localFont({ src: "./SugoProDisplay-Regular.ttf", variable: "--font-sugo" });
 
 /**
- * Cyberwave 2000 — the Y2K display font (user-supplied).
- * Ultra-wide futuristic techno face: headlines, wordmarks, big numbers.
+ * Brewok — the WENOV8 primary display font (user-supplied).
+ * Bold distressed display face: headlines, wordmarks, W8 marks,
+ * big numerals. The hero voice of the brand.
  */
-export const Cyberwave2000 = localFont({
-  src: "./Cyberwave2000-Regular.otf",
-  variable: "--font-cyber",
+export const Brewok = localFont({
+  src: "./Brewok.otf",
+  variable: "--font-brewok",
   display: "swap",
 });
 

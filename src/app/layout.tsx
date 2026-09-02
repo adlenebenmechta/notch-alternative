@@ -1,6 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist, Geist_Mono, Sora } from "next/font/google";
-import { Cyberwave2000, GamePaused } from "@/fonts/fonts";
+import { Brewok, GamePaused } from "@/fonts/fonts";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 import { AuthProvider } from "@/providers/auth-provider";
@@ -88,7 +88,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Cyberwave2000.variable} ${GamePaused.variable} antialiased bg-background text-foreground`}
+        className={`${geistSans.variable} ${geistMono.variable} ${sora.variable} ${Brewok.variable} ${GamePaused.variable} antialiased bg-background text-foreground`}
       >
         <AuthProvider>{children}</AuthProvider>
         <Toaster />

@@ -145,7 +145,7 @@ export function ProcessSection() {
                     <h3
                       className="text-[15px]"
                       style={{
-                        fontFamily: "var(--font-cyber), var(--w8-font-display)",
+                        fontFamily: "var(--font-brewok), var(--w8-font-display)",
                         color: "var(--w8-text)",
                       }}
                     >
@@ -215,7 +215,7 @@ export function ProcessSection() {
                     <h3
                       className="text-[15px]"
                       style={{
-                        fontFamily: "var(--font-cyber), var(--w8-font-display)",
+                        fontFamily: "var(--font-brewok), var(--w8-font-display)",
                         color: "var(--w8-text)",
                       }}
                     >
